@@ -52,7 +52,7 @@ pub struct Client {
 
 static DEFAULT_API_SERVER: &'static str = "api.yubico.com/wsapi/2.0/verify";
 
-static TOUCH_YUBIKEY_PROMPT: &'static str = "Touch Yubikey: ";
+static TOUCH_YUBIKEY_PROMPT: &'static str = "Touch YubiKey: ";
 
 impl Client {
     pub fn new(protocol: Protocol,
@@ -102,7 +102,7 @@ impl Client {
             try!(transfer.perform());
         }
 
-        Ok(VerificationResult {})
+        Ok(try!(VerificationResult::new(response)))
     }
 
     pub fn verify_prompt(&self) -> Result<VerificationResult> {
