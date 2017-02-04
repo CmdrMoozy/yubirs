@@ -1,3 +1,4 @@
+extern crate chrono;
 extern crate curl;
 extern crate data_encoding;
 #[macro_use]
