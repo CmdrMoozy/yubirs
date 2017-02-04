@@ -4,7 +4,11 @@ version = "0.1.0"
 authors = ["Axel Rasmussen <axel.rasmussen1@gmail.com>"]
 
 [dependencies]
+bdrck_params = "0.3"
+curl = "0.4"
 data-encoding = "1.1"
 error-chain = "0.8"
 lazy_static = "0.2"
 regex = "0.2"
+rpassword = "0.3"
+sodiumoxide = "0.0.14"
