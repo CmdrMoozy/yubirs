@@ -28,7 +28,6 @@ lazy_static! {
     };
 }
 
-// TODO: Make 'sl' and 'timestamp' parameters configurable.
 fn build_url(protocol: Protocol, api_server: &str, request: &Request) -> String {
     format!("{}{}?{}",
             PROTOCOL_PREFIXES.get(&protocol).unwrap(),
@@ -75,15 +74,20 @@ impl Client {
     /// Verify the given YubiKey OTP string. If some internal error occurs, an error will be
     /// returned. Otherwise, even if the key is invalid, a VerificationResult structure will be
     /// returned. It is up to the caller to check .is_valid() to see if the OTP was accepted.
-    pub fn verify(&self, otp: &str) -> Result<VerificationResult> {
+    pub fn verify(&self,
+                  otp: &str,
+                  timestamp: bool,
+                  success_percentage: Option<SuccessPercentage>,
+                  timeout: Option<u64>)
+                  -> Result<VerificationResult> {
         // Try parsing the OTP, to ensure it is vaguely valid.
         let otp = try!(Otp::new(otp));
         let request = Request::new(self.client_id.clone(),
                                    self.api_key.clone(),
                                    otp,
-                                   true,
-                                   Some(SuccessPercentage::Secure),
-                                   None);
+                                   timestamp,
+                                   success_percentage,
+                                   timeout);
 
         let mut headers = List::new();
         try!(headers.append("User-Agent: github.com/CmdrMoozy/yubirs"));
@@ -112,8 +116,29 @@ impl Client {
                                         response)))
     }
 
+    /// Call .verify(), with most options set to sane default values. Timestamp information will be
+    /// returned, we'll use the "secure" success percentage, and we'll let the server choose a
+    /// timeout value.
+    pub fn verify_default(&self, otp: &str) -> Result<VerificationResult> {
+        self.verify(otp, true, Some(SuccessPercentage::Secure), None)
+    }
+
     /// Prompt for a YubiKey OTP (wait for a "touch"), and then verify it as per verify().
-    pub fn verify_prompt(&self) -> Result<VerificationResult> {
-        self.verify(try!(prompt_password_stderr(TOUCH_YUBIKEY_PROMPT)).as_str())
+    pub fn verify_prompt(&self,
+                         timestamp: bool,
+                         success_percentage: Option<SuccessPercentage>,
+                         timeout: Option<u64>)
+                         -> Result<VerificationResult> {
+        self.verify(try!(prompt_password_stderr(TOUCH_YUBIKEY_PROMPT)).as_str(),
+                    timestamp,
+                    success_percentage,
+                    timeout)
+    }
+
+    /// Call .verify_prompt(), with most options set to sane default values. Timestamp information
+    /// will be returned, we'll use the "secure" success percentage, and we'll let the server
+    /// choose a timeout value.
+    pub fn verify_prompt_default(&self) -> Result<VerificationResult> {
+        self.verify_prompt(true, Some(SuccessPercentage::Secure), None)
     }
 }
