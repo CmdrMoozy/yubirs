@@ -13,9 +13,10 @@ lazy_static! {
         (vec![
             format!("otp={}", TEST_OTP),
             format!("nonce={}", TEST_NONCE),
-            "h=waUYX2BayANQT0W3lpDB3EzhFRs=".to_owned(),
+            "h=yBTXdBJ0wMmdXxZ7aPqGU7rd0og=".to_owned(),
             "t=2017-02-05T03:16:19Z0302".to_owned(),
             "status=OK".to_owned(),
+            "sl=100".to_owned(),
         ].join("\n").into_bytes(), true),
 
         // Invalid field name.
