@@ -1,10 +1,10 @@
 use curl::easy::{Easy, List};
-use data_encoding::{base64, base64url};
+use data_encoding::base64;
 use error::Result;
 use otp::Otp;
+use request::{Request, SuccessPercentage};
 use result::VerificationResult;
 use rpassword::prompt_password_stderr;
-use sodiumoxide::randombytes::randombytes;
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -24,23 +24,12 @@ lazy_static! {
     };
 }
 
-/// Generate a 40 character long string with random unique data.
-fn gen_yubico_api_nonce() -> String {
-    base64url::encode(randombytes(30).as_slice())
-}
-
-fn build_url(protocol: Protocol,
-             api_server: &str,
-             client_id: &str,
-             otp: &str,
-             nonce: &str)
-             -> String {
-    format!("{}{}?id={}&otp={}&nonce={}&sl=secure&timestamp=1",
+// TODO: Make 'sl' and 'timestamp' parameters configurable.
+fn build_url(protocol: Protocol, api_server: &str, request: &Request) -> String {
+    format!("{}{}?{}",
             PROTOCOL_PREFIXES.get(&protocol).unwrap(),
             api_server,
-            client_id,
-            otp,
-            nonce)
+            request)
 }
 
 pub struct Client {
@@ -75,9 +64,13 @@ impl Client {
 
     pub fn verify(&self, otp: &str) -> Result<VerificationResult> {
         // Try parsing the OTP, to ensure it is vaguely valid.
-        try!(Otp::new(otp));
-
-        let nonce = gen_yubico_api_nonce();
+        let otp = try!(Otp::new(otp));
+        let request = Request::new(self.client_id.clone(),
+                                   &self.api_key[..],
+                                   otp,
+                                   true,
+                                   Some(SuccessPercentage::Secure),
+                                   None);
 
         let mut headers = List::new();
         try!(headers.append("User-Agent: github.com/CmdrMoozy/yubirs"));
@@ -85,12 +78,7 @@ impl Client {
         let mut handle = Easy::new();
         try!(handle.http_headers(headers));
         try!(handle.get(true));
-        try!(handle.url(build_url(self.protocol,
-                                  self.api_server.as_str(),
-                                  self.client_id.as_str(),
-                                  otp,
-                                  nonce.as_str())
-            .as_str()));
+        try!(handle.url(build_url(self.protocol, self.api_server.as_str(), &request).as_str()));
 
         let mut response = Vec::new();
         {
@@ -102,7 +90,7 @@ impl Client {
             try!(transfer.perform());
         }
 
-        Ok(try!(VerificationResult::new(response)))
+        Ok(try!(VerificationResult::new(request.get_otp(), request.get_nonce(), response)))
     }
 
     pub fn verify_prompt(&self) -> Result<VerificationResult> {

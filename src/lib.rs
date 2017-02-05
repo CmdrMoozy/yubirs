@@ -1,4 +1,7 @@
 extern crate chrono;
+// NOTE: Strongly prefer sodiumoxide over crypto. Crypto is only used because it supports certain
+// legacy crypto algorithms which sodiumoxide omits.
+extern crate crypto;
 extern crate curl;
 extern crate data_encoding;
 #[macro_use]
@@ -12,6 +15,7 @@ extern crate sodiumoxide;
 pub mod client;
 pub mod error;
 pub mod otp;
+pub mod request;
 pub mod result;
 
 #[cfg(test)]
