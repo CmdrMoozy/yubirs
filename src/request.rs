@@ -1,6 +1,3 @@
-use crypto::sha1::Sha1;
-use crypto::hmac::Hmac;
-use data_encoding::base64;
 use data_encoding::base64url;
 use otp::Otp;
 use sodiumoxide::randombytes::randombytes;
@@ -19,16 +16,6 @@ fn gen_yubico_api_nonce() -> String {
     }
     nonce.truncate(40);
     nonce
-}
-
-/// Generate a HMAC-SHA1 signature as accepted by the Yubico API, using the given decoded API key.
-fn generate_signature(key: &[u8], data: String) -> String {
-    use crypto::mac::Mac;
-    let mut hmac = Hmac::new(Sha1::new(), key);
-    let data = data.into_bytes();
-    hmac.input(&data[..]);
-    let signature = base64::encode(hmac.result().code());
-    util::url_encode(signature.as_str())
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -79,7 +66,7 @@ impl Request {
             timeout: timeout,
         };
         let signature_data = req.to_string_without_signature();
-        req.signature = generate_signature(api_key, signature_data);
+        req.signature = util::generate_encoded_signature(api_key, signature_data);
         req
     }
 

@@ -5,6 +5,7 @@ use error::Result;
 use otp::Otp;
 use regex::Regex;
 use std::collections::HashMap;
+use util;
 
 /// The response status codes validation servers might return.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -92,6 +93,9 @@ lazy_static! {
         m.insert("sl", Field::SuccessPercent);
         m
     };
+
+    static ref FIELD_TO_STRING: HashMap<Field, &'static str> =
+        STRING_TO_FIELD.iter().map(|pair| (*pair.1, *pair.0)).collect();
 }
 
 fn string_to_field(s: &str) -> Result<Field> {
@@ -155,6 +159,17 @@ fn get_success_percent(fields: &HashMap<Field, &str>) -> Result<Option<u8>> {
     Ok(None)
 }
 
+fn get_signature_data(fields: &HashMap<Field, &str>) -> String {
+    let mut pairs: Vec<(&str, &str)> = fields.iter()
+        .filter(|pair| *pair.0 != Field::Signature)
+        .map(|pair| (*FIELD_TO_STRING.get(&pair.0).unwrap(), *pair.1))
+        .collect();
+    pairs.sort_by_key(|v| v.0);
+    let pairs: Vec<String> =
+        pairs.into_iter().map(|pair| format!("{}={}", pair.0, pair.1)).collect();
+    pairs.join("&")
+}
+
 #[derive(Clone, Debug)]
 pub struct VerificationResult {
     pub otp: Option<String>,
@@ -166,10 +181,12 @@ pub struct VerificationResult {
     pub decrypted_use_counter: Option<String>,
     pub decrypted_session_use_counter: Option<String>,
     pub success_percent: Option<u8>,
+    signature_data: String,
 }
 
 impl VerificationResult {
-    pub fn new(expected_otp: &Otp,
+    pub fn new(api_key: &[u8],
+               expected_otp: &Otp,
                expected_nonce: &str,
                response: Vec<u8>)
                -> Result<VerificationResult> {
@@ -187,6 +204,7 @@ impl VerificationResult {
             decrypted_session_use_counter:
                 get_cloned_string_field(&fields, Field::DecryptedSessionUseCounter),
             success_percent: try!(get_success_percent(&fields)),
+            signature_data: get_signature_data(&fields),
         };
 
         if result.status == Status::Ok {
@@ -198,6 +216,10 @@ impl VerificationResult {
             if result.nonce.as_ref().map_or("", |s| s.as_str()) != expected_nonce {
                 bail!("Nonce in response did not match nonce sent with request");
             }
+        }
+
+        if util::generate_signature(api_key, result.signature_data.clone()) != result.signature {
+            bail!("Verifying response signature failed");
         }
 
         Ok(result)

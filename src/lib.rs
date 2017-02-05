@@ -17,7 +17,7 @@ pub mod error;
 pub mod otp;
 pub mod request;
 pub mod result;
-pub mod util;
+mod util;
 
 #[cfg(test)]
 mod tests;
