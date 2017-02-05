@@ -70,7 +70,7 @@ impl Client {
         // Try parsing the OTP, to ensure it is vaguely valid.
         let otp = try!(Otp::new(otp));
         let request = Request::new(self.client_id.clone(),
-                                   &self.api_key[..],
+                                   self.api_key.clone(),
                                    otp,
                                    true,
                                    Some(SuccessPercentage::Secure),
@@ -98,8 +98,8 @@ impl Client {
         }
 
         Ok(try!(VerificationResult::new(&self.api_key[..],
-                                        request.get_otp(),
-                                        request.get_nonce(),
+                                        &request.otp,
+                                        request.nonce.as_str(),
                                         response)))
     }
 
