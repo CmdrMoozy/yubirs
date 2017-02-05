@@ -170,6 +170,10 @@ fn get_signature_data(fields: &HashMap<Field, &str>) -> String {
     pairs.join("&")
 }
 
+/// This structure provides type-safe access to all of the fields which may appear in a response /
+/// verification result from the Yubico API. More details on what the fields mean are in the
+/// official documentation:
+/// https://developers.yubico.com/OTP/Specifications/OTP_validation_protocol.html.
 #[derive(Clone, Debug)]
 pub struct VerificationResult {
     pub otp: Option<String>,
@@ -185,6 +189,9 @@ pub struct VerificationResult {
 }
 
 impl VerificationResult {
+    /// Parse the given raw HTTP response into a result structure. Use the other pieces of
+    /// information to verify that the response is valid (i.e., the contents and signature match
+    /// what we expect).
     pub fn new(api_key: &[u8],
                expected_otp: &Otp,
                expected_nonce: &str,

@@ -18,6 +18,9 @@ fn gen_yubico_api_nonce() -> String {
     nonce
 }
 
+/// The possible values for the "success percentage" request parameter. From the validation server
+/// specification, this value is: "A value of 0 to 100 indicating percentage of syncing required by
+/// client, or strings 'fast' or 'secure' to use server-configured values."
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SuccessPercentage {
     Fast,
@@ -37,6 +40,7 @@ impl fmt::Display for SuccessPercentage {
     }
 }
 
+/// This structure denotes all of the parameters which comprise a verification API request.
 #[derive(Clone, Debug)]
 pub struct Request {
     pub client_id: String,
@@ -49,6 +53,9 @@ pub struct Request {
 }
 
 impl Request {
+    /// Create a new request with the given parameters. More details on what the parameters mean
+    /// are available in the official documentation:
+    /// https://developers.yubico.com/OTP/Specifications/OTP_validation_protocol.html.
     pub fn new(client_id: String,
                api_key: Vec<u8>,
                otp: Otp,
@@ -86,6 +93,7 @@ impl Request {
         parameters.join("&")
     }
 
+    /// Returns, as a base64-/percent-encoded string, the signature for this request.
     pub fn get_signature(&self) -> String {
         util::generate_encoded_signature(self.api_key.as_slice(),
                                          self.to_string_without_signature())
