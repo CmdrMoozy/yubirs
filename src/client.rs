@@ -36,6 +36,8 @@ fn build_url(protocol: Protocol, api_server: &str, request: &Request) -> String 
             request)
 }
 
+/// Client is an opaque structure which manages the state and configuration used to make
+/// verification requests.
 pub struct Client {
     protocol: Protocol,
     api_server: String,
@@ -48,6 +50,9 @@ static DEFAULT_API_SERVER: &'static str = "api.yubico.com/wsapi/2.0/verify";
 static TOUCH_YUBIKEY_PROMPT: &'static str = "Touch YubiKey: ";
 
 impl Client {
+    /// Create a new, fully-customized client. The API server should be given without a protocol on
+    /// the front - for example, "api.yubico.com/wsapi/2.0/verify". If you don't have a client ID /
+    /// API key pair, you can get one here: https://upgrade.yubico.com/getapikey/.
     pub fn new(protocol: Protocol,
                api_server: &str,
                client_id: &str,
@@ -62,10 +67,14 @@ impl Client {
         })
     }
 
+    /// Create a new client using the default / recommended protocol and API server.
     pub fn default(client_id: &str, api_key: &str) -> Result<Client> {
         Client::new(Protocol::Https, DEFAULT_API_SERVER, client_id, api_key)
     }
 
+    /// Verify the given YubiKey OTP string. If some internal error occurs, an error will be
+    /// returned. Otherwise, even if the key is invalid, a VerificationResult structure will be
+    /// returned. It is up to the caller to check .is_valid() to see if the OTP was accepted.
     pub fn verify(&self, otp: &str) -> Result<VerificationResult> {
         // Try parsing the OTP, to ensure it is vaguely valid.
         let otp = try!(Otp::new(otp));
@@ -103,6 +112,7 @@ impl Client {
                                         response)))
     }
 
+    /// Prompt for a YubiKey OTP (wait for a "touch"), and then verify it as per verify().
     pub fn verify_prompt(&self) -> Result<VerificationResult> {
         self.verify(try!(prompt_password_stderr(TOUCH_YUBIKEY_PROMPT)).as_str())
     }

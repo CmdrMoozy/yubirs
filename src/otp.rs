@@ -43,6 +43,7 @@ fn to_qwerty(otp: &str) -> Result<String> {
     }
 }
 
+/// Otp is a structure which represents a YubiKey OTP in a standard format, used throughout yubirs.
 #[derive(Clone, Debug)]
 pub struct Otp {
     pub prefix: String,
@@ -50,6 +51,9 @@ pub struct Otp {
 }
 
 impl Otp {
+    /// Construct a new Otp structure from the given raw OTP string. Since YubiKeys act as USB
+    /// keyboard devices, the output from a "touch" is different depending on the system's keyboard
+    /// layout. Either QWERTY or DVORAK versions of OTPs are accepted.
     pub fn new(otp: &str) -> Result<Otp> {
         let otp = try!(to_qwerty(otp));
         Ok(Otp {
