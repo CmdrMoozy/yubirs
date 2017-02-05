@@ -97,7 +97,10 @@ impl Client {
             try!(transfer.perform());
         }
 
-        Ok(try!(VerificationResult::new(request.get_otp(), request.get_nonce(), response)))
+        Ok(try!(VerificationResult::new(&self.api_key[..],
+                                        request.get_otp(),
+                                        request.get_nonce(),
+                                        response)))
     }
 
     pub fn verify_prompt(&self) -> Result<VerificationResult> {
