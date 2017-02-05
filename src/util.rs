@@ -3,6 +3,8 @@ use crypto::hmac::Hmac;
 use curl::easy::Easy;
 use data_encoding::base64;
 
+/// URL-encode the given string. That is, replacing any characters which are not allowed to appear
+/// in URLs with their percent-encoded versions.
 pub fn url_encode(s: &str) -> String {
     let mut easy = Easy::new();
     easy.url_encode(s.as_bytes())
