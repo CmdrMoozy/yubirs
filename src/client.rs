@@ -7,10 +7,14 @@ use result::VerificationResult;
 use rpassword::prompt_password_stderr;
 use std::collections::HashMap;
 
+/// The protocol to use to make the verification request.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub enum Protocol {
+    /// Use plain HTTP. Not recommended.
     Http,
+    /// Use HTTPS, but don't verify the server's certificate. STRONGLY NOT RECOMMENDED.
     HttpsWithoutVerification,
+    /// Use HTTPS. Recommended.
     Https,
 }
 
@@ -76,6 +80,9 @@ impl Client {
         try!(headers.append("User-Agent: github.com/CmdrMoozy/yubirs"));
 
         let mut handle = Easy::new();
+        if self.protocol == Protocol::HttpsWithoutVerification {
+            try!(handle.ssl_verify_peer(false));
+        }
         try!(handle.http_headers(headers));
         try!(handle.get(true));
         try!(handle.url(build_url(self.protocol, self.api_server.as_str(), &request).as_str()));
