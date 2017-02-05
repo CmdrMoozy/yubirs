@@ -17,6 +17,34 @@ lazy_static! {
             "t=2017-02-05T03:16:19Z0302".to_owned(),
             "status=OK".to_owned(),
         ].join("\n").into_bytes(), true),
+
+        // Invalid field name.
+        (vec![
+            format!("otp={}", TEST_OTP),
+            format!("nonce={}", TEST_NONCE),
+            "h=waUYX2BayANQT0W3lpDB3EzhFRs=".to_owned(),
+            "t=2017-02-05T03:16:19Z0302".to_owned(),
+            "istatus=OK".to_owned(),
+            "foo=bar".to_owned(),
+        ].join("\n").into_bytes(), false),
+
+        // Missing required field.
+        (vec![
+            format!("otp={}", TEST_OTP),
+            format!("nonce={}", TEST_NONCE),
+            "h=waUYX2BayANQT0W3lpDB3EzhFRs=".to_owned(),
+            "status=OK".to_owned(),
+        ].join("\n").into_bytes(), false),
+
+        // Invalid timestamp format.
+        (vec![
+            format!("otp={}", TEST_OTP),
+            format!("nonce={}", TEST_NONCE),
+            "h=waUYX2BayANQT0W3lpDB3EzhFRs=".to_owned(),
+            "t=20170205T03:16:19Z0302".to_owned(),
+            "status=OK".to_owned(),
+        ].join("\n").into_bytes(), false),
+
         // OTP mismatch.
         (vec![
             "otp=foo".to_owned(),
@@ -25,6 +53,7 @@ lazy_static! {
             "t=2017-02-05T03:16:19Z0302".to_owned(),
             "status=OK".to_owned(),
         ].join("\n").into_bytes(), false),
+
         // Nonce mismatch.
         (vec![
             format!("otp={}", TEST_OTP),
@@ -33,6 +62,26 @@ lazy_static! {
             "t=2017-02-05T03:16:19Z0302".to_owned(),
             "status=OK".to_owned(),
         ].join("\n").into_bytes(), false),
+
+        // Invalid status.
+        (vec![
+            format!("otp={}", TEST_OTP),
+            format!("nonce={}", TEST_NONCE),
+            "h=waUYX2BayANQT0W3lpDB3EzhFRs=".to_owned(),
+            "t=2017-02-05T03:16:19Z0302".to_owned(),
+            "status=FOOBAR".to_owned(),
+        ].join("\n").into_bytes(), false),
+
+        // Invalid success percent.
+        (vec![
+            format!("otp={}", TEST_OTP),
+            format!("nonce={}", TEST_NONCE),
+            "h=waUYX2BayANQT0W3lpDB3EzhFRs=".to_owned(),
+            "t=2017-02-05T03:16:19Z0302".to_owned(),
+            "status=OK".to_owned(),
+            "sl=foo".to_owned(),
+        ].join("\n").into_bytes(), false),
+
         // Signature mismatch.
         (vec![
             format!("otp={}", TEST_OTP),
@@ -52,5 +101,10 @@ fn test_result_construction() {
                                              TEST_NONCE,
                                              test_case.0.clone());
         assert_eq!(test_case.1, result.is_ok());
+
+        if let Ok(result) = result {
+            assert!(result.is_valid());
+            assert!(!result.is_retryable_error());
+        }
     }
 }
