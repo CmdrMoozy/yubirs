@@ -39,35 +39,32 @@ impl fmt::Display for SuccessPercentage {
 
 #[derive(Clone, Debug)]
 pub struct Request {
-    client_id: String,
-    otp: Otp,
-    signature: String,
-    timestamp: bool,
-    nonce: String,
-    success_percentage: Option<SuccessPercentage>,
-    timeout: Option<u64>,
+    pub client_id: String,
+    api_key: Vec<u8>,
+    pub otp: Otp,
+    pub timestamp: bool,
+    pub nonce: String,
+    pub success_percentage: Option<SuccessPercentage>,
+    pub timeout: Option<u64>,
 }
 
 impl Request {
     pub fn new(client_id: String,
-               api_key: &[u8],
+               api_key: Vec<u8>,
                otp: Otp,
                timestamp: bool,
                success_percentage: Option<SuccessPercentage>,
                timeout: Option<u64>)
                -> Request {
-        let mut req = Request {
+        Request {
             client_id: client_id,
+            api_key: api_key,
             otp: otp,
-            signature: String::new(),
             timestamp: timestamp,
             nonce: gen_yubico_api_nonce(),
             success_percentage: success_percentage,
             timeout: timeout,
-        };
-        let signature_data = req.to_string_without_signature();
-        req.signature = util::generate_encoded_signature(api_key, signature_data);
-        req
+        }
     }
 
     fn to_string_without_signature(&self) -> String {
@@ -89,12 +86,9 @@ impl Request {
         parameters.join("&")
     }
 
-    pub fn get_otp(&self) -> &Otp {
-        &self.otp
-    }
-
-    pub fn get_nonce(&self) -> &str {
-        self.nonce.as_str()
+    pub fn get_signature(&self) -> String {
+        util::generate_encoded_signature(self.api_key.as_slice(),
+                                         self.to_string_without_signature())
     }
 }
 
@@ -102,7 +96,7 @@ impl fmt::Display for Request {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f,
                "h={}&{}",
-               self.signature,
+               self.get_signature(),
                self.to_string_without_signature())
     }
 }
