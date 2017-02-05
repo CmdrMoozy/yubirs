@@ -207,4 +207,10 @@ impl VerificationResult {
     pub fn is_valid(&self) -> bool {
         self.status == Status::Ok
     }
+
+    /// Returns true if this error is retryable (i.e., the request may actually succeed if we try
+    /// it again).
+    pub fn is_retryable_error(&self) -> bool {
+        self.status == Status::BackendError || self.status == Status::NotEnoughAnswers
+    }
 }
