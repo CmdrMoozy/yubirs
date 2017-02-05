@@ -30,6 +30,7 @@ fn test_otp_parsing() {
         let otp = Otp::new(test_case.0).unwrap();
         assert_eq!(otp.prefix, test_case.1);
         assert_eq!(otp.ciphertext, test_case.2);
+        assert_eq!(otp.to_string(), format!("{}{}", otp.prefix, otp.ciphertext));
     }
 }
 
