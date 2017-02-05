@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 
+extern crate bdrck_log;
+use bdrck_log::init_cli_logger;
+
 extern crate bdrck_params;
 use bdrck_params::command::{Command, ExecutableCommand};
 use bdrck_params::main_impl::main_impl_single_command;
@@ -21,7 +24,7 @@ fn verify(options: HashMap<String, String>,
 }
 
 fn main() {
-
+    init_cli_logger().unwrap();
     main_impl_single_command(
         ExecutableCommand::new(
             Command::new(

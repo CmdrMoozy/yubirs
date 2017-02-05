@@ -2,6 +2,7 @@ use chrono::datetime::DateTime;
 use chrono::offset::utc::UTC;
 use data_encoding::base64;
 use error::Result;
+use otp::Otp;
 use regex::Regex;
 use std::collections::HashMap;
 
@@ -168,11 +169,14 @@ pub struct VerificationResult {
 }
 
 impl VerificationResult {
-    pub fn new(response: Vec<u8>) -> Result<VerificationResult> {
+    pub fn new(expected_otp: &Otp,
+               expected_nonce: &str,
+               response: Vec<u8>)
+               -> Result<VerificationResult> {
         let response = try!(String::from_utf8(response));
         let fields = try!(split_response(response.as_str()));
 
-        Ok(VerificationResult {
+        let result = VerificationResult {
             otp: get_cloned_string_field(&fields, Field::Otp),
             nonce: get_cloned_string_field(&fields, Field::Nonce),
             signature: try!(get_signature(&fields)),
@@ -183,6 +187,24 @@ impl VerificationResult {
             decrypted_session_use_counter:
                 get_cloned_string_field(&fields, Field::DecryptedSessionUseCounter),
             success_percent: try!(get_success_percent(&fields)),
-        })
+        };
+
+        if result.status == Status::Ok {
+            if result.otp.as_ref().map_or("", |s| s.as_str()) != expected_otp.to_string() {
+                bail!("OTP in response did not match OTP sent with request");
+            }
+        }
+        if result.status == Status::Ok {
+            if result.nonce.as_ref().map_or("", |s| s.as_str()) != expected_nonce {
+                bail!("Nonce in response did not match nonce sent with request");
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Returns true if and only if the result indicates that the OTP was successfully verified.
+    pub fn is_valid(&self) -> bool {
+        self.status == Status::Ok
     }
 }

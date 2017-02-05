@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Axel Rasmussen <axel.rasmussen1@gmail.com>"]
 
 [dependencies]
+bdrck_log = "0.3"
 bdrck_params = "0.3"
 chrono = "0.2"
 curl = "0.4"
@@ -12,4 +13,5 @@ error-chain = "0.8"
 lazy_static = "0.2"
 regex = "0.2"
 rpassword = "0.3"
+rust-crypto = "0.2"
 sodiumoxide = "0.0.14"

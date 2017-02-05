@@ -1,6 +1,7 @@
 use error::Result;
 use regex::Regex;
 use std::collections::HashMap;
+use std::fmt;
 
 lazy_static! {
     static ref DVORAK_OTP_RE: Regex = Regex::new(r"^[jxe.uidchtnbpygk]{32,48}$").unwrap();
@@ -42,6 +43,7 @@ fn to_qwerty(otp: &str) -> Result<String> {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Otp {
     pub prefix: String,
     pub ciphertext: String,
@@ -54,5 +56,11 @@ impl Otp {
             prefix: otp[0..(otp.len() - 32)].to_owned(),
             ciphertext: otp[(otp.len() - 32)..].to_owned(),
         })
+    }
+}
+
+impl fmt::Display for Otp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}{}", self.prefix, self.ciphertext)
     }
 }
