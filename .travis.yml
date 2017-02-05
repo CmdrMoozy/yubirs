@@ -42,4 +42,4 @@ script:
 after_success:
   - travis-cargo coveralls --no-sudo --verify
   # Workaround for https://github.com/huonw/travis-cargo/pull/55
-  - ./kcov/build/src/kcov --verify --coveralls-id=$TRAVIS_JOB_ID --include-path=$TRAVIS_BUILD_DIR/src --exclude-path=$TRAVIS_BUILD_DIR/src/tests target/kcov target/debug/deps/yubirs_lib-*
+  - ./kcov/build/src/kcov --verify --coveralls-id=$TRAVIS_JOB_ID --include-path=$TRAVIS_BUILD_DIR/src --exclude-path=$TRAVIS_BUILD_DIR/src/tests target/kcov target/debug/deps/yubirs-*
