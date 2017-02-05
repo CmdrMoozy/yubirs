@@ -4,8 +4,6 @@ version = "0.1.0"
 authors = ["Axel Rasmussen <axel.rasmussen1@gmail.com>"]
 
 [dependencies]
-bdrck_log = "0.3"
-bdrck_params = "0.3"
 chrono = "0.2"
 curl = "0.4"
 data-encoding = "1.1"
