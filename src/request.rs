@@ -5,10 +5,20 @@ use data_encoding::base64url;
 use otp::Otp;
 use sodiumoxide::randombytes::randombytes;
 use std::fmt;
+use util;
 
-/// Generate a 40 character long string with random unique data.
+/// Generate a 40 character long string with random unique data. Note that the Yubico API will only
+/// accept nonces which contain the characters [a-zA-Z0-9]. If the nonce contains other characters,
+/// the misleading error code MISSING_PARAMETER will be returned.
 fn gen_yubico_api_nonce() -> String {
-    base64url::encode(randombytes(30).as_slice())
+    let mut nonce = String::new();
+    while nonce.len() < 40 {
+        let s = base64url::encode(randombytes(30).as_slice());
+        let s: String = s.chars().filter(|c| *c != '-' && *c != '_').collect();
+        nonce.push_str(s.as_str());
+    }
+    nonce.truncate(40);
+    nonce
 }
 
 /// Generate a HMAC-SHA1 signature as accepted by the Yubico API, using the given decoded API key.
@@ -17,9 +27,8 @@ fn generate_signature(key: &[u8], data: String) -> String {
     let mut hmac = Hmac::new(Sha1::new(), key);
     let data = data.into_bytes();
     hmac.input(&data[..]);
-    let signature = hmac.result();
-    let signature = base64::encode(signature.code());
-    signature.replace('+', "%2B")
+    let signature = base64::encode(hmac.result().code());
+    util::url_encode(signature.as_str())
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
