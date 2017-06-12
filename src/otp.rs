@@ -69,7 +69,7 @@ impl Otp {
     /// keyboard devices, the output from a "touch" is different depending on the system's keyboard
     /// layout. Either QWERTY or DVORAK versions of OTPs are accepted.
     pub fn new(otp: &str) -> Result<Otp> {
-        let otp = try!(to_qwerty(otp));
+        let otp = to_qwerty(otp)?;
         Ok(Otp {
             prefix: otp[0..(otp.len() - 32)].to_owned(),
             ciphertext: otp[(otp.len() - 32)..].to_owned(),
