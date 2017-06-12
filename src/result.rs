@@ -125,7 +125,7 @@ fn split_response<'a>(response: &'a str) -> Result<HashMap<Field, &'a str>> {
     for line in response.lines() {
         if let Some(index) = line.find('=') {
             let (k, v) = line.split_at(index);
-            m.insert(try!(string_to_field(k)), &v[1..]);
+            m.insert(string_to_field(k)?, &v[1..]);
         }
     }
     Ok(m)
@@ -143,7 +143,7 @@ fn get_cloned_string_field(fields: &HashMap<Field, &str>, field: Field) -> Optio
 }
 
 fn get_signature(fields: &HashMap<Field, &str>) -> Result<Vec<u8>> {
-    Ok(try!(base64::decode(try!(get_required_field(fields, Field::Signature)).as_bytes())))
+    Ok(base64::decode(get_required_field(fields, Field::Signature)?.as_bytes())?)
 }
 
 lazy_static! {
@@ -153,21 +153,20 @@ lazy_static! {
 
 fn get_timestamp(fields: &HashMap<Field, &str>) -> Result<DateTime<UTC>> {
     use chrono::TimeZone;
-    if let Some(captures) =
-        DATETIME_REGEX.captures(try!(get_required_field(fields, Field::Timestamp))) {
-        let nanoseconds: u64 = try!(captures.name("ms").unwrap().as_str().parse());
+    if let Some(captures) = DATETIME_REGEX.captures(get_required_field(fields, Field::Timestamp)?) {
+        let nanoseconds: u64 = captures.name("ms").unwrap().as_str().parse()?;
         let reformatted = format!("{} {} {}",
                                   captures.name("d").unwrap().as_str(),
                                   captures.name("t").unwrap().as_str(),
                                   nanoseconds);
-        return Ok(try!(UTC.datetime_from_str(reformatted.as_str(), "%Y-%m-%d %H:%M:%S %f")));
+        return Ok(UTC.datetime_from_str(reformatted.as_str(), "%Y-%m-%d %H:%M:%S %f")?);
     }
     bail!("Response contained incorrectly formatted 't' field");
 }
 
 fn get_success_percent(fields: &HashMap<Field, &str>) -> Result<Option<u8>> {
     if let Some(sl) = fields.get(&Field::SuccessPercent) {
-        let success_percent: u8 = try!(sl.parse());
+        let success_percent: u8 = sl.parse()?;
         return Ok(Some(success_percent));
     }
     Ok(None)
@@ -211,20 +210,20 @@ impl VerificationResult {
                expected_nonce: &str,
                response: Vec<u8>)
                -> Result<VerificationResult> {
-        let response = try!(String::from_utf8(response));
-        let fields = try!(split_response(response.as_str()));
+        let response = String::from_utf8(response)?;
+        let fields = split_response(response.as_str())?;
 
         let result = VerificationResult {
             otp: get_cloned_string_field(&fields, Field::Otp),
             nonce: get_cloned_string_field(&fields, Field::Nonce),
-            signature: try!(get_signature(&fields)),
-            timestamp: try!(get_timestamp(&fields)),
-            status: try!(string_to_status(try!(get_required_field(&fields, Field::Status)))),
+            signature: get_signature(&fields)?,
+            timestamp: get_timestamp(&fields)?,
+            status: string_to_status(get_required_field(&fields, Field::Status)?)?,
             decrypted_timestamp: get_cloned_string_field(&fields, Field::DecryptedTimestamp),
             decrypted_use_counter: get_cloned_string_field(&fields, Field::DecryptedUseCounter),
             decrypted_session_use_counter:
                 get_cloned_string_field(&fields, Field::DecryptedSessionUseCounter),
-            success_percent: try!(get_success_percent(&fields)),
+            success_percent: get_success_percent(&fields)?,
             signature_data: get_signature_data(&fields),
         };
 

@@ -71,7 +71,7 @@ impl Client {
                client_id: &str,
                api_key: &str)
                -> Result<Client> {
-        let api_key = try!(base64::decode(api_key.as_bytes()));
+        let api_key = base64::decode(api_key.as_bytes())?;
         Ok(Client {
             protocol: protocol,
             api_server: api_server.to_owned(),
@@ -95,7 +95,7 @@ impl Client {
                   timeout: Option<u64>)
                   -> Result<VerificationResult> {
         // Try parsing the OTP, to ensure it is vaguely valid.
-        let otp = try!(Otp::new(otp));
+        let otp = Otp::new(otp)?;
         let request = Request::new(self.client_id.clone(),
                                    self.api_key.clone(),
                                    otp,
@@ -104,30 +104,30 @@ impl Client {
                                    timeout);
 
         let mut headers = List::new();
-        try!(headers.append("User-Agent: github.com/CmdrMoozy/yubirs"));
+        headers.append("User-Agent: github.com/CmdrMoozy/yubirs")?;
 
         let mut handle = Easy::new();
         if self.protocol == Protocol::HttpsWithoutVerification {
-            try!(handle.ssl_verify_peer(false));
+            handle.ssl_verify_peer(false)?;
         }
-        try!(handle.http_headers(headers));
-        try!(handle.get(true));
-        try!(handle.url(build_url(self.protocol, self.api_server.as_str(), &request).as_str()));
+        handle.http_headers(headers)?;
+        handle.get(true)?;
+        handle.url(build_url(self.protocol, self.api_server.as_str(), &request).as_str())?;
 
         let mut response = Vec::new();
         {
             let mut transfer = handle.transfer();
-            try!(transfer.write_function(|data| {
-                response.extend_from_slice(data);
-                Ok(data.len())
-            }));
-            try!(transfer.perform());
+            transfer.write_function(|data| {
+                    response.extend_from_slice(data);
+                    Ok(data.len())
+                })?;
+            transfer.perform()?;
         }
 
-        Ok(try!(VerificationResult::new(&self.api_key[..],
-                                        &request.otp,
-                                        request.nonce.as_str(),
-                                        response)))
+        Ok(VerificationResult::new(&self.api_key[..],
+                                   &request.otp,
+                                   request.nonce.as_str(),
+                                   response)?)
     }
 
     /// Call .verify(), with most options set to sane default values. Timestamp information will be
@@ -143,7 +143,7 @@ impl Client {
                          success_percentage: Option<SuccessPercentage>,
                          timeout: Option<u64>)
                          -> Result<VerificationResult> {
-        self.verify(try!(prompt_password_stderr(TOUCH_YUBIKEY_PROMPT)).as_str(),
+        self.verify(prompt_password_stderr(TOUCH_YUBIKEY_PROMPT)?.as_str(),
                     timestamp,
                     success_percentage,
                     timeout)
