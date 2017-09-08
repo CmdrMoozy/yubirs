@@ -14,9 +14,9 @@
 
 use data_encoding::base64url;
 use otp::Otp;
+use otp::util;
 use sodiumoxide::randombytes::randombytes;
 use std::fmt;
-use util;
 
 /// Generate a 40 character long string with random unique data. Note that the Yubico API will only
 /// accept nonces which contain the characters [a-zA-Z0-9]. If the nonce contains other characters,

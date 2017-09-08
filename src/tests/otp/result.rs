@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use otp::Otp;
-use result::*;
+use otp::result::*;
 
 static TEST_API_KEY: &'static [u8] = &[
     0x7d,

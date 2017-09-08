@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(test)]
+mod request;
+#[cfg(test)]
+mod result;
+#[cfg(test)]
+mod util;
+
 use otp::*;
 
 #[cfg_attr(rustfmt, rustfmt_skip)]

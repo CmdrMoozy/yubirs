@@ -17,9 +17,9 @@ use chrono::offset::Utc;
 use data_encoding::base64;
 use error::Result;
 use otp::Otp;
+use otp::util;
 use regex::Regex;
 use std::collections::HashMap;
-use util;
 
 /// The response status codes validation servers might return.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

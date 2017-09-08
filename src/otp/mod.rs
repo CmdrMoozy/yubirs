@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod client;
+pub mod request;
+pub mod result;
+pub mod util;
+
 use error::Result;
 use regex::Regex;
 use std::collections::HashMap;

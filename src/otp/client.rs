@@ -16,8 +16,8 @@ use curl::easy::{Easy, List};
 use data_encoding::base64;
 use error::Result;
 use otp::Otp;
-use request::{Request, SuccessPercentage};
-use result::VerificationResult;
+use otp::request::{Request, SuccessPercentage};
+use otp::result::VerificationResult;
 use rpassword::prompt_password_stderr;
 use std::collections::HashMap;
 

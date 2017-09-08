@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use otp::Otp;
-use request::*;
+use otp::request::*;
 use regex::Regex;
 
 #[test]

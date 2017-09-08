@@ -27,12 +27,8 @@ extern crate regex;
 extern crate rpassword;
 extern crate sodiumoxide;
 
-pub mod client;
 pub mod error;
 pub mod otp;
-pub mod request;
-pub mod result;
-mod util;
 
 #[cfg(test)]
 mod tests;
