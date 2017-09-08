@@ -23,6 +23,7 @@ extern crate data_encoding;
 extern crate error_chain;
 #[macro_use]
 extern crate lazy_static;
+extern crate pcsc;
 extern crate regex;
 extern crate rpassword;
 extern crate sodiumoxide;
