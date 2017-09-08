@@ -1,0 +1,21 @@
+[package]
+name = "yubico-piv-tool-sys"
+version = "0.1.0"
+authors = ["Axel Rasmussen <axel.rasmussen1@gmail.com>"]
+description = "Low-level bindings to Yubico's PIV tool library"
+homepage = "https://github.com/CmdrMoozy/yubirs"
+repository = "https://github.com/CmdrMoozy/yubirs"
+license = "Apache-2.0"
+links = "pcsclite ykpiv"
+build = "build.rs"
+
+[lib]
+name = "yubico_piv_tool_sys"
+path = "lib.rs"
+
+[dependencies]
+libc = "0.2"
+pcsc-sys = "0.1"
+
+[build-dependencies]
+cmake = "0.1"

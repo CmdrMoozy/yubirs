@@ -1,2 +1,4 @@
 /Cargo.lock
 /target/
+/yubico-piv-tool-sys/Cargo.lock
+/yubico-piv-tool-sys/target/

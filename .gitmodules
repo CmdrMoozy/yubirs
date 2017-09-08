@@ -1,0 +1,3 @@
+[submodule "yubico-piv-tool-sys/yubico-piv-tool"]
+	path = yubico-piv-tool-sys/yubico-piv-tool
+	url = https://github.com/CmdrMoozy/yubico-piv-tool.git
