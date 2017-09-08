@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::datetime::DateTime;
-use chrono::offset::utc::UTC;
+use chrono::DateTime;
+use chrono::offset::Utc;
 use data_encoding::base64;
 use error::Result;
 use otp::Otp;
@@ -153,7 +153,7 @@ lazy_static! {
         r"^(?P<d>\d{4}-\d{2}-\d{2})T(?P<t>\d{2}:\d{2}:\d{2})Z(?P<ms>\d{4})$").unwrap();
 }
 
-fn get_timestamp(fields: &HashMap<Field, &str>) -> Result<DateTime<UTC>> {
+fn get_timestamp(fields: &HashMap<Field, &str>) -> Result<DateTime<Utc>> {
     use chrono::TimeZone;
     if let Some(captures) = DATETIME_REGEX.captures(get_required_field(fields, Field::Timestamp)?) {
         let nanoseconds: u64 = captures.name("ms").unwrap().as_str().parse()?;
@@ -164,7 +164,7 @@ fn get_timestamp(fields: &HashMap<Field, &str>) -> Result<DateTime<UTC>> {
             nanoseconds
         );
         return Ok(
-            UTC.datetime_from_str(reformatted.as_str(), "%Y-%m-%d %H:%M:%S %f")?,
+            Utc.datetime_from_str(reformatted.as_str(), "%Y-%m-%d %H:%M:%S %f")?,
         );
     }
     bail!("Response contained incorrectly formatted 't' field");
@@ -201,7 +201,7 @@ pub struct VerificationResult {
     pub otp: Option<String>,
     pub nonce: Option<String>,
     pub signature: Vec<u8>,
-    pub timestamp: DateTime<UTC>,
+    pub timestamp: DateTime<Utc>,
     pub status: Status,
     pub decrypted_timestamp: Option<String>,
     pub decrypted_use_counter: Option<String>,
