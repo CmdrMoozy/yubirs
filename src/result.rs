@@ -143,7 +143,9 @@ fn get_cloned_string_field(fields: &HashMap<Field, &str>, field: Field) -> Optio
 }
 
 fn get_signature(fields: &HashMap<Field, &str>) -> Result<Vec<u8>> {
-    Ok(base64::decode(get_required_field(fields, Field::Signature)?.as_bytes())?)
+    Ok(base64::decode(
+        get_required_field(fields, Field::Signature)?.as_bytes(),
+    )?)
 }
 
 lazy_static! {
@@ -155,11 +157,15 @@ fn get_timestamp(fields: &HashMap<Field, &str>) -> Result<DateTime<UTC>> {
     use chrono::TimeZone;
     if let Some(captures) = DATETIME_REGEX.captures(get_required_field(fields, Field::Timestamp)?) {
         let nanoseconds: u64 = captures.name("ms").unwrap().as_str().parse()?;
-        let reformatted = format!("{} {} {}",
-                                  captures.name("d").unwrap().as_str(),
-                                  captures.name("t").unwrap().as_str(),
-                                  nanoseconds);
-        return Ok(UTC.datetime_from_str(reformatted.as_str(), "%Y-%m-%d %H:%M:%S %f")?);
+        let reformatted = format!(
+            "{} {} {}",
+            captures.name("d").unwrap().as_str(),
+            captures.name("t").unwrap().as_str(),
+            nanoseconds
+        );
+        return Ok(
+            UTC.datetime_from_str(reformatted.as_str(), "%Y-%m-%d %H:%M:%S %f")?,
+        );
     }
     bail!("Response contained incorrectly formatted 't' field");
 }
@@ -173,13 +179,16 @@ fn get_success_percent(fields: &HashMap<Field, &str>) -> Result<Option<u8>> {
 }
 
 fn get_signature_data(fields: &HashMap<Field, &str>) -> String {
-    let mut pairs: Vec<(&str, &str)> = fields.iter()
+    let mut pairs: Vec<(&str, &str)> = fields
+        .iter()
         .filter(|pair| *pair.0 != Field::Signature)
         .map(|pair| (*FIELD_TO_STRING.get(&pair.0).unwrap(), *pair.1))
         .collect();
     pairs.sort_by_key(|v| v.0);
-    let pairs: Vec<String> =
-        pairs.into_iter().map(|pair| format!("{}={}", pair.0, pair.1)).collect();
+    let pairs: Vec<String> = pairs
+        .into_iter()
+        .map(|pair| format!("{}={}", pair.0, pair.1))
+        .collect();
     pairs.join("&")
 }
 
@@ -205,11 +214,12 @@ impl VerificationResult {
     /// Parse the given raw HTTP response into a result structure. Use the other pieces of
     /// information to verify that the response is valid (i.e., the contents and signature match
     /// what we expect).
-    pub fn new(api_key: &[u8],
-               expected_otp: &Otp,
-               expected_nonce: &str,
-               response: Vec<u8>)
-               -> Result<VerificationResult> {
+    pub fn new(
+        api_key: &[u8],
+        expected_otp: &Otp,
+        expected_nonce: &str,
+        response: Vec<u8>,
+    ) -> Result<VerificationResult> {
         let response = String::from_utf8(response)?;
         let fields = split_response(response.as_str())?;
 
@@ -221,8 +231,10 @@ impl VerificationResult {
             status: string_to_status(get_required_field(&fields, Field::Status)?)?,
             decrypted_timestamp: get_cloned_string_field(&fields, Field::DecryptedTimestamp),
             decrypted_use_counter: get_cloned_string_field(&fields, Field::DecryptedUseCounter),
-            decrypted_session_use_counter:
-                get_cloned_string_field(&fields, Field::DecryptedSessionUseCounter),
+            decrypted_session_use_counter: get_cloned_string_field(
+                &fields,
+                Field::DecryptedSessionUseCounter,
+            ),
             success_percent: get_success_percent(&fields)?,
             signature_data: get_signature_data(&fields),
         };

@@ -43,10 +43,12 @@ lazy_static! {
 }
 
 fn build_url(protocol: Protocol, api_server: &str, request: &Request) -> String {
-    format!("{}{}?{}",
-            PROTOCOL_PREFIXES.get(&protocol).unwrap(),
-            api_server,
-            request)
+    format!(
+        "{}{}?{}",
+        PROTOCOL_PREFIXES.get(&protocol).unwrap(),
+        api_server,
+        request
+    )
 }
 
 /// Client is an opaque structure which manages the state and configuration used to make
@@ -66,11 +68,12 @@ impl Client {
     /// Create a new, fully-customized client. The API server should be given without a protocol on
     /// the front - for example, "api.yubico.com/wsapi/2.0/verify". If you don't have a client ID /
     /// API key pair, you can get one here: https://upgrade.yubico.com/getapikey/.
-    pub fn new(protocol: Protocol,
-               api_server: &str,
-               client_id: &str,
-               api_key: &str)
-               -> Result<Client> {
+    pub fn new(
+        protocol: Protocol,
+        api_server: &str,
+        client_id: &str,
+        api_key: &str,
+    ) -> Result<Client> {
         let api_key = base64::decode(api_key.as_bytes())?;
         Ok(Client {
             protocol: protocol,
@@ -88,20 +91,23 @@ impl Client {
     /// Verify the given YubiKey OTP string. If some internal error occurs, an error will be
     /// returned. Otherwise, even if the key is invalid, a VerificationResult structure will be
     /// returned. It is up to the caller to check .is_valid() to see if the OTP was accepted.
-    pub fn verify(&self,
-                  otp: &str,
-                  timestamp: bool,
-                  success_percentage: Option<SuccessPercentage>,
-                  timeout: Option<u64>)
-                  -> Result<VerificationResult> {
+    pub fn verify(
+        &self,
+        otp: &str,
+        timestamp: bool,
+        success_percentage: Option<SuccessPercentage>,
+        timeout: Option<u64>,
+    ) -> Result<VerificationResult> {
         // Try parsing the OTP, to ensure it is vaguely valid.
         let otp = Otp::new(otp)?;
-        let request = Request::new(self.client_id.clone(),
-                                   self.api_key.clone(),
-                                   otp,
-                                   timestamp,
-                                   success_percentage,
-                                   timeout);
+        let request = Request::new(
+            self.client_id.clone(),
+            self.api_key.clone(),
+            otp,
+            timestamp,
+            success_percentage,
+            timeout,
+        );
 
         let mut headers = List::new();
         headers.append("User-Agent: github.com/CmdrMoozy/yubirs")?;
@@ -112,22 +118,26 @@ impl Client {
         }
         handle.http_headers(headers)?;
         handle.get(true)?;
-        handle.url(build_url(self.protocol, self.api_server.as_str(), &request).as_str())?;
+        handle.url(
+            build_url(self.protocol, self.api_server.as_str(), &request).as_str(),
+        )?;
 
         let mut response = Vec::new();
         {
             let mut transfer = handle.transfer();
             transfer.write_function(|data| {
-                    response.extend_from_slice(data);
-                    Ok(data.len())
-                })?;
+                response.extend_from_slice(data);
+                Ok(data.len())
+            })?;
             transfer.perform()?;
         }
 
-        Ok(VerificationResult::new(&self.api_key[..],
-                                   &request.otp,
-                                   request.nonce.as_str(),
-                                   response)?)
+        Ok(VerificationResult::new(
+            &self.api_key[..],
+            &request.otp,
+            request.nonce.as_str(),
+            response,
+        )?)
     }
 
     /// Call .verify(), with most options set to sane default values. Timestamp information will be
@@ -138,15 +148,18 @@ impl Client {
     }
 
     /// Prompt for a YubiKey OTP (wait for a "touch"), and then verify it as per verify().
-    pub fn verify_prompt(&self,
-                         timestamp: bool,
-                         success_percentage: Option<SuccessPercentage>,
-                         timeout: Option<u64>)
-                         -> Result<VerificationResult> {
-        self.verify(prompt_password_stderr(TOUCH_YUBIKEY_PROMPT)?.as_str(),
-                    timestamp,
-                    success_percentage,
-                    timeout)
+    pub fn verify_prompt(
+        &self,
+        timestamp: bool,
+        success_percentage: Option<SuccessPercentage>,
+        timeout: Option<u64>,
+    ) -> Result<VerificationResult> {
+        self.verify(
+            prompt_password_stderr(TOUCH_YUBIKEY_PROMPT)?.as_str(),
+            timestamp,
+            success_percentage,
+            timeout,
+        )
     }
 
     /// Call .verify_prompt(), with most options set to sane default values. Timestamp information

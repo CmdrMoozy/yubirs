@@ -23,7 +23,7 @@ lazy_static! {
 
     static ref DVORAK_TO_QWERTY: HashMap<char, char> = {
         let mut m = HashMap::new();
-		m.insert('j', 'c');
+        m.insert('j', 'c');
         m.insert('x', 'b');
         m.insert('e', 'd');
         m.insert('.', 'e');
@@ -31,7 +31,7 @@ lazy_static! {
         m.insert('i', 'g');
         m.insert('d', 'h');
         m.insert('c', 'i');
-		m.insert('h', 'j');
+        m.insert('h', 'j');
         m.insert('t', 'k');
         m.insert('n', 'l');
         m.insert('b', 'n');
@@ -46,14 +46,18 @@ lazy_static! {
 fn to_qwerty(otp: &str) -> Result<String> {
     let otp = otp.to_lowercase();
     if DVORAK_OTP_RE.is_match(otp.as_str()) {
-        let otp: String = otp.chars().map(|c| *DVORAK_TO_QWERTY.get(&c).unwrap()).collect();
+        let otp: String = otp.chars()
+            .map(|c| *DVORAK_TO_QWERTY.get(&c).unwrap())
+            .collect();
         Ok(otp)
     } else if QWERTY_OTP_RE.is_match(otp.as_str()) {
         Ok(otp.to_owned())
     } else {
-        bail!("'{}' is not a valid Yubikey OTP. It is the wrong length or contains invalid \
-               characters.",
-              otp);
+        bail!(
+            "'{}' is not a valid Yubikey OTP. It is the wrong length or contains invalid \
+             characters.",
+            otp
+        );
     }
 }
 

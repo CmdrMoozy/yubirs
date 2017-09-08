@@ -18,12 +18,13 @@ use regex::Regex;
 
 #[test]
 fn test_success_percentage_display() {
-    static TEST_CASES: &'static [(SuccessPercentage, &'static str)] =
-        &[(SuccessPercentage::Fast, "fast"),
-          (SuccessPercentage::Secure, "secure"),
-          (SuccessPercentage::Percent(0), "0"),
-          (SuccessPercentage::Percent(100), "100"),
-          (SuccessPercentage::Percent(33), "33")];
+    static TEST_CASES: &'static [(SuccessPercentage, &'static str)] = &[
+        (SuccessPercentage::Fast, "fast"),
+        (SuccessPercentage::Secure, "secure"),
+        (SuccessPercentage::Percent(0), "0"),
+        (SuccessPercentage::Percent(100), "100"),
+        (SuccessPercentage::Percent(33), "33"),
+    ];
 
     for test_case in TEST_CASES {
         assert_eq!(test_case.1, test_case.0.to_string());

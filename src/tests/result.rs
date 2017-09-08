@@ -15,8 +15,22 @@
 use otp::Otp;
 use result::*;
 
-static TEST_API_KEY: &'static [u8] = &[0x7d, 0xdb, 0x1a, 0x7d, 0xfa, 0x9a, 0x7f, 0x8b, 0xeb, 0x73,
-                                       0x6a, 0xb7, 0x71, 0xdb];
+static TEST_API_KEY: &'static [u8] = &[
+    0x7d,
+    0xdb,
+    0x1a,
+    0x7d,
+    0xfa,
+    0x9a,
+    0x7f,
+    0x8b,
+    0xeb,
+    0x73,
+    0x6a,
+    0xb7,
+    0x71,
+    0xdb,
+];
 static TEST_OTP: &'static str = "vvvvvvcucrlcietctckflvnncdgckubflugerlnr";
 static TEST_NONCE: &'static str = "gPjfNhJFeeHZgfC9kKifggiWmIApziQ8XA4Vye1e";
 
@@ -111,10 +125,12 @@ lazy_static! {
 #[test]
 fn test_result_construction() {
     for test_case in RESULT_CONSTRUCTION_TEST_CASES.iter() {
-        let result = VerificationResult::new(TEST_API_KEY,
-                                             &Otp::new(TEST_OTP).unwrap(),
-                                             TEST_NONCE,
-                                             test_case.0.clone());
+        let result = VerificationResult::new(
+            TEST_API_KEY,
+            &Otp::new(TEST_OTP).unwrap(),
+            TEST_NONCE,
+            test_case.0.clone(),
+        );
         assert_eq!(test_case.1, result.is_ok());
 
         if let Ok(result) = result {

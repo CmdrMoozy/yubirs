@@ -44,13 +44,15 @@ pub enum SuccessPercentage {
 
 impl fmt::Display for SuccessPercentage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,
-               "{}",
-               match *self {
-                   SuccessPercentage::Fast => "fast".to_owned(),
-                   SuccessPercentage::Secure => "secure".to_owned(),
-                   SuccessPercentage::Percent(p) => p.to_string(),
-               })
+        write!(
+            f,
+            "{}",
+            match *self {
+                SuccessPercentage::Fast => "fast".to_owned(),
+                SuccessPercentage::Secure => "secure".to_owned(),
+                SuccessPercentage::Percent(p) => p.to_string(),
+            }
+        )
     }
 }
 
@@ -70,13 +72,14 @@ impl Request {
     /// Create a new request with the given parameters. More details on what the parameters mean
     /// are available in the official documentation:
     /// https://developers.yubico.com/OTP/Specifications/OTP_validation_protocol.html.
-    pub fn new(client_id: String,
-               api_key: Vec<u8>,
-               otp: Otp,
-               timestamp: bool,
-               success_percentage: Option<SuccessPercentage>,
-               timeout: Option<u64>)
-               -> Request {
+    pub fn new(
+        client_id: String,
+        api_key: Vec<u8>,
+        otp: Otp,
+        timestamp: bool,
+        success_percentage: Option<SuccessPercentage>,
+        timeout: Option<u64>,
+    ) -> Request {
         Request {
             client_id: client_id,
             api_key: api_key,
@@ -109,16 +112,20 @@ impl Request {
 
     /// Returns, as a base64-/percent-encoded string, the signature for this request.
     pub fn get_signature(&self) -> String {
-        util::generate_encoded_signature(self.api_key.as_slice(),
-                                         self.to_string_without_signature())
+        util::generate_encoded_signature(
+            self.api_key.as_slice(),
+            self.to_string_without_signature(),
+        )
     }
 }
 
 impl fmt::Display for Request {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,
-               "h={}&{}",
-               self.get_signature(),
-               self.to_string_without_signature())
+        write!(
+            f,
+            "h={}&{}",
+            self.get_signature(),
+            self.to_string_without_signature()
+        )
     }
 }
