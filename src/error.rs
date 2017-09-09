@@ -19,6 +19,7 @@ error_chain! {
         Io(::std::io::Error);
         ParseDateTime(::chrono::ParseError);
         ParseInt(::std::num::ParseIntError);
+        Piv(::piv::Error);
         Utf8(::std::string::FromUtf8Error);
     }
 }
