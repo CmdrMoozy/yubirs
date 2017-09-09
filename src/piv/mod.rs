@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod state;
+
 use std::ffi::CStr;
 use std::fmt;
 use yubico_piv_tool_sys as ykpiv;

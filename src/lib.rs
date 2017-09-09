@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+extern crate bdrck_log;
+extern crate bdrck_params;
 extern crate chrono;
 // NOTE: Strongly prefer sodiumoxide over crypto. Crypto is only used because it supports certain
 // legacy crypto algorithms which sodiumoxide omits.
@@ -23,6 +25,9 @@ extern crate data_encoding;
 extern crate error_chain;
 #[macro_use]
 extern crate lazy_static;
+extern crate libc;
+#[macro_use]
+extern crate log;
 extern crate pcsc;
 extern crate regex;
 extern crate rpassword;

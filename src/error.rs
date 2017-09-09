@@ -21,5 +21,6 @@ error_chain! {
         ParseInt(::std::num::ParseIntError);
         Piv(::piv::Error);
         Utf8(::std::string::FromUtf8Error);
+        Utf8Slice(::std::str::Utf8Error);
     }
 }
