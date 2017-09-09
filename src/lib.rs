@@ -27,9 +27,11 @@ extern crate pcsc;
 extern crate regex;
 extern crate rpassword;
 extern crate sodiumoxide;
+extern crate yubico_piv_tool_sys;
 
 pub mod error;
 pub mod otp;
+pub mod piv;
 
 #[cfg(test)]
 mod tests;
