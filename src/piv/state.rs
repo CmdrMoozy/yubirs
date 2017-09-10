@@ -13,8 +13,9 @@
 // limitations under the License.
 
 use error::*;
-use libc::{c_char, size_t};
+use libc::{c_char, c_int, size_t};
 use piv::try_ykpiv;
+use rpassword;
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::ptr;
@@ -30,6 +31,19 @@ pub const DEFAULT_READER: &'static str = "Yubikey";
 // The version format is "%d.%d.%d", where each number is an 8-bit unsigned integer. So, we need
 // three digits per number * three numbers + two .'s + one null-terminator, which gives 12 bytes.
 const VERSION_BUFFER_SIZE: usize = 12;
+
+const PIN_PROMPT: &'static str = "PIN: ";
+const NEW_PIN_PROMPT: &'static str = "New PIN: ";
+
+/// This is a utility function to prompt the user for a sensitive string, probably a PIN or a PUK.
+fn prompt_for_string(prompt: &str, confirm: bool) -> Result<String> {
+    loop {
+        let string = rpassword::prompt_password_stderr(prompt)?;
+        if !confirm || string == rpassword::prompt_password_stderr("Confirm: ")? {
+            return Ok(string);
+        }
+    }
+}
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Version(u8, u8, u8);
@@ -157,6 +171,81 @@ impl State {
         Ok(
             unsafe { CStr::from_ptr(buffer.as_ptr()) }.to_str()?.parse()?,
         )
+    }
+
+    /// This function allows the user to change the Yubikey's PIN, given that the user knows the
+    /// existing PIN. The old and new PINs can be provided as function arguments. If they are not
+    /// provided, this function will prompt for them on stdin.
+    ///
+    /// When prompting for a PIN, this function will automatically retry if PIN verification fails,
+    /// until there are no more available retries. At that point, the PIN can be unblocked using
+    /// the PUK.
+    pub fn change_pin(&mut self, old_pin: Option<&str>, new_pin: Option<&str>) -> Result<()> {
+        loop {
+            let mut old_pin_ptr: *const c_char = match old_pin {
+                None => ptr::null(),
+                Some(pin) => pin.as_ptr() as *const c_char,
+            };
+            let mut prompted_old_pin: Option<String> = None;
+            if old_pin_ptr.is_null() {
+                let pin = prompt_for_string(PIN_PROMPT, false)?;
+                old_pin_ptr = pin.as_ptr() as *const c_char;
+                prompted_old_pin = Some(pin);
+            }
+            let old_pin_len: size_t = old_pin.map_or_else(
+                || prompted_old_pin.map_or(0, |pin| pin.len()),
+                |pin| pin.len(),
+            );
+
+            let mut new_pin_ptr: *const c_char = match new_pin {
+                None => ptr::null(),
+                Some(pin) => pin.as_ptr() as *const c_char,
+            };
+            let mut prompted_new_pin: Option<String> = None;
+            if new_pin_ptr.is_null() {
+                let pin = prompt_for_string(NEW_PIN_PROMPT, true)?;
+                new_pin_ptr = pin.as_ptr() as *const c_char;
+                prompted_new_pin = Some(pin);
+            }
+            let new_pin_len: size_t = new_pin.map_or_else(
+                || prompted_new_pin.map_or(0, |pin| pin.len()),
+                |pin| pin.len(),
+            );
+
+            let mut tries: c_int = 0;
+            let result = try_ykpiv(unsafe {
+                ykpiv::ykpiv_change_pin(
+                    self.state,
+                    old_pin_ptr,
+                    old_pin_len,
+                    new_pin_ptr,
+                    new_pin_len,
+                    &mut tries,
+                )
+            });
+
+            // If we changed the PIN successfully, stop here.
+            if result.is_ok() {
+                break;
+            }
+
+            if let Some(err) = result.err() {
+                if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
+                    // We got some error other than the PIN being wrong. Return the error.
+                    bail!(err);
+                } else if old_pin.is_some() {
+                    // The given old PIN is wrong, and is static. Return the error.
+                    bail!(err);
+                } else if tries <= 0 {
+                    // If we have no more tries available, return an error.
+                    bail!("Changing PIN failed: no more retries");
+                }
+
+                // Otherwise, loop and re-prompt the user so they can try again.
+            }
+        }
+
+        Ok(())
     }
 }
 
