@@ -15,12 +15,46 @@
 use error::*;
 use libc::{c_char, size_t};
 use piv::try_ykpiv;
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
+use std::fmt;
 use std::ptr;
+use std::str::FromStr;
 use yubico_piv_tool_sys as ykpiv;
 
 const READER_BUFFER_SIZE: usize = 65536; // 64 KiB
-const DEFAULT_READER: &'static str = "Yubikey";
+/// The default reader string to use. The first reader (as returned by list_readers) which contains
+/// this string as a substring is the one which will be used. So, this default will result in us
+/// using the first connected Yubikey we find.
+pub const DEFAULT_READER: &'static str = "Yubikey";
+
+// The version format is "%d.%d.%d", where each number is an 8-bit unsigned integer. So, we need
+// three digits per number * three numbers + two .'s + one null-terminator, which gives 12 bytes.
+const VERSION_BUFFER_SIZE: usize = 12;
+
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Version(u8, u8, u8);
+
+impl fmt::Display for Version {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}.{}.{}", self.0, self.1, self.2)
+    }
+}
+
+impl FromStr for Version {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let numbers: Vec<&str> = s.split('.').collect();
+        if numbers.len() != 3 {
+            bail!("Invalid Yubikey version string '{}'", s);
+        }
+        Ok(Version(
+            numbers[0].parse::<u8>()?,
+            numbers[1].parse::<u8>()?,
+            numbers[2].parse::<u8>()?,
+        ))
+    }
+}
 
 pub struct State {
     state: *mut ykpiv::ykpiv_state,
@@ -68,7 +102,7 @@ impl State {
         });
         if let Some(err) = result.as_ref().err() {
             if *err == ::piv::Error::from(ykpiv::YKPIV_PCSC_ERROR) {
-                info!(
+                error!(
                     "Listing readers returned a PC/SC error. Usually this means pcscd is not \
                      running, or no readers are available. Try running with --verbose for more \
                      details."
@@ -89,6 +123,9 @@ impl State {
         Ok(ret?)
     }
 
+    /// Connect to the PC/SC reader which matches the given reader string (or DEFAULT_READER, if
+    /// one was not provided). The first reader which includes the given string as a substring will
+    /// be used.
     pub fn connect(&mut self, reader: Option<&str>) -> Result<()> {
         let reader = CString::new(reader.unwrap_or(DEFAULT_READER)).unwrap();
         Ok(try_ykpiv(
@@ -96,8 +133,30 @@ impl State {
         )?)
     }
 
+    /// Disconnect from the currently connected PC/SC reader. This is only necessary if you want to
+    /// re-use this State to interact with a different reader.
     pub fn disconnect(&mut self) -> Result<()> {
         Ok(try_ykpiv(unsafe { ykpiv::ykpiv_disconnect(self.state) })?)
+    }
+
+    /// This function returns the version number the connected reader reports. Note that connect()
+    /// must be called before this function, or an error will be returned.
+    pub fn get_version(&self) -> Result<Version> {
+        let mut buffer: Vec<c_char> = vec![0_i8; VERSION_BUFFER_SIZE];
+        let result = try_ykpiv(unsafe {
+            ykpiv::ykpiv_get_version(self.state, buffer.as_mut_ptr(), VERSION_BUFFER_SIZE)
+        });
+        if let Some(err) = result.as_ref().err() {
+            if *err == ::piv::Error::from(ykpiv::YKPIV_PCSC_ERROR) {
+                error!(
+                    "Getting version returned a PC/SC error. Usually this means no Yubikey found."
+                );
+            }
+        }
+        result?;
+        Ok(
+            unsafe { CStr::from_ptr(buffer.as_ptr()) }.to_str()?.parse()?,
+        )
     }
 }
 
