@@ -77,6 +77,16 @@ fn change_puk(
     state.change_puk(None, None)
 }
 
+fn reset(
+    options: HashMap<String, String>,
+    flags: HashMap<String, bool>,
+    _: HashMap<String, Vec<String>>,
+) -> Result<()> {
+    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
+    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+    state.reset()
+}
+
 fn main() {
     bdrck_log::init_cli_logger().unwrap();
     yubirs::init().unwrap();
@@ -168,6 +178,26 @@ fn main() {
                 false,
             ).unwrap(),
             Box::new(change_puk),
+        ),
+        ExecutableCommand::new(
+            Command::new(
+                "reset",
+                "Reset the Yubikey's PIN, PUK, and management key to unblock the PIN and PUK retry \
+                 counters",
+                vec![
+                    Option::flag("verbose", "Enable verbose output", Some('v')),
+                    Option::required(
+                        "reader",
+                        "The PC/SC reader to use. Try list_readers for possible values. The first \
+                         reader with the value given here as a substring is used.",
+                        Some('r'),
+                        Some(DEFAULT_READER),
+                    ),
+                ],
+                vec![],
+                false,
+            ).unwrap(),
+            Box::new(reset),
         ),
     ]);
 }

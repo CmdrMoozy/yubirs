@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use error::*;
-use libc::{c_char, c_int, size_t};
+use libc::{c_char, c_int, c_uchar, c_ulong, size_t};
 use piv::try_ykpiv;
 use rpassword;
 use std::ffi::{CStr, CString};
@@ -361,6 +361,36 @@ impl State {
             }
         }
 
+        Ok(())
+    }
+
+    /// This function resets the PIN, PUK, and management key to their factory default values, as
+    /// well as delete any stored certificates and keys. The default values for the PIN and PUK are
+    /// 123456 and 12345678, respectively.
+    ///
+    /// Note that this function will return an error unless the tries to verify the PIN and PUK
+    /// have both been fully exhausted (e.g., the Yubikey is now unusable). Otherwise, the
+    /// change_pin, unblock_pin, and change_puk functions should be used instead of this function.
+    pub fn reset(&mut self) -> Result<()> {
+        let templ: Vec<c_uchar> = vec![0, ykpiv::YKPIV_INS_RESET, 0, 0];
+        let mut data: Vec<c_uchar> = vec![0; 255];
+        let mut data_len: c_ulong = 0;
+        let mut sw: c_int = 0;
+
+        try_ykpiv(unsafe {
+            ykpiv::ykpiv_transfer_data(
+                self.state,
+                templ.as_ptr(),
+                ptr::null(),
+                0,
+                data.as_mut_ptr(),
+                &mut data_len,
+                &mut sw,
+            )
+        })?;
+        if sw != ykpiv::SW_SUCCESS {
+            bail!("Reset failed, probably because PIN or PUK retries are still available");
+        }
         Ok(())
     }
 }
