@@ -57,6 +57,16 @@ fn change_pin(
     state.change_pin(None, None)
 }
 
+fn unblock_pin(
+    options: HashMap<String, String>,
+    flags: HashMap<String, bool>,
+    _: HashMap<String, Vec<String>>,
+) -> Result<()> {
+    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
+    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+    state.unblock_pin(None, None)
+}
+
 fn change_puk(
     options: HashMap<String, String>,
     flags: HashMap<String, bool>,
@@ -119,6 +129,26 @@ fn main() {
                 false,
             ).unwrap(),
             Box::new(change_pin),
+        ),
+        ExecutableCommand::new(
+            Command::new(
+                "unblock_pin",
+                "Unblock the Yubikey's PIN using the PUK, after exhausting the tries allotted to \
+                 enter a valid PIN",
+                vec![
+                    Option::flag("verbose", "Enable verbose output", Some('v')),
+                    Option::required(
+                        "reader",
+                        "The PC/SC reader to use. Try list_readers for possible values. The first \
+                         reader with the value given here as a substring is used.",
+                        Some('r'),
+                        Some(DEFAULT_READER),
+                    ),
+                ],
+                vec![],
+                false,
+            ).unwrap(),
+            Box::new(unblock_pin),
         ),
         ExecutableCommand::new(
             Command::new(

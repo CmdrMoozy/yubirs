@@ -265,6 +265,56 @@ impl State {
         Ok(())
     }
 
+    /// This function allows the user to reset the Yubikey's PIN using the PUK, after the user has
+    /// exhausted their allotted tries to enter the PIN correctly. The PUK and new PIN can be
+    /// provided as function arguments. If they are not provided, this function will prompt for
+    /// them on stdin.
+    ///
+    /// When prompting for a PUK, this function will automatically retry if PUK verification fails,
+    /// until there are no more available retries. At that point, the Yubiey can be reset to
+    /// factory defaults using the reset function.
+    pub fn unblock_pin(&mut self, puk: Option<&str>, new_pin: Option<&str>) -> Result<()> {
+        loop {
+            let puk = MaybePromptedString::new(puk, PUK_PROMPT, false)?;
+            let new_pin = MaybePromptedString::new(new_pin, NEW_PIN_PROMPT, true)?;
+
+            let mut tries: c_int = 0;
+            let result = try_ykpiv(unsafe {
+                ykpiv::ykpiv_unblock_pin(
+                    self.state,
+                    puk.as_ptr(),
+                    puk.len(),
+                    new_pin.as_ptr(),
+                    new_pin.len(),
+                    &mut tries,
+                )
+            });
+
+            // If we unblocked the PIN successfully, stop here.
+            if result.is_ok() {
+                break;
+            }
+
+            if let Some(err) = result.err() {
+                if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
+                    // We got some error other than the PUK being wrong. Return the error.
+                    bail!(err);
+                } else if puk.was_provided() {
+                    // The given PUK is wrong, and is static. Return the error.
+                    bail!(err);
+                } else if tries <= 0 {
+                    // If we have no more tries available, return an error.
+                    bail!("Unblocking PUK failed: no more retries");
+                }
+
+                // Otherwise, loop and re-prompt the user so they can try again.
+                info!("Incorrect PUK, try again - {} tries remaining", tries);
+            }
+        }
+
+        Ok(())
+    }
+
     /// This function allows the user to change the Yubikey's PUK, given that the user knows the
     /// existing PUK. The old and new PUKs can be provided as function arguments. If they are not
     /// provided, this function will prompt for them on stdin.
