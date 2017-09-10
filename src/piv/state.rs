@@ -70,6 +70,47 @@ impl FromStr for Version {
     }
 }
 
+struct MaybePromptedString<'a> {
+    provided: Option<&'a str>,
+    prompted: Option<String>,
+}
+
+impl<'a> MaybePromptedString<'a> {
+    pub fn new(provided: Option<&'a str>, prompt: &str, confirm: bool) -> Result<Self> {
+        let prompted: Option<String> = match provided {
+            None => Some(prompt_for_string(prompt, confirm)?),
+            Some(_) => None,
+        };
+
+        Ok(MaybePromptedString {
+            provided: provided,
+            prompted: prompted,
+        })
+    }
+
+    pub fn was_provided(&self) -> bool {
+        self.provided.is_some()
+    }
+
+    pub fn as_ptr(&self) -> *const c_char {
+        self.provided.map_or_else(
+            || {
+                self.prompted
+                    .as_ref()
+                    .map_or_else(ptr::null, |s| s.as_ptr() as *const c_char)
+            },
+            |s| s.as_ptr() as *const c_char,
+        )
+    }
+
+    pub fn len(&self) -> usize {
+        self.provided.map_or_else(
+            || self.prompted.as_ref().map_or(0, |s| s.len()),
+            |s| s.len(),
+        )
+    }
+}
+
 pub struct State {
     state: *mut ykpiv::ykpiv_state,
 }
@@ -182,44 +223,17 @@ impl State {
     /// the PUK.
     pub fn change_pin(&mut self, old_pin: Option<&str>, new_pin: Option<&str>) -> Result<()> {
         loop {
-            let mut old_pin_ptr: *const c_char = match old_pin {
-                None => ptr::null(),
-                Some(pin) => pin.as_ptr() as *const c_char,
-            };
-            let mut prompted_old_pin: Option<String> = None;
-            if old_pin_ptr.is_null() {
-                let pin = prompt_for_string(PIN_PROMPT, false)?;
-                old_pin_ptr = pin.as_ptr() as *const c_char;
-                prompted_old_pin = Some(pin);
-            }
-            let old_pin_len: size_t = old_pin.map_or_else(
-                || prompted_old_pin.map_or(0, |pin| pin.len()),
-                |pin| pin.len(),
-            );
-
-            let mut new_pin_ptr: *const c_char = match new_pin {
-                None => ptr::null(),
-                Some(pin) => pin.as_ptr() as *const c_char,
-            };
-            let mut prompted_new_pin: Option<String> = None;
-            if new_pin_ptr.is_null() {
-                let pin = prompt_for_string(NEW_PIN_PROMPT, true)?;
-                new_pin_ptr = pin.as_ptr() as *const c_char;
-                prompted_new_pin = Some(pin);
-            }
-            let new_pin_len: size_t = new_pin.map_or_else(
-                || prompted_new_pin.map_or(0, |pin| pin.len()),
-                |pin| pin.len(),
-            );
+            let old_pin = MaybePromptedString::new(old_pin, PIN_PROMPT, false)?;
+            let new_pin = MaybePromptedString::new(new_pin, NEW_PIN_PROMPT, true)?;
 
             let mut tries: c_int = 0;
             let result = try_ykpiv(unsafe {
                 ykpiv::ykpiv_change_pin(
                     self.state,
-                    old_pin_ptr,
-                    old_pin_len,
-                    new_pin_ptr,
-                    new_pin_len,
+                    old_pin.as_ptr(),
+                    old_pin.len(),
+                    new_pin.as_ptr(),
+                    new_pin.len(),
                     &mut tries,
                 )
             });
@@ -233,7 +247,7 @@ impl State {
                 if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
                     // We got some error other than the PIN being wrong. Return the error.
                     bail!(err);
-                } else if old_pin.is_some() {
+                } else if old_pin.was_provided() {
                     // The given old PIN is wrong, and is static. Return the error.
                     bail!(err);
                 } else if tries <= 0 {
