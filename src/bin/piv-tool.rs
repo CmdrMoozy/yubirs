@@ -57,6 +57,16 @@ fn change_pin(
     state.change_pin(None, None)
 }
 
+fn change_puk(
+    options: HashMap<String, String>,
+    flags: HashMap<String, bool>,
+    _: HashMap<String, Vec<String>>,
+) -> Result<()> {
+    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
+    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+    state.change_puk(None, None)
+}
+
 fn main() {
     bdrck_log::init_cli_logger().unwrap();
     yubirs::init().unwrap();
@@ -109,6 +119,25 @@ fn main() {
                 false,
             ).unwrap(),
             Box::new(change_pin),
+        ),
+        ExecutableCommand::new(
+            Command::new(
+                "change_puk",
+                "Change the Yubikey's PUK, using the existing PUK",
+                vec![
+                    Option::flag("verbose", "Enable verbose output", Some('v')),
+                    Option::required(
+                        "reader",
+                        "The PC/SC reader to use. Try list_readers for possible values. The first \
+                         reader with the value given here as a substring is used.",
+                        Some('r'),
+                        Some(DEFAULT_READER),
+                    ),
+                ],
+                vec![],
+                false,
+            ).unwrap(),
+            Box::new(change_puk),
         ),
     ]);
 }
