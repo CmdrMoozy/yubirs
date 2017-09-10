@@ -32,8 +32,11 @@ pub const DEFAULT_READER: &'static str = "Yubikey";
 // three digits per number * three numbers + two .'s + one null-terminator, which gives 12 bytes.
 const VERSION_BUFFER_SIZE: usize = 12;
 
+const PIN_NAME: &'static str = "PIN";
 const PIN_PROMPT: &'static str = "PIN: ";
 const NEW_PIN_PROMPT: &'static str = "New PIN: ";
+
+const PUK_NAME: &'static str = "PUK";
 const PUK_PROMPT: &'static str = "PUK: ";
 const NEW_PUK_PROMPT: &'static str = "New PUK: ";
 
@@ -216,6 +219,67 @@ impl State {
         )
     }
 
+    /// This function provides the common implementation for the various functions which can be
+    /// used to change or unblock the Yubikey's PIN or PUK.
+    fn change_pin_or_puk<F>(
+        &mut self,
+        existing_name: &str,
+        existing: Option<&str>,
+        new_name: &str,
+        new: Option<&str>,
+        existing_prompt: &str,
+        new_prompt: &str,
+        change_fn: F,
+    ) -> Result<()>
+    where
+        F: Fn(*mut ykpiv::ykpiv_state, *const c_char, size_t, *const c_char, size_t, *mut c_int)
+            -> ::std::result::Result<(), ::piv::Error>,
+    {
+        loop {
+            let existing = MaybePromptedString::new(existing, existing_prompt, false)?;
+            let new = MaybePromptedString::new(new, new_prompt, true)?;
+
+            let mut tries: c_int = 0;
+            let result = change_fn(
+                self.state,
+                existing.as_ptr(),
+                existing.len(),
+                new.as_ptr(),
+                new.len(),
+                &mut tries,
+            );
+
+            // If we changed the value successfully, stop here.
+            if result.is_ok() {
+                break;
+            }
+
+            if let Some(err) = result.err() {
+                if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
+                    // We got some error other than the existing PIN or PUK being wrong (the same
+                    // error is used for both). Return the error.
+                    bail!(err);
+                } else if existing.was_provided() {
+                    // The given existing PIN or PUK was wrong, but it is static. Return the error
+                    // without retrying.
+                    bail!(err);
+                } else if tries <= 0 {
+                    // If we have no more tries available, return an error.
+                    bail!("Changing {} failed: no more retries", new_name);
+                } else {
+                    // Otherwise, loop and re-prompt the user so they can try again.
+                    error!(
+                        "Incorrect {}, try again - {} tries remaining",
+                        existing_name,
+                        tries
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// This function allows the user to change the Yubikey's PIN, given that the user knows the
     /// existing PIN. The old and new PINs can be provided as function arguments. If they are not
     /// provided, this function will prompt for them on stdin.
@@ -224,45 +288,19 @@ impl State {
     /// until there are no more available retries. At that point, the PIN can be unblocked using
     /// the PUK.
     pub fn change_pin(&mut self, old_pin: Option<&str>, new_pin: Option<&str>) -> Result<()> {
-        loop {
-            let old_pin = MaybePromptedString::new(old_pin, PIN_PROMPT, false)?;
-            let new_pin = MaybePromptedString::new(new_pin, NEW_PIN_PROMPT, true)?;
-
-            let mut tries: c_int = 0;
-            let result = try_ykpiv(unsafe {
-                ykpiv::ykpiv_change_pin(
-                    self.state,
-                    old_pin.as_ptr(),
-                    old_pin.len(),
-                    new_pin.as_ptr(),
-                    new_pin.len(),
-                    &mut tries,
-                )
-            });
-
-            // If we changed the PIN successfully, stop here.
-            if result.is_ok() {
-                break;
-            }
-
-            if let Some(err) = result.err() {
-                if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
-                    // We got some error other than the PIN being wrong. Return the error.
-                    bail!(err);
-                } else if old_pin.was_provided() {
-                    // The given old PIN is wrong, and is static. Return the error.
-                    bail!(err);
-                } else if tries <= 0 {
-                    // If we have no more tries available, return an error.
-                    bail!("Changing PIN failed: no more retries");
-                }
-
-                // Otherwise, loop and re-prompt the user so they can try again.
-                info!("Incorrect PIN, try again - {} tries remaining", tries);
-            }
-        }
-
-        Ok(())
+        self.change_pin_or_puk(
+            PIN_NAME,
+            old_pin,
+            PIN_NAME,
+            new_pin,
+            PIN_PROMPT,
+            NEW_PIN_PROMPT,
+            |state, existing, existing_len, new, new_len, tries| {
+                try_ykpiv(unsafe {
+                    ykpiv::ykpiv_change_pin(state, existing, existing_len, new, new_len, tries)
+                })
+            },
+        )
     }
 
     /// This function allows the user to reset the Yubikey's PIN using the PUK, after the user has
@@ -274,45 +312,19 @@ impl State {
     /// until there are no more available retries. At that point, the Yubiey can be reset to
     /// factory defaults using the reset function.
     pub fn unblock_pin(&mut self, puk: Option<&str>, new_pin: Option<&str>) -> Result<()> {
-        loop {
-            let puk = MaybePromptedString::new(puk, PUK_PROMPT, false)?;
-            let new_pin = MaybePromptedString::new(new_pin, NEW_PIN_PROMPT, true)?;
-
-            let mut tries: c_int = 0;
-            let result = try_ykpiv(unsafe {
-                ykpiv::ykpiv_unblock_pin(
-                    self.state,
-                    puk.as_ptr(),
-                    puk.len(),
-                    new_pin.as_ptr(),
-                    new_pin.len(),
-                    &mut tries,
-                )
-            });
-
-            // If we unblocked the PIN successfully, stop here.
-            if result.is_ok() {
-                break;
-            }
-
-            if let Some(err) = result.err() {
-                if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
-                    // We got some error other than the PUK being wrong. Return the error.
-                    bail!(err);
-                } else if puk.was_provided() {
-                    // The given PUK is wrong, and is static. Return the error.
-                    bail!(err);
-                } else if tries <= 0 {
-                    // If we have no more tries available, return an error.
-                    bail!("Unblocking PUK failed: no more retries");
-                }
-
-                // Otherwise, loop and re-prompt the user so they can try again.
-                info!("Incorrect PUK, try again - {} tries remaining", tries);
-            }
-        }
-
-        Ok(())
+        self.change_pin_or_puk(
+            PUK_NAME,
+            puk,
+            PIN_NAME,
+            new_pin,
+            PUK_PROMPT,
+            NEW_PIN_PROMPT,
+            |state, existing, existing_len, new, new_len, tries| {
+                try_ykpiv(unsafe {
+                    ykpiv::ykpiv_unblock_pin(state, existing, existing_len, new, new_len, tries)
+                })
+            },
+        )
     }
 
     /// This function allows the user to change the Yubikey's PUK, given that the user knows the
@@ -323,45 +335,19 @@ impl State {
     /// until there are no more available retries. At that point, the PIN and PUK can both be
     /// unblocked using the reset function.
     pub fn change_puk(&mut self, old_puk: Option<&str>, new_puk: Option<&str>) -> Result<()> {
-        loop {
-            let old_puk = MaybePromptedString::new(old_puk, PUK_PROMPT, false)?;
-            let new_puk = MaybePromptedString::new(new_puk, NEW_PUK_PROMPT, true)?;
-
-            let mut tries: c_int = 0;
-            let result = try_ykpiv(unsafe {
-                ykpiv::ykpiv_change_puk(
-                    self.state,
-                    old_puk.as_ptr(),
-                    old_puk.len(),
-                    new_puk.as_ptr(),
-                    new_puk.len(),
-                    &mut tries,
-                )
-            });
-
-            // If we changed the PUK successfully, stop here.
-            if result.is_ok() {
-                break;
-            }
-
-            if let Some(err) = result.err() {
-                if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
-                    // We got some error other than the PUK being wrong. Return the error.
-                    bail!(err);
-                } else if old_puk.was_provided() {
-                    // The given old PUK is wrong, and is static. Return the error.
-                    bail!(err);
-                } else if tries <= 0 {
-                    // If we have no more tries available, return an error.
-                    bail!("Changing PUK failed: no more retries");
-                }
-
-                // Otherwise, loop and re-prompt the user so they can try again.
-                info!("Incorrect PUK, try again - {} tries remaining", tries);
-            }
-        }
-
-        Ok(())
+        self.change_pin_or_puk(
+            PUK_NAME,
+            old_puk,
+            PUK_NAME,
+            new_puk,
+            PUK_PROMPT,
+            NEW_PUK_PROMPT,
+            |state, existing, existing_len, new, new_len, tries| {
+                try_ykpiv(unsafe {
+                    ykpiv::ykpiv_change_puk(state, existing, existing_len, new, new_len, tries)
+                })
+            },
+        )
     }
 
     /// This function resets the PIN, PUK, and management key to their factory default values, as
