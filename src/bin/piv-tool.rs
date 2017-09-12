@@ -87,6 +87,18 @@ fn reset(
     state.reset()
 }
 
+fn change_mgm_key(
+    options: HashMap<String, String>,
+    flags: HashMap<String, bool>,
+    _: HashMap<String, Vec<String>>,
+) -> Result<()> {
+    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
+    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+    state.authenticate(None)?;
+    state.set_management_key(None)?;
+    Ok(())
+}
+
 fn main() {
     bdrck_log::init_cli_logger().unwrap();
     yubirs::init().unwrap();
@@ -198,6 +210,25 @@ fn main() {
                 false,
             ).unwrap(),
             Box::new(reset),
+        ),
+        ExecutableCommand::new(
+            Command::new(
+                "change_mgm_key",
+                "Change the Yubikey's management key",
+                vec![
+                    Option::flag("verbose", "Enable verbose output", Some('v')),
+                    Option::required(
+                        "reader",
+                        "The PC/SC reader to use. Try list_readers for possible values. The first \
+                         reader with the value given here as a substring is used.",
+                        Some('r'),
+                        Some(DEFAULT_READER),
+                    ),
+                ],
+                vec![],
+                false,
+            ).unwrap(),
+            Box::new(change_mgm_key),
         ),
     ]);
 }
