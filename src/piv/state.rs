@@ -283,6 +283,49 @@ impl State {
         )
     }
 
+    /// This is a generic function which provides the boilerplate needed to execute some other
+    /// function which requires PIN or PUK verification.
+    fn verify_pin_or_puk<F>(
+        &mut self,
+        name: &str,
+        value: Option<&str>,
+        prompt: &str,
+        verify_fn: F,
+    ) -> Result<()>
+    where
+        F: Fn(*mut ykpiv::ykpiv_state, *const c_char, size_t, *mut c_int)
+            -> ::std::result::Result<(), ::piv::Error>,
+    {
+        loop {
+            let value = MaybePromptedString::new(value, prompt, false)?;
+            let mut tries: c_int = 0;
+            let result = verify_fn(self.state, value.as_ptr(), value.len(), &mut tries);
+
+            // If we called the function successfully, stop here.
+            if result.is_ok() {
+                return Ok(());
+            }
+
+            if let Some(err) = result.err() {
+                if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
+                    // We got some error other than the existing PIN or PUK being wrong (the same
+                    // error is used for both). Return the error.
+                    bail!(err);
+                } else if value.was_provided() {
+                    // The given existing PIN or PUK was wrong, but it is static. Return the error
+                    // without retrying.
+                    bail!(err);
+                } else if tries <= 0 {
+                    // If we have no more tries available, return an error.
+                    bail!("Verifying {} failed: no more retries", name);
+                } else {
+                    // Otherwise, loop and re-prompt the user so they can try again.
+                    error!("Incorrect {}, try again - {} tries remaining", name, tries);
+                }
+            }
+        }
+    }
+
     /// This function provides the common implementation for the various functions which can be
     /// used to change or unblock the Yubikey's PIN or PUK.
     fn change_pin_or_puk<F>(
@@ -299,49 +342,28 @@ impl State {
         F: Fn(*mut ykpiv::ykpiv_state, *const c_char, size_t, *const c_char, size_t, *mut c_int)
             -> ::std::result::Result<(), ::piv::Error>,
     {
-        loop {
-            let existing = MaybePromptedString::new(existing, existing_prompt, false)?;
-            let new = MaybePromptedString::new(new, new_prompt, true)?;
-
-            let mut tries: c_int = 0;
-            let result = change_fn(
-                self.state,
-                existing.as_ptr(),
-                existing.len(),
-                new.as_ptr(),
-                new.len(),
-                &mut tries,
-            );
-
-            // If we changed the value successfully, stop here.
-            if result.is_ok() {
-                break;
-            }
-
-            if let Some(err) = result.err() {
-                if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
-                    // We got some error other than the existing PIN or PUK being wrong (the same
-                    // error is used for both). Return the error.
-                    bail!(err);
-                } else if existing.was_provided() {
-                    // The given existing PIN or PUK was wrong, but it is static. Return the error
-                    // without retrying.
-                    bail!(err);
-                } else if tries <= 0 {
-                    // If we have no more tries available, return an error.
-                    bail!("Changing {} failed: no more retries", new_name);
-                } else {
-                    // Otherwise, loop and re-prompt the user so they can try again.
-                    error!(
-                        "Incorrect {}, try again - {} tries remaining",
-                        existing_name,
-                        tries
-                    );
-                }
-            }
-        }
-
-        Ok(())
+        self.verify_pin_or_puk(
+            existing_name,
+            existing,
+            existing_prompt,
+            |state, existing, existing_len, tries| {
+                let new = match MaybePromptedString::new(new.clone(), new_prompt, true) {
+                    Ok(new) => new,
+                    Err(err) => {
+                        error!("Reading {} user input failed: {}", new_name, err);
+                        bail!(::piv::Error::from(ykpiv::YKPIV_GENERIC_ERROR));
+                    }
+                };
+                change_fn(
+                    state,
+                    existing,
+                    existing_len,
+                    new.as_ptr(),
+                    new.len(),
+                    tries,
+                )
+            },
+        )
     }
 
     /// This function allows the user to change the Yubikey's PIN, given that the user knows the
