@@ -15,6 +15,7 @@
 use error::*;
 use libc::{c_char, c_int, c_uchar, c_ulong, size_t};
 use piv::try_ykpiv;
+use rand::{self, Rng};
 use rpassword;
 use std::ffi::{CStr, CString};
 use std::fmt;
@@ -43,6 +44,30 @@ const NEW_PUK_PROMPT: &'static str = "New PUK: ";
 const MGM_KEY_PROMPT: &'static str = "Management Key: ";
 const NEW_MGM_KEY_PROMPT: &'static str = "New Management Key: ";
 const MGM_KEY_BYTES: usize = 24;
+
+// TODO: This CHUID has an expiry of 2030-01-01, it should be configurable instead.
+/// FASC-N containing S9999F9999F999999F0F1F0000000000300001E encoded in 4-bit BCD with 1-bit
+/// parity. This can be run through
+/// https://github.com/Yubico/yubico-piv-tool/blob/master/tools/fasc.pl to get bytes.
+#[cfg_attr(rustfmt, rustfmt_skip)]
+const CHUID_TEMPLATE: &'static [c_uchar] = &[
+    0x30, 0x19, 0xd4, 0xe7, 0x39, 0xda, 0x73, 0x9c, 0xed, 0x39, 0xce, 0x73, 0x9d, 0x83, 0x68,
+    0x58, 0x21, 0x08, 0x42, 0x10, 0x84, 0x21, 0x38, 0x42, 0x10, 0xc3, 0xf5, 0x34, 0x10, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x35, 0x08, 0x32, 0x30, 0x33, 0x30, 0x30, 0x31, 0x30, 0x31, 0x3e, 0x00, 0xfe, 0x00,
+];
+const CHUID_RANDOM_OFFSET: usize = 29;
+const CHUID_RANDOM_BYTES: usize = 16;
+
+#[cfg_attr(rustfmt, rustfmt_skip)]
+const CCC_TEMPLATE: &'static [c_uchar] = &[
+    0xf0, 0x15, 0xa0, 0x00, 0x00, 0x01, 0x16, 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf1, 0x01, 0x21, 0xf2, 0x01, 0x21, 0xf3,
+    0x00, 0xf4, 0x01, 0x00, 0xf5, 0x01, 0x10, 0xf6, 0x00, 0xf7, 0x00, 0xfa, 0x00, 0xfb, 0x00,
+    0xfc, 0x00, 0xfd, 0x00, 0xfe, 0x00,
+];
+const CCC_RANDOM_OFFSET: usize = 9;
+const CCC_RANDOM_BYTES: usize = 14;
 
 /// This is a utility function to prompt the user for a sensitive string, probably a PIN or a PUK.
 fn prompt_for_string(prompt: &str, confirm: bool) -> Result<String> {
@@ -140,6 +165,19 @@ fn decode_management_key(
         )
     })?;
     Ok(decoded)
+}
+
+fn build_data_object(
+    template: &'static [c_uchar],
+    random_offset: usize,
+    random_bytes_len: usize,
+) -> Vec<c_uchar> {
+    let mut object: Vec<c_uchar> = Vec::with_capacity(template.len());
+    object.extend_from_slice(&template[..random_offset]);
+    let random_bytes: Vec<c_uchar> = rand::weak_rng().gen_iter().take(random_bytes_len).collect();
+    object.extend(random_bytes.into_iter());
+    object.extend_from_slice(&template[random_offset + random_bytes_len..]);
+    object
 }
 
 pub struct State {
@@ -419,10 +457,54 @@ impl State {
 
     /// This function changes the management key stored on the device. This is the key used to
     /// authenticate() for administrative / management access.
+    ///
+    /// It is an error to call this function without having called authenticate() first.
     pub fn set_management_key(&mut self, new_mgm_key: Option<&str>) -> Result<()> {
         let new_mgm_key = decode_management_key(new_mgm_key, NEW_MGM_KEY_PROMPT, true)?;
         try_ykpiv(unsafe {
             ykpiv::ykpiv_set_mgmkey(self.state, new_mgm_key.as_ptr())
+        })?;
+        Ok(())
+    }
+
+    /// This function writes a new, randomly-generated Card Holder Unique Identifier (CHUID) to the
+    /// device. Some systems (Windows) require a CHUID to be present before they will recognize the
+    /// Yubikey. This data object is not present on Yubikeys by default (from the factory).
+    ///
+    /// Also note that, according to the Yubikey docs, the card contents are aggressively cached on
+    /// Windows. In order to invalidate the cached data, e.g. after changing stored certificates,
+    /// the CHUID must also be changed.
+    ///
+    /// It is an error to call this function without having called authenticate() first.
+    pub fn set_chuid(&mut self) -> Result<()> {
+        let mut object: Vec<c_uchar> =
+            build_data_object(CHUID_TEMPLATE, CHUID_RANDOM_OFFSET, CHUID_RANDOM_BYTES);
+        try_ykpiv(unsafe {
+            ykpiv::ykpiv_save_object(
+                self.state,
+                ykpiv::YKPIV_OBJ_CHUID,
+                object.as_mut_ptr(),
+                object.len(),
+            )
+        })?;
+        Ok(())
+    }
+
+    /// This function writes a new, randomly-generated Card Capability Container (CCC) to the
+    /// device. Some systems (MacOS) require a CCC to be present before they will recognize the
+    /// Yubikey. This data object is not present on Yubikeys by default (from the factory).
+    ///
+    /// It is an error to call this function without having called authenticate() first.
+    pub fn set_ccc(&mut self) -> Result<()> {
+        let mut object: Vec<c_uchar> =
+            build_data_object(CCC_TEMPLATE, CCC_RANDOM_OFFSET, CCC_RANDOM_BYTES);
+        try_ykpiv(unsafe {
+            ykpiv::ykpiv_save_object(
+                self.state,
+                ykpiv::YKPIV_OBJ_CAPABILITY,
+                object.as_mut_ptr(),
+                object.len(),
+            )
         })?;
         Ok(())
     }

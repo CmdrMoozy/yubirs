@@ -99,6 +99,30 @@ fn change_mgm_key(
     Ok(())
 }
 
+fn set_chuid(
+    options: HashMap<String, String>,
+    flags: HashMap<String, bool>,
+    _: HashMap<String, Vec<String>>,
+) -> Result<()> {
+    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
+    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+    state.authenticate(None)?;
+    state.set_chuid()?;
+    Ok(())
+}
+
+fn set_ccc(
+    options: HashMap<String, String>,
+    flags: HashMap<String, bool>,
+    _: HashMap<String, Vec<String>>,
+) -> Result<()> {
+    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
+    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+    state.authenticate(None)?;
+    state.set_ccc()?;
+    Ok(())
+}
+
 fn main() {
     bdrck_log::init_cli_logger().unwrap();
     yubirs::init().unwrap();
@@ -229,6 +253,44 @@ fn main() {
                 false,
             ).unwrap(),
             Box::new(change_mgm_key),
+        ),
+        ExecutableCommand::new(
+            Command::new(
+                "set_chuid",
+                "Write a new Card Holder Unique Identifier (CHUID) to the Yubikey",
+                vec![
+                    Option::flag("verbose", "Enable verbose output", Some('v')),
+                    Option::required(
+                        "reader",
+                        "The PC/SC reader to use. Try list_readers for possible values. The first \
+                         reader with the value given here as a substring is used.",
+                        Some('r'),
+                        Some(DEFAULT_READER),
+                    ),
+                ],
+                vec![],
+                false,
+            ).unwrap(),
+            Box::new(set_chuid),
+        ),
+        ExecutableCommand::new(
+            Command::new(
+                "set_ccc",
+                "Write a new Card Capability Container (CCC) to the Yubikey",
+                vec![
+                    Option::flag("verbose", "Enable verbose output", Some('v')),
+                    Option::required(
+                        "reader",
+                        "The PC/SC reader to use. Try list_readers for possible values. The first \
+                         reader with the value given here as a substring is used.",
+                        Some('r'),
+                        Some(DEFAULT_READER),
+                    ),
+                ],
+                vec![],
+                false,
+            ).unwrap(),
+            Box::new(set_ccc),
         ),
     ]);
 }
