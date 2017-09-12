@@ -87,6 +87,20 @@ fn reset(
     state.reset()
 }
 
+fn set_retries(
+    options: HashMap<String, String>,
+    flags: HashMap<String, bool>,
+    _: HashMap<String, Vec<String>>,
+) -> Result<()> {
+    let pin_retries = options.get("pin_retries").unwrap().parse::<u8>()?;
+    let puk_retries = options.get("puk_retries").unwrap().parse::<u8>()?;
+    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
+    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+    state.authenticate(None)?;
+    state.set_retries(None, pin_retries, puk_retries)?;
+    Ok(())
+}
+
 fn change_mgm_key(
     options: HashMap<String, String>,
     flags: HashMap<String, bool>,
@@ -234,6 +248,37 @@ fn main() {
                 false,
             ).unwrap(),
             Box::new(reset),
+        ),
+        ExecutableCommand::new(
+            Command::new(
+                "set_retries",
+                "Set the PIN and PUK retry counters, and reset the PIN and PUK back to defaults",
+                vec![
+                    Option::flag("verbose", "Enable verbose output", Some('v')),
+                    Option::required(
+                        "reader",
+                        "The PC/SC reader to use. Try list_readers for possible values. The first \
+                         reader with the value given here as a substring is used.",
+                        Some('r'),
+                        Some(DEFAULT_READER),
+                    ),
+                    Option::required(
+                        "pin_retries",
+                        "The number of retries to allow for the PIN.",
+                        None,
+                        None,
+                    ),
+                    Option::required(
+                        "puk_retries",
+                        "The number of retries to allow for the PUK.",
+                        None,
+                        None,
+                    ),
+                ],
+                vec![],
+                false,
+            ).unwrap(),
+            Box::new(set_retries),
         ),
         ExecutableCommand::new(
             Command::new(

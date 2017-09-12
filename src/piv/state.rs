@@ -455,6 +455,77 @@ impl State {
         Ok(())
     }
 
+    /// This function sets the number of retries available for PIN or PUK verification. This also
+    /// resets the PIN and PUK back to their factory default values, 123456 and 12345678,
+    /// respectively.
+    ///
+    /// Note that this function is slightly strange compared to the rest of the API, in that both
+    /// the management key *and* the current PIN are required.
+    ///
+    /// It is an error to call this function without having called authenticate() first.
+    pub fn set_retries(
+        &mut self,
+        pin: Option<&str>,
+        pin_retries: u8,
+        puk_retries: u8,
+    ) -> Result<()> {
+        loop {
+            let pin = MaybePromptedString::new(pin, PIN_PROMPT, false)?;
+
+            let mut tries: c_int = 0;
+            let result = try_ykpiv(unsafe {
+                ykpiv::ykpiv_verify(self.state, pin.as_ptr(), &mut tries)
+            });
+
+            // If the PIN was correct, stop here.
+            if result.is_ok() {
+                break;
+            }
+
+            if let Some(err) = result.err() {
+                if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
+                    // We got some error other than the PIN being wrong. Return the error.
+                    bail!(err);
+                } else if pin.was_provided() {
+                    // The PIN was wrong, but it is static. Return the error without retrying.
+                    bail!(err);
+                } else if tries <= 0 {
+                    // If we have no more tries available, return an error.
+                    bail!("Verifying PIN failed: no more retries");
+                } else {
+                    // Otherwise, loop and re-prompt the user so they can try again.
+                    error!("Incorrect PIN, try again - {} tries remaining", tries);
+                }
+            }
+        }
+
+        let templ: Vec<c_uchar> = vec![
+            0,
+            ykpiv::YKPIV_INS_SET_PIN_RETRIES,
+            pin_retries,
+            puk_retries,
+        ];
+        let mut data: Vec<c_uchar> = vec![0; 255];
+        let mut data_len: c_ulong = 0;
+        let mut sw: c_int = 0;
+
+        try_ykpiv(unsafe {
+            ykpiv::ykpiv_transfer_data(
+                self.state,
+                templ.as_ptr(),
+                ptr::null(),
+                0,
+                data.as_mut_ptr(),
+                &mut data_len,
+                &mut sw,
+            )
+        })?;
+        if sw != ykpiv::SW_SUCCESS {
+            bail!("Setting PIN and PUK retries failed");
+        }
+        Ok(())
+    }
+
     /// This function changes the management key stored on the device. This is the key used to
     /// authenticate() for administrative / management access.
     ///
