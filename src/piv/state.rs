@@ -40,6 +40,9 @@ const PUK_NAME: &'static str = "PUK";
 const PUK_PROMPT: &'static str = "PUK: ";
 const NEW_PUK_PROMPT: &'static str = "New PUK: ";
 
+const MGM_KEY_PROMPT: &'static str = "Management Key: ";
+const MGM_KEY_BYTES: usize = 24;
+
 /// This is a utility function to prompt the user for a sensitive string, probably a PIN or a PUK.
 fn prompt_for_string(prompt: &str, confirm: bool) -> Result<String> {
     loop {
@@ -114,6 +117,17 @@ impl<'a> MaybePromptedString<'a> {
             |s| s.len(),
         )
     }
+}
+
+fn get_management_key(mgm_key: Option<&str>) -> Result<Vec<c_uchar>> {
+    let mgm_key = MaybePromptedString::new(mgm_key, MGM_KEY_PROMPT, false)?;
+    let mut decoded: Vec<c_uchar> = vec![0; MGM_KEY_BYTES];
+    let mut decoded_len: size_t = MGM_KEY_BYTES;
+    if decoded_len != MGM_KEY_BYTES {
+        bail!("Hex decoding failed: decoded length doesn't match expectations");
+    }
+    try_ykpiv(unsafe { ykpiv::ykpiv_hex_decode(mgm_key.as_ptr(), mgm_key.len(), decoded.as_mut_ptr(), &mut decoded_len) })?;
+    Ok(decoded)
 }
 
 pub struct State {
@@ -377,6 +391,15 @@ impl State {
         if sw != ykpiv::SW_SUCCESS {
             bail!("Reset failed, probably because PIN or PUK retries are still available");
         }
+        Ok(())
+    }
+
+    /// This function authenticates this state with the management key, unlocking various
+    /// administrative / management functions. For details on what features require authentication,
+    /// see: https://developers.yubico.com/PIV/Introduction/Admin_access.html
+    pub fn authenticate(&mut self, mgm_key: Option<&str>) -> Result<()> {
+        let mgm_key = get_management_key(mgm_key)?;
+        try_ykpiv(unsafe { ykpiv::ykpiv_authenticate(self.state, mgm_key.as_ptr()) })?;
         Ok(())
     }
 }
