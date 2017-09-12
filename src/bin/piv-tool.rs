@@ -96,8 +96,7 @@ fn set_retries(
     let puk_retries = options.get("puk_retries").unwrap().parse::<u8>()?;
     let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
     state.connect(Some(options.get("reader").unwrap().as_str()))?;
-    state.authenticate(None)?;
-    state.set_retries(None, pin_retries, puk_retries)?;
+    state.set_retries(None, None, pin_retries, puk_retries)?;
     Ok(())
 }
 
@@ -108,8 +107,7 @@ fn change_mgm_key(
 ) -> Result<()> {
     let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
     state.connect(Some(options.get("reader").unwrap().as_str()))?;
-    state.authenticate(None)?;
-    state.set_management_key(None)?;
+    state.set_management_key(None, None)?;
     Ok(())
 }
 
@@ -120,8 +118,7 @@ fn set_chuid(
 ) -> Result<()> {
     let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
     state.connect(Some(options.get("reader").unwrap().as_str()))?;
-    state.authenticate(None)?;
-    state.set_chuid()?;
+    state.set_chuid(None)?;
     Ok(())
 }
 
@@ -132,8 +129,7 @@ fn set_ccc(
 ) -> Result<()> {
     let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
     state.connect(Some(options.get("reader").unwrap().as_str()))?;
-    state.authenticate(None)?;
-    state.set_ccc()?;
+    state.set_ccc(None)?;
     Ok(())
 }
 

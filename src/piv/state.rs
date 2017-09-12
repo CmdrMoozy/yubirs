@@ -182,6 +182,8 @@ fn build_data_object(
 
 pub struct State {
     state: *mut ykpiv::ykpiv_state,
+    authenticated_pin: bool,
+    authenticated_mgm: bool,
 }
 
 impl State {
@@ -199,7 +201,11 @@ impl State {
         if state.is_null() {
             bail!("Initializing ykpiv state resulted in null ptr");
         }
-        Ok(State { state: state })
+        Ok(State {
+            state: state,
+            authenticated_pin: false,
+            authenticated_mgm: false,
+        })
     }
 
     /// This function returns the list of valid reader strings which can be passed to State::new.
@@ -466,10 +472,28 @@ impl State {
         Ok(())
     }
 
+    /// This function authenticates this State with the current PIN (ykpiv calls this ykpiv_verify,
+    /// essentially). This can only be done once per State, so if it has been done before this
+    /// function is a no-op.
+    fn authenticate_pin(&mut self, pin: Option<&str>) -> Result<()> {
+        if self.authenticated_pin {
+            return Ok(());
+        }
+
+        self.verify_pin_or_puk(PIN_NAME, pin, PIN_PROMPT, |state, pin, _, tries| {
+            try_ykpiv(unsafe { ykpiv::ykpiv_verify(state, pin, tries) })
+        })?;
+        Ok(())
+    }
+
     /// This function authenticates this state with the management key, unlocking various
     /// administrative / management functions. For details on what features require authentication,
     /// see: https://developers.yubico.com/PIV/Introduction/Admin_access.html
-    pub fn authenticate(&mut self, mgm_key: Option<&str>) -> Result<()> {
+    fn authenticate_mgm(&mut self, mgm_key: Option<&str>) -> Result<()> {
+        if self.authenticated_mgm {
+            return Ok(());
+        }
+
         let mgm_key = decode_management_key(mgm_key, MGM_KEY_PROMPT, false)?;
         try_ykpiv(unsafe {
             ykpiv::ykpiv_authenticate(self.state, mgm_key.as_ptr())
@@ -483,43 +507,15 @@ impl State {
     ///
     /// Note that this function is slightly strange compared to the rest of the API, in that both
     /// the management key *and* the current PIN are required.
-    ///
-    /// It is an error to call this function without having called authenticate() first.
     pub fn set_retries(
         &mut self,
+        mgm_key: Option<&str>,
         pin: Option<&str>,
         pin_retries: u8,
         puk_retries: u8,
     ) -> Result<()> {
-        loop {
-            let pin = MaybePromptedString::new(pin, PIN_PROMPT, false)?;
-
-            let mut tries: c_int = 0;
-            let result = try_ykpiv(unsafe {
-                ykpiv::ykpiv_verify(self.state, pin.as_ptr(), &mut tries)
-            });
-
-            // If the PIN was correct, stop here.
-            if result.is_ok() {
-                break;
-            }
-
-            if let Some(err) = result.err() {
-                if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
-                    // We got some error other than the PIN being wrong. Return the error.
-                    bail!(err);
-                } else if pin.was_provided() {
-                    // The PIN was wrong, but it is static. Return the error without retrying.
-                    bail!(err);
-                } else if tries <= 0 {
-                    // If we have no more tries available, return an error.
-                    bail!("Verifying PIN failed: no more retries");
-                } else {
-                    // Otherwise, loop and re-prompt the user so they can try again.
-                    error!("Incorrect PIN, try again - {} tries remaining", tries);
-                }
-            }
-        }
+        self.authenticate_mgm(mgm_key)?;
+        self.authenticate_pin(pin)?;
 
         let templ: Vec<c_uchar> = vec![
             0,
@@ -550,9 +546,13 @@ impl State {
 
     /// This function changes the management key stored on the device. This is the key used to
     /// authenticate() for administrative / management access.
-    ///
-    /// It is an error to call this function without having called authenticate() first.
-    pub fn set_management_key(&mut self, new_mgm_key: Option<&str>) -> Result<()> {
+    pub fn set_management_key(
+        &mut self,
+        old_mgm_key: Option<&str>,
+        new_mgm_key: Option<&str>,
+    ) -> Result<()> {
+        self.authenticate_mgm(old_mgm_key)?;
+
         let new_mgm_key = decode_management_key(new_mgm_key, NEW_MGM_KEY_PROMPT, true)?;
         try_ykpiv(unsafe {
             ykpiv::ykpiv_set_mgmkey(self.state, new_mgm_key.as_ptr())
@@ -567,9 +567,9 @@ impl State {
     /// Also note that, according to the Yubikey docs, the card contents are aggressively cached on
     /// Windows. In order to invalidate the cached data, e.g. after changing stored certificates,
     /// the CHUID must also be changed.
-    ///
-    /// It is an error to call this function without having called authenticate() first.
-    pub fn set_chuid(&mut self) -> Result<()> {
+    pub fn set_chuid(&mut self, mgm_key: Option<&str>) -> Result<()> {
+        self.authenticate_mgm(mgm_key)?;
+
         let mut object: Vec<c_uchar> =
             build_data_object(CHUID_TEMPLATE, CHUID_RANDOM_OFFSET, CHUID_RANDOM_BYTES);
         try_ykpiv(unsafe {
@@ -586,9 +586,9 @@ impl State {
     /// This function writes a new, randomly-generated Card Capability Container (CCC) to the
     /// device. Some systems (MacOS) require a CCC to be present before they will recognize the
     /// Yubikey. This data object is not present on Yubikeys by default (from the factory).
-    ///
-    /// It is an error to call this function without having called authenticate() first.
-    pub fn set_ccc(&mut self) -> Result<()> {
+    pub fn set_ccc(&mut self, mgm_key: Option<&str>) -> Result<()> {
+        self.authenticate_mgm(mgm_key)?;
+
         let mut object: Vec<c_uchar> =
             build_data_object(CCC_TEMPLATE, CCC_RANDOM_OFFSET, CCC_RANDOM_BYTES);
         try_ykpiv(unsafe {
