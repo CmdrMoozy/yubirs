@@ -104,44 +104,42 @@ impl FromStr for Version {
     }
 }
 
-struct MaybePromptedString<'a> {
-    provided: Option<&'a str>,
-    prompted: Option<String>,
+struct MaybePromptedString {
+    value: CString,
+    length: usize,
+    was_provided: bool,
 }
 
-impl<'a> MaybePromptedString<'a> {
-    pub fn new(provided: Option<&'a str>, prompt: &str, confirm: bool) -> Result<Self> {
+impl MaybePromptedString {
+    pub fn new(provided: Option<&str>, prompt: &str, confirm: bool) -> Result<Self> {
         let prompted: Option<String> = match provided {
             None => Some(prompt_for_string(prompt, confirm)?),
             Some(_) => None,
         };
+        let length: usize =
+            provided.map_or_else(|| prompted.as_ref().map_or(0, |s| s.len()), |s| s.len());
 
         Ok(MaybePromptedString {
-            provided: provided,
-            prompted: prompted,
+            value: CString::new(
+                provided.map_or_else(|| prompted.as_ref().map_or("", |s| s.as_str()), |s| s),
+            )?,
+            length: length,
+            was_provided: provided.is_some(),
         })
     }
 
     pub fn was_provided(&self) -> bool {
-        self.provided.is_some()
+        self.was_provided
     }
 
+    /// Returns a pointer to the string's bytes. This pointer is guaranteed to point to a
+    /// NUL-terminated string.
     pub fn as_ptr(&self) -> *const c_char {
-        self.provided.map_or_else(
-            || {
-                self.prompted
-                    .as_ref()
-                    .map_or_else(ptr::null, |s| s.as_ptr() as *const c_char)
-            },
-            |s| s.as_ptr() as *const c_char,
-        )
+        self.value.as_ptr()
     }
 
     pub fn len(&self) -> usize {
-        self.provided.map_or_else(
-            || self.prompted.as_ref().map_or(0, |s| s.len()),
-            |s| s.len(),
-        )
+        self.length
     }
 }
 
@@ -524,7 +522,7 @@ impl State {
             puk_retries,
         ];
         let mut data: Vec<c_uchar> = vec![0; 255];
-        let mut data_len: c_ulong = 0;
+        let mut data_len: c_ulong = data.len() as c_ulong;
         let mut sw: c_int = 0;
 
         try_ykpiv(unsafe {

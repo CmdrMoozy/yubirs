@@ -17,6 +17,7 @@ error_chain! {
         Curl(::curl::Error);
         Encoding(::data_encoding::decode::Error);
         Io(::std::io::Error);
+        Nul(::std::ffi::NulError);
         ParseDateTime(::chrono::ParseError);
         ParseInt(::std::num::ParseIntError);
         Piv(::piv::Error);
