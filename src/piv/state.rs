@@ -209,6 +209,78 @@ impl State {
         })
     }
 
+    /// This is a generic function which provides the boilerplate needed to execute some other
+    /// function which requires PIN or PUK verification.
+    fn verify_pin_or_puk<F>(
+        &mut self,
+        name: &str,
+        value: Option<&str>,
+        prompt: &str,
+        verify_fn: F,
+    ) -> Result<()>
+    where
+        F: Fn(*mut ykpiv::ykpiv_state, *const c_char, size_t, *mut c_int)
+            -> ::std::result::Result<(), ::piv::Error>,
+    {
+        loop {
+            let value = MaybePromptedString::new(value, prompt, false)?;
+            let mut tries: c_int = 0;
+            let result = verify_fn(self.state, value.as_ptr(), value.len(), &mut tries);
+
+            // If we called the function successfully, stop here.
+            if result.is_ok() {
+                return Ok(());
+            }
+
+            if let Some(err) = result.err() {
+                if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
+                    // We got some error other than the existing PIN or PUK being wrong (the same
+                    // error is used for both). Return the error.
+                    bail!(err);
+                } else if value.was_provided() {
+                    // The given existing PIN or PUK was wrong, but it is static. Return the error
+                    // without retrying.
+                    bail!(err);
+                } else if tries <= 0 {
+                    // If we have no more tries available, return an error.
+                    bail!("Verifying {} failed: no more retries", name);
+                } else {
+                    // Otherwise, loop and re-prompt the user so they can try again.
+                    error!("Incorrect {}, try again - {} tries remaining", name, tries);
+                }
+            }
+        }
+    }
+
+    /// This function authenticates this State with the current PIN (ykpiv calls this ykpiv_verify,
+    /// essentially). This can only be done once per State, so if it has been done before this
+    /// function is a no-op.
+    fn authenticate_pin(&mut self, pin: Option<&str>) -> Result<()> {
+        if self.authenticated_pin {
+            return Ok(());
+        }
+
+        self.verify_pin_or_puk(PIN_NAME, pin, PIN_PROMPT, |state, pin, _, tries| {
+            try_ykpiv(unsafe { ykpiv::ykpiv_verify(state, pin, tries) })
+        })?;
+        Ok(())
+    }
+
+    /// This function authenticates this state with the management key, unlocking various
+    /// administrative / management functions. For details on what features require authentication,
+    /// see: https://developers.yubico.com/PIV/Introduction/Admin_access.html
+    fn authenticate_mgm(&mut self, mgm_key: Option<&str>) -> Result<()> {
+        if self.authenticated_mgm {
+            return Ok(());
+        }
+
+        let mgm_key = decode_management_key(mgm_key, MGM_KEY_PROMPT, false)?;
+        try_ykpiv(unsafe {
+            ykpiv::ykpiv_authenticate(self.state, mgm_key.as_ptr())
+        })?;
+        Ok(())
+    }
+
     /// This function returns the list of valid reader strings which can be passed to State::new.
     ///
     /// Warning: this function is, generally speaking, very inefficient in terms of memory usage.
@@ -288,49 +360,6 @@ impl State {
         Ok(
             unsafe { CStr::from_ptr(buffer.as_ptr()) }.to_str()?.parse()?,
         )
-    }
-
-    /// This is a generic function which provides the boilerplate needed to execute some other
-    /// function which requires PIN or PUK verification.
-    fn verify_pin_or_puk<F>(
-        &mut self,
-        name: &str,
-        value: Option<&str>,
-        prompt: &str,
-        verify_fn: F,
-    ) -> Result<()>
-    where
-        F: Fn(*mut ykpiv::ykpiv_state, *const c_char, size_t, *mut c_int)
-            -> ::std::result::Result<(), ::piv::Error>,
-    {
-        loop {
-            let value = MaybePromptedString::new(value, prompt, false)?;
-            let mut tries: c_int = 0;
-            let result = verify_fn(self.state, value.as_ptr(), value.len(), &mut tries);
-
-            // If we called the function successfully, stop here.
-            if result.is_ok() {
-                return Ok(());
-            }
-
-            if let Some(err) = result.err() {
-                if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
-                    // We got some error other than the existing PIN or PUK being wrong (the same
-                    // error is used for both). Return the error.
-                    bail!(err);
-                } else if value.was_provided() {
-                    // The given existing PIN or PUK was wrong, but it is static. Return the error
-                    // without retrying.
-                    bail!(err);
-                } else if tries <= 0 {
-                    // If we have no more tries available, return an error.
-                    bail!("Verifying {} failed: no more retries", name);
-                } else {
-                    // Otherwise, loop and re-prompt the user so they can try again.
-                    error!("Incorrect {}, try again - {} tries remaining", name, tries);
-                }
-            }
-        }
     }
 
     /// This function provides the common implementation for the various functions which can be
@@ -484,31 +513,17 @@ impl State {
         Ok(buffer)
     }
 
-    /// This function authenticates this State with the current PIN (ykpiv calls this ykpiv_verify,
-    /// essentially). This can only be done once per State, so if it has been done before this
-    /// function is a no-op.
-    fn authenticate_pin(&mut self, pin: Option<&str>) -> Result<()> {
-        if self.authenticated_pin {
-            return Ok(());
-        }
-
-        self.verify_pin_or_puk(PIN_NAME, pin, PIN_PROMPT, |state, pin, _, tries| {
-            try_ykpiv(unsafe { ykpiv::ykpiv_verify(state, pin, tries) })
-        })?;
-        Ok(())
-    }
-
-    /// This function authenticates this state with the management key, unlocking various
-    /// administrative / management functions. For details on what features require authentication,
-    /// see: https://developers.yubico.com/PIV/Introduction/Admin_access.html
-    fn authenticate_mgm(&mut self, mgm_key: Option<&str>) -> Result<()> {
-        if self.authenticated_mgm {
-            return Ok(());
-        }
-
-        let mgm_key = decode_management_key(mgm_key, MGM_KEY_PROMPT, false)?;
+    /// Write a data object to the Yubikey. This function takes ownership of the data, because
+    /// upstream's API requires a mutable data buffer.
+    pub fn write_object(
+        &mut self,
+        mgm_key: Option<&str>,
+        id: Object,
+        mut buffer: Vec<u8>,
+    ) -> Result<()> {
+        self.authenticate_mgm(mgm_key)?;
         try_ykpiv(unsafe {
-            ykpiv::ykpiv_authenticate(self.state, mgm_key.as_ptr())
+            ykpiv::ykpiv_save_object(self.state, id.to_value(), buffer.as_mut_ptr(), buffer.len())
         })?;
         Ok(())
     }

@@ -22,6 +22,8 @@ use bdrck_params::command::{Command, ExecutableCommand};
 use bdrck_params::main_impl::main_impl_multiple_commands;
 use bdrck_params::option::Option;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
 use yubirs::error::*;
 use yubirs::piv::state::{State, DEFAULT_READER};
 
@@ -34,6 +36,18 @@ fn print_data(data: &[u8]) -> Result<()> {
         stdout.write_all(data)?;
     }
     Ok(())
+}
+
+fn read_data(path: &str, is_base64: bool) -> Result<Vec<u8>> {
+    Ok(match is_base64 {
+        false => {
+            let mut buffer: Vec<u8> = Vec::new();
+            let mut f = File::open(path)?;
+            f.read_to_end(&mut buffer)?;
+            buffer
+        }
+        true => base64::decode(path)?,
+    })
 }
 
 fn list_readers(
@@ -109,6 +123,21 @@ fn read_object(
     state.connect(Some(options.get("reader").unwrap().as_str()))?;
     let data = state.read_object(options.get("object_id").unwrap().parse()?)?;
     print_data(data.as_slice())?;
+    Ok(())
+}
+
+fn write_object(
+    options: HashMap<String, String>,
+    flags: HashMap<String, bool>,
+    _: HashMap<String, Vec<String>>,
+) -> Result<()> {
+    let data = read_data(
+        options.get("input").unwrap(),
+        flags.get("base64").map_or(false, |v| *v),
+    )?;
+    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
+    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+    state.write_object(None, options.get("object_id").unwrap().parse()?, data)?;
     Ok(())
 }
 
@@ -294,6 +323,42 @@ fn main() {
                 false,
             ).unwrap(),
             Box::new(read_object),
+        ),
+        ExecutableCommand::new(
+            Command::new(
+                "write_object",
+                "Write a data object to the Yubikey",
+                vec![
+                    Option::flag("verbose", "Enable verbose output", Some('v')),
+                    Option::required(
+                        "reader",
+                        "The PC/SC reader to use. Try list_readers for possible values. The first \
+                         reader with the value given here as a substring is used.",
+                        Some('r'),
+                        Some(DEFAULT_READER),
+                    ),
+                    Option::required(
+                        "object_id",
+                        "The human-readable object ID of the object to read.",
+                        Some('o'),
+                        None,
+                    ),
+                    Option::required(
+                        "input",
+                        "The path to an input file, or a base64-encoded string.",
+                        Some('i'),
+                        None,
+                    ),
+                    Option::flag(
+                        "base64",
+                        "The input is a base64-encoded string, instead of a path.",
+                        None,
+                    ),
+                ],
+                vec![],
+                false,
+            ).unwrap(),
+            Box::new(write_object),
         ),
         ExecutableCommand::new(
             Command::new(
