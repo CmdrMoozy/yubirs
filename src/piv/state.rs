@@ -15,6 +15,7 @@
 use error::*;
 use libc::{c_char, c_int, c_uchar, c_ulong, size_t};
 use piv::try_ykpiv;
+use piv::id::Object;
 use rand::{self, Rng};
 use rpassword;
 use std::ffi::{CStr, CString};
@@ -32,6 +33,8 @@ pub const DEFAULT_READER: &'static str = "Yubikey";
 // The version format is "%d.%d.%d", where each number is an 8-bit unsigned integer. So, we need
 // three digits per number * three numbers + two .'s + one null-terminator, which gives 12 bytes.
 const VERSION_BUFFER_SIZE: usize = 12;
+
+const OBJECT_BUFFER_SIZE: usize = 3072;
 
 const PIN_NAME: &'static str = "PIN";
 const PIN_PROMPT: &'static str = "PIN: ";
@@ -468,6 +471,17 @@ impl State {
             bail!("Reset failed, probably because PIN or PUK retries are still available");
         }
         Ok(())
+    }
+
+    /// Read a data object from the Yubikey, returning the byte contents.
+    pub fn read_object(&self, id: Object) -> Result<Vec<u8>> {
+        let mut buffer: Vec<u8> = vec![0; OBJECT_BUFFER_SIZE];
+        let mut len: c_ulong = OBJECT_BUFFER_SIZE as c_ulong;
+        try_ykpiv(unsafe {
+            ykpiv::ykpiv_fetch_object(self.state, id.to_value(), buffer.as_mut_ptr(), &mut len)
+        })?;
+        buffer.truncate(len as usize);
+        Ok(buffer)
     }
 
     /// This function authenticates this State with the current PIN (ykpiv calls this ykpiv_verify,

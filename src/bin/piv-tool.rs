@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+extern crate base64;
 extern crate bdrck_log;
 extern crate bdrck_params;
+extern crate isatty;
 extern crate yubirs;
 
 use bdrck_params::command::{Command, ExecutableCommand};
@@ -22,6 +24,17 @@ use bdrck_params::option::Option;
 use std::collections::HashMap;
 use yubirs::error::*;
 use yubirs::piv::state::{State, DEFAULT_READER};
+
+fn print_data(data: &[u8]) -> Result<()> {
+    if isatty::stdout_isatty() {
+        println!("{}", base64::encode(data));
+    } else {
+        use std::io::Write;
+        let mut stdout = ::std::io::stdout();
+        stdout.write_all(data)?;
+    }
+    Ok(())
+}
 
 fn list_readers(
     _: HashMap<String, String>,
@@ -85,6 +98,18 @@ fn reset(
     let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
     state.connect(Some(options.get("reader").unwrap().as_str()))?;
     state.reset()
+}
+
+fn read_object(
+    options: HashMap<String, String>,
+    flags: HashMap<String, bool>,
+    _: HashMap<String, Vec<String>>,
+) -> Result<()> {
+    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
+    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+    let data = state.read_object(options.get("object_id").unwrap().parse()?)?;
+    print_data(data.as_slice())?;
+    Ok(())
 }
 
 fn set_retries(
@@ -244,6 +269,31 @@ fn main() {
                 false,
             ).unwrap(),
             Box::new(reset),
+        ),
+        ExecutableCommand::new(
+            Command::new(
+                "read_object",
+                "Read the contents of a data object from the Yubikey",
+                vec![
+                    Option::flag("verbose", "Enable verbose output", Some('v')),
+                    Option::required(
+                        "reader",
+                        "The PC/SC reader to use. Try list_readers for possible values. The first \
+                         reader with the value given here as a substring is used.",
+                        Some('r'),
+                        Some(DEFAULT_READER),
+                    ),
+                    Option::required(
+                        "object_id",
+                        "The human-readable object ID of the object to read.",
+                        Some('o'),
+                        None,
+                    ),
+                ],
+                vec![],
+                false,
+            ).unwrap(),
+            Box::new(read_object),
         ),
         ExecutableCommand::new(
             Command::new(
