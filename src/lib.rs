@@ -37,6 +37,7 @@ extern crate rpassword;
 extern crate sodiumoxide;
 extern crate yubico_piv_tool_sys;
 
+pub mod cert;
 pub mod error;
 pub mod otp;
 pub mod piv;

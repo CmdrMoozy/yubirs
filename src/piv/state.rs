@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use cert::{format_certificate, Format};
 use error::*;
 use libc::{c_char, c_int, c_uchar, c_ulong, size_t};
 use piv::try_ykpiv;
-use piv::id::Object;
+use piv::id::{Key, Object};
 use rand::{self, Rng};
 use rpassword;
 use std::ffi::{CStr, CString};
@@ -502,32 +503,6 @@ impl State {
         Ok(())
     }
 
-    /// Read a data object from the Yubikey, returning the byte contents.
-    pub fn read_object(&self, id: Object) -> Result<Vec<u8>> {
-        let mut buffer: Vec<u8> = vec![0; OBJECT_BUFFER_SIZE];
-        let mut len: c_ulong = OBJECT_BUFFER_SIZE as c_ulong;
-        try_ykpiv(unsafe {
-            ykpiv::ykpiv_fetch_object(self.state, id.to_value(), buffer.as_mut_ptr(), &mut len)
-        })?;
-        buffer.truncate(len as usize);
-        Ok(buffer)
-    }
-
-    /// Write a data object to the Yubikey. This function takes ownership of the data, because
-    /// upstream's API requires a mutable data buffer.
-    pub fn write_object(
-        &mut self,
-        mgm_key: Option<&str>,
-        id: Object,
-        mut buffer: Vec<u8>,
-    ) -> Result<()> {
-        self.authenticate_mgm(mgm_key)?;
-        try_ykpiv(unsafe {
-            ykpiv::ykpiv_save_object(self.state, id.to_value(), buffer.as_mut_ptr(), buffer.len())
-        })?;
-        Ok(())
-    }
-
     /// This function sets the number of retries available for PIN or PUK verification. This also
     /// resets the PIN and PUK back to their factory default values, 123456 and 12345678,
     /// respectively.
@@ -627,6 +602,39 @@ impl State {
             )
         })?;
         Ok(())
+    }
+
+    /// Read a data object from the Yubikey, returning the byte contents.
+    pub fn read_object(&self, id: Object) -> Result<Vec<u8>> {
+        let mut buffer: Vec<u8> = vec![0; OBJECT_BUFFER_SIZE];
+        let mut len: c_ulong = OBJECT_BUFFER_SIZE as c_ulong;
+        try_ykpiv(unsafe {
+            ykpiv::ykpiv_fetch_object(self.state, id.to_value(), buffer.as_mut_ptr(), &mut len)
+        })?;
+        buffer.truncate(len as usize);
+        Ok(buffer)
+    }
+
+    /// Write a data object to the Yubikey. This function takes ownership of the data, because
+    /// upstream's API requires a mutable data buffer.
+    pub fn write_object(
+        &mut self,
+        mgm_key: Option<&str>,
+        id: Object,
+        mut buffer: Vec<u8>,
+    ) -> Result<()> {
+        self.authenticate_mgm(mgm_key)?;
+        try_ykpiv(unsafe {
+            ykpiv::ykpiv_save_object(self.state, id.to_value(), buffer.as_mut_ptr(), buffer.len())
+        })?;
+        Ok(())
+    }
+
+    /// This is a convenience function to read a certificate's data object from the Yubikey, and
+    /// then return it formatted in a specified way.
+    pub fn read_certificate(&self, id: Key, format: Format) -> Result<String> {
+        let data = self.read_object(id.to_object()?)?;
+        format_certificate(data.as_slice(), format)
     }
 }
 
