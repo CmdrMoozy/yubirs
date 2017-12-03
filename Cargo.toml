@@ -9,8 +9,7 @@ license = "Apache-2.0"
 
 [dependencies]
 base64 = "0.8"
-bdrck_log = "0.3"
-bdrck_params = "0.3"
+bdrck = "0.4"
 chrono = "0.4"
 curl = "0.4"
 error-chain = "0.11"

@@ -143,7 +143,10 @@ fn get_cloned_string_field(fields: &HashMap<Field, &str>, field: Field) -> Optio
 }
 
 fn get_signature(fields: &HashMap<Field, &str>) -> Result<Vec<u8>> {
-    Ok(base64::decode_config(get_required_field(fields, Field::Signature)?.as_bytes(), base64::STANDARD)?)
+    Ok(base64::decode_config(
+        get_required_field(fields, Field::Signature)?.as_bytes(),
+        base64::STANDARD,
+    )?)
 }
 
 lazy_static! {

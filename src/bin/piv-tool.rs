@@ -13,15 +13,11 @@
 // limitations under the License.
 
 extern crate base64;
-extern crate bdrck_log;
-extern crate bdrck_params;
+extern crate bdrck;
 extern crate isatty;
 extern crate yubirs;
 
-use bdrck_params::command::{Command, ExecutableCommand};
-use bdrck_params::main_impl::main_impl_multiple_commands;
-use bdrck_params::option::Option;
-use std::collections::HashMap;
+use bdrck::flags::*;
 use std::fs::File;
 use std::io::Read;
 use yubirs::error::*;
@@ -50,12 +46,8 @@ fn read_data(path: &str, is_base64: bool) -> Result<Vec<u8>> {
     })
 }
 
-fn list_readers(
-    _: HashMap<String, String>,
-    flags: HashMap<String, bool>,
-    _: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
+fn list_readers(values: Values) -> Result<()> {
+    let state = State::new(values.get_boolean("verbose"))?;
     let readers: Vec<String> = state.list_readers()?;
     for reader in readers {
         println!("{}", reader);
@@ -63,437 +55,364 @@ fn list_readers(
     Ok(())
 }
 
-fn get_version(
-    options: HashMap<String, String>,
-    flags: HashMap<String, bool>,
-    _: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
-    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+fn get_version(values: Values) -> Result<()> {
+    let mut state = State::new(values.get_boolean("verbose"))?;
+    state.connect(Some(values.get_required("reader")))?;
     println!("{}", state.get_version()?);
     Ok(())
 }
 
-fn change_pin(
-    options: HashMap<String, String>,
-    flags: HashMap<String, bool>,
-    _: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
-    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+fn change_pin(values: Values) -> Result<()> {
+    let mut state = State::new(values.get_boolean("verbose"))?;
+    state.connect(Some(values.get_required("reader")))?;
     state.change_pin(None, None)
 }
 
-fn unblock_pin(
-    options: HashMap<String, String>,
-    flags: HashMap<String, bool>,
-    _: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
-    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+fn unblock_pin(values: Values) -> Result<()> {
+    let mut state = State::new(values.get_boolean("verbose"))?;
+    state.connect(Some(values.get_required("reader")))?;
     state.unblock_pin(None, None)
 }
 
-fn change_puk(
-    options: HashMap<String, String>,
-    flags: HashMap<String, bool>,
-    _: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
-    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+fn change_puk(values: Values) -> Result<()> {
+    let mut state = State::new(values.get_boolean("verbose"))?;
+    state.connect(Some(values.get_required("reader")))?;
     state.change_puk(None, None)
 }
 
-fn reset(
-    options: HashMap<String, String>,
-    flags: HashMap<String, bool>,
-    _: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
-    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+fn reset(values: Values) -> Result<()> {
+    let mut state = State::new(values.get_boolean("verbose"))?;
+    state.connect(Some(values.get_required("reader")))?;
     state.reset()
 }
 
-fn set_retries(
-    options: HashMap<String, String>,
-    flags: HashMap<String, bool>,
-    _: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let pin_retries = options.get("pin_retries").unwrap().parse::<u8>()?;
-    let puk_retries = options.get("puk_retries").unwrap().parse::<u8>()?;
-    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
-    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+fn set_retries(values: Values) -> Result<()> {
+    let pin_retries: u8 = values.get_required_parsed("pin_retries")?;
+    let puk_retries: u8 = values.get_required_parsed("puk_retries")?;
+    let mut state = State::new(values.get_boolean("verbose"))?;
+    state.connect(Some(values.get_required("reader")))?;
     state.set_retries(None, None, pin_retries, puk_retries)?;
     Ok(())
 }
 
-fn change_mgm_key(
-    options: HashMap<String, String>,
-    flags: HashMap<String, bool>,
-    _: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
-    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+fn change_mgm_key(values: Values) -> Result<()> {
+    let mut state = State::new(values.get_boolean("verbose"))?;
+    state.connect(Some(values.get_required("reader")))?;
     state.set_management_key(None, None)?;
     Ok(())
 }
 
-fn set_chuid(
-    options: HashMap<String, String>,
-    flags: HashMap<String, bool>,
-    _: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
-    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+fn set_chuid(values: Values) -> Result<()> {
+    let mut state = State::new(values.get_boolean("verbose"))?;
+    state.connect(Some(values.get_required("reader")))?;
     state.set_chuid(None)?;
     Ok(())
 }
 
-fn set_ccc(
-    options: HashMap<String, String>,
-    flags: HashMap<String, bool>,
-    _: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
-    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+fn set_ccc(values: Values) -> Result<()> {
+    let mut state = State::new(values.get_boolean("verbose"))?;
+    state.connect(Some(values.get_required("reader")))?;
     state.set_ccc(None)?;
     Ok(())
 }
 
-fn read_object(
-    options: HashMap<String, String>,
-    flags: HashMap<String, bool>,
-    _: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
-    state.connect(Some(options.get("reader").unwrap().as_str()))?;
-    let data = state.read_object(options.get("object_id").unwrap().parse()?)?;
+fn read_object(values: Values) -> Result<()> {
+    let mut state = State::new(values.get_boolean("verbose"))?;
+    state.connect(Some(values.get_required("reader")))?;
+    let data = state.read_object(values.get_required_parsed("object_id")?)?;
     print_data(data.as_slice())?;
     Ok(())
 }
 
-fn write_object(
-    options: HashMap<String, String>,
-    flags: HashMap<String, bool>,
-    _: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let data = read_data(
-        options.get("input").unwrap(),
-        flags.get("base64").map_or(false, |v| *v),
-    )?;
-    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
-    state.connect(Some(options.get("reader").unwrap().as_str()))?;
-    state.write_object(None, options.get("object_id").unwrap().parse()?, data)?;
+fn write_object(values: Values) -> Result<()> {
+    let data = read_data(values.get_required("input"), values.get_boolean("base64"))?;
+    let mut state = State::new(values.get_boolean("verbose"))?;
+    state.connect(Some(values.get_required("reader")))?;
+    state.write_object(None, values.get_required_parsed("object_id")?, data)?;
     Ok(())
 }
 
-fn read_certificate(
-    options: HashMap<String, String>,
-    flags: HashMap<String, bool>,
-    _: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let mut state = State::new(flags.get("verbose").map_or(false, |v| *v))?;
-    state.connect(Some(options.get("reader").unwrap().as_str()))?;
+fn read_certificate(values: Values) -> Result<()> {
+    let mut state = State::new(values.get_boolean("verbose"))?;
+    state.connect(Some(values.get_required("reader")))?;
     println!(
         "{}",
         state.read_certificate(
-            options.get("certificate_id").unwrap().parse()?,
-            options.get("format").unwrap().parse()?
+            values.get_required_parsed("certificate_id")?,
+            values.get_required_parsed("format")?
         )?
     );
     Ok(())
 }
 
 fn main() {
-    bdrck_log::init_cli_logger().unwrap();
+    bdrck::logging::init(None);
     yubirs::init().unwrap();
 
     main_impl_multiple_commands(vec![
-        ExecutableCommand::new(
-            Command::new(
-                "list_readers",
-                "List the available PC/SC readers",
-                vec![Option::flag("verbose", "Enable verbose output", Some('v'))],
-                vec![],
-                false,
-            ).unwrap(),
+        Command::new(
+            "list_readers",
+            "List the available PC/SC readers",
+            Specs::new(vec![
+                Spec::boolean("verbose", "Enable verbose output", Some('v')),
+            ]).unwrap(),
             Box::new(list_readers),
         ),
-        ExecutableCommand::new(
-            Command::new(
-                "get_version",
-                "Retrieve the version number from the Yubikey",
-                vec![
-                    Option::flag("verbose", "Enable verbose output", Some('v')),
-                    Option::required(
-                        "reader",
-                        "The PC/SC reader to use. Try list_readers for possible values. The first \
-                         reader with the value given here as a substring is used.",
-                        Some('r'),
-                        Some(DEFAULT_READER),
+        Command::new(
+            "get_version",
+            "Retrieve the version number from the Yubikey",
+            Specs::new(vec![
+                Spec::boolean("verbose", "Enable verbose output", Some('v')),
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
                     ),
-                ],
-                vec![],
-                false,
-            ).unwrap(),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+            ]).unwrap(),
             Box::new(get_version),
         ),
-        ExecutableCommand::new(
-            Command::new(
-                "change_pin",
-                "Change the Yubikey's PIN, using the existing PIN",
-                vec![
-                    Option::flag("verbose", "Enable verbose output", Some('v')),
-                    Option::required(
-                        "reader",
-                        "The PC/SC reader to use. Try list_readers for possible values. The first \
-                         reader with the value given here as a substring is used.",
-                        Some('r'),
-                        Some(DEFAULT_READER),
+        Command::new(
+            "change_pin",
+            "Change the Yubikey's PIN, using the existing PIN",
+            Specs::new(vec![
+                Spec::boolean("verbose", "Enable verbose output", Some('v')),
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
                     ),
-                ],
-                vec![],
-                false,
-            ).unwrap(),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+            ]).unwrap(),
             Box::new(change_pin),
         ),
-        ExecutableCommand::new(
-            Command::new(
-                "unblock_pin",
-                "Unblock the Yubikey's PIN using the PUK, after exhausting the tries allotted to \
-                 enter a valid PIN",
-                vec![
-                    Option::flag("verbose", "Enable verbose output", Some('v')),
-                    Option::required(
-                        "reader",
-                        "The PC/SC reader to use. Try list_readers for possible values. The first \
-                         reader with the value given here as a substring is used.",
-                        Some('r'),
-                        Some(DEFAULT_READER),
+        Command::new(
+            "unblock_pin",
+            concat!(
+                "Unblock the Yubikey's PIN using the PUK, after exhausting the tries allotted to ",
+                "enter a valid PIN",
+            ),
+            Specs::new(vec![
+                Spec::boolean("verbose", "Enable verbose output", Some('v')),
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
                     ),
-                ],
-                vec![],
-                false,
-            ).unwrap(),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+            ]).unwrap(),
             Box::new(unblock_pin),
         ),
-        ExecutableCommand::new(
-            Command::new(
-                "change_puk",
-                "Change the Yubikey's PUK, using the existing PUK",
-                vec![
-                    Option::flag("verbose", "Enable verbose output", Some('v')),
-                    Option::required(
-                        "reader",
-                        "The PC/SC reader to use. Try list_readers for possible values. The first \
-                         reader with the value given here as a substring is used.",
-                        Some('r'),
-                        Some(DEFAULT_READER),
+        Command::new(
+            "change_puk",
+            "Change the Yubikey's PUK, using the existing PUK",
+            Specs::new(vec![
+                Spec::boolean("verbose", "Enable verbose output", Some('v')),
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
                     ),
-                ],
-                vec![],
-                false,
-            ).unwrap(),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+            ]).unwrap(),
             Box::new(change_puk),
         ),
-        ExecutableCommand::new(
-            Command::new(
-                "reset",
-                "Reset the Yubikey's PIN, PUK, and management key to unblock the PIN and PUK retry \
-                 counters",
-                vec![
-                    Option::flag("verbose", "Enable verbose output", Some('v')),
-                    Option::required(
-                        "reader",
-                        "The PC/SC reader to use. Try list_readers for possible values. The first \
-                         reader with the value given here as a substring is used.",
-                        Some('r'),
-                        Some(DEFAULT_READER),
+        Command::new(
+            "reset",
+            concat!(
+                "Reset the Yubikey's PIN, PUK, and management key to unblock the PIN and PUK ",
+                "retry counters",
+            ),
+            Specs::new(vec![
+                Spec::boolean("verbose", "Enable verbose output", Some('v')),
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
                     ),
-                ],
-                vec![],
-                false,
-            ).unwrap(),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+            ]).unwrap(),
             Box::new(reset),
         ),
-        ExecutableCommand::new(
-            Command::new(
-                "set_retries",
-                "Set the PIN and PUK retry counters, and reset the PIN and PUK back to defaults",
-                vec![
-                    Option::flag("verbose", "Enable verbose output", Some('v')),
-                    Option::required(
-                        "reader",
-                        "The PC/SC reader to use. Try list_readers for possible values. The first \
-                         reader with the value given here as a substring is used.",
-                        Some('r'),
-                        Some(DEFAULT_READER),
+        Command::new(
+            "set_retries",
+            "Set the PIN and PUK retry counters, and reset the PIN and PUK back to defaults",
+            Specs::new(vec![
+                Spec::boolean("verbose", "Enable verbose output", Some('v')),
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
                     ),
-                    Option::required(
-                        "pin_retries",
-                        "The number of retries to allow for the PIN.",
-                        None,
-                        None,
-                    ),
-                    Option::required(
-                        "puk_retries",
-                        "The number of retries to allow for the PUK.",
-                        None,
-                        None,
-                    ),
-                ],
-                vec![],
-                false,
-            ).unwrap(),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+                Spec::required(
+                    "pin_retries",
+                    "The number of retries to allow for the PIN.",
+                    None,
+                    None,
+                ),
+                Spec::required(
+                    "puk_retries",
+                    "The number of retries to allow for the PUK.",
+                    None,
+                    None,
+                ),
+            ]).unwrap(),
             Box::new(set_retries),
         ),
-        ExecutableCommand::new(
-            Command::new(
-                "change_mgm_key",
-                "Change the Yubikey's management key",
-                vec![
-                    Option::flag("verbose", "Enable verbose output", Some('v')),
-                    Option::required(
-                        "reader",
-                        "The PC/SC reader to use. Try list_readers for possible values. The first \
-                         reader with the value given here as a substring is used.",
-                        Some('r'),
-                        Some(DEFAULT_READER),
+        Command::new(
+            "change_mgm_key",
+            "Change the Yubikey's management key",
+            Specs::new(vec![
+                Spec::boolean("verbose", "Enable verbose output", Some('v')),
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
                     ),
-                ],
-                vec![],
-                false,
-            ).unwrap(),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+            ]).unwrap(),
             Box::new(change_mgm_key),
         ),
-        ExecutableCommand::new(
-            Command::new(
-                "set_chuid",
-                "Write a new Card Holder Unique Identifier (CHUID) to the Yubikey",
-                vec![
-                    Option::flag("verbose", "Enable verbose output", Some('v')),
-                    Option::required(
-                        "reader",
-                        "The PC/SC reader to use. Try list_readers for possible values. The first \
-                         reader with the value given here as a substring is used.",
-                        Some('r'),
-                        Some(DEFAULT_READER),
+        Command::new(
+            "set_chuid",
+            "Write a new Card Holder Unique Identifier (CHUID) to the Yubikey",
+            Specs::new(vec![
+                Spec::boolean("verbose", "Enable verbose output", Some('v')),
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
                     ),
-                ],
-                vec![],
-                false,
-            ).unwrap(),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+            ]).unwrap(),
             Box::new(set_chuid),
         ),
-        ExecutableCommand::new(
-            Command::new(
-                "set_ccc",
-                "Write a new Card Capability Container (CCC) to the Yubikey",
-                vec![
-                    Option::flag("verbose", "Enable verbose output", Some('v')),
-                    Option::required(
-                        "reader",
-                        "The PC/SC reader to use. Try list_readers for possible values. The first \
-                         reader with the value given here as a substring is used.",
-                        Some('r'),
-                        Some(DEFAULT_READER),
+        Command::new(
+            "set_ccc",
+            "Write a new Card Capability Container (CCC) to the Yubikey",
+            Specs::new(vec![
+                Spec::boolean("verbose", "Enable verbose output", Some('v')),
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
                     ),
-                ],
-                vec![],
-                false,
-            ).unwrap(),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+            ]).unwrap(),
             Box::new(set_ccc),
         ),
-        ExecutableCommand::new(
-            Command::new(
-                "read_object",
-                "Read the contents of a data object from the Yubikey",
-                vec![
-                    Option::flag("verbose", "Enable verbose output", Some('v')),
-                    Option::required(
-                        "reader",
-                        "The PC/SC reader to use. Try list_readers for possible values. The first \
-                         reader with the value given here as a substring is used.",
-                        Some('r'),
-                        Some(DEFAULT_READER),
+        Command::new(
+            "read_object",
+            "Read the contents of a data object from the Yubikey",
+            Specs::new(vec![
+                Spec::boolean("verbose", "Enable verbose output", Some('v')),
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
                     ),
-                    Option::required(
-                        "object_id",
-                        "The human-readable object ID of the object to read.",
-                        Some('o'),
-                        None,
-                    ),
-                ],
-                vec![],
-                false,
-            ).unwrap(),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+                Spec::required(
+                    "object_id",
+                    "The human-readable ID of the object to read.",
+                    Some('o'),
+                    None,
+                ),
+            ]).unwrap(),
             Box::new(read_object),
         ),
-        ExecutableCommand::new(
-            Command::new(
-                "write_object",
-                "Write a data object to the Yubikey",
-                vec![
-                    Option::flag("verbose", "Enable verbose output", Some('v')),
-                    Option::required(
-                        "reader",
-                        "The PC/SC reader to use. Try list_readers for possible values. The first \
-                         reader with the value given here as a substring is used.",
-                        Some('r'),
-                        Some(DEFAULT_READER),
+        Command::new(
+            "write_object",
+            "Write a data object to the Yubikey",
+            Specs::new(vec![
+                Spec::boolean("verbose", "Enable verbose output", Some('v')),
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
                     ),
-                    Option::required(
-                        "object_id",
-                        "The human-readable object ID of the object to read.",
-                        Some('o'),
-                        None,
-                    ),
-                    Option::required(
-                        "input",
-                        "The path to an input file, or a base64-encoded string.",
-                        Some('i'),
-                        None,
-                    ),
-                    Option::flag(
-                        "base64",
-                        "The input is a base64-encoded string, instead of a path.",
-                        None,
-                    ),
-                ],
-                vec![],
-                false,
-            ).unwrap(),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+                Spec::required(
+                    "object_id",
+                    "The human-readable ID of the object to write.",
+                    Some('o'),
+                    None,
+                ),
+                Spec::required(
+                    "input",
+                    "The path to an input file, or a base64-encoded string.",
+                    Some('i'),
+                    None,
+                ),
+                Spec::boolean(
+                    "base64",
+                    "The input is a base64-encoded string, instead of a path.",
+                    None,
+                ),
+            ]).unwrap(),
             Box::new(write_object),
         ),
-        ExecutableCommand::new(
-            Command::new(
-                "read_certificate",
-                "Read a certificate from the Yubikey",
-                vec![
-                    Option::flag("verbose", "Enable verbose output", Some('v')),
-                    Option::required(
-                        "reader",
-                        "The PC/SC reader to use. Try list_readers for possible values. The first \
-                         reader with the value given here as a substring is used.",
-                        Some('r'),
-                        Some(DEFAULT_READER),
+        Command::new(
+            "read_certificate",
+            "Read a certificate from the Yubikey",
+            Specs::new(vec![
+                Spec::boolean("verbose", "Enable verbose output", Some('v')),
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
                     ),
-                    Option::required(
-                        "certificate_id",
-                        "The human-readable certificate ID of the certificate to read.",
-                        Some('c'),
-                        None,
-                    ),
-                    Option::required(
-                        "format",
-                        "The output format to use.",
-                        Some('f'),
-                        Some("PEM"),
-                    ),
-                ],
-                vec![],
-                false,
-            ).unwrap(),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+                Spec::required(
+                    "certificate_id",
+                    "The human-readable ID of the certificate to read.",
+                    Some('c'),
+                    None,
+                ),
+                Spec::required(
+                    "format",
+                    "The output format to use.",
+                    Some('f'),
+                    Some("PEM"),
+                ),
+            ]).unwrap(),
             Box::new(read_certificate),
         ),
     ]);

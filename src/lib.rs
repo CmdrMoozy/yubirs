@@ -13,8 +13,7 @@
 // limitations under the License.
 
 extern crate base64;
-extern crate bdrck_log;
-extern crate bdrck_params;
+extern crate bdrck;
 extern crate chrono;
 // NOTE: Strongly prefer sodiumoxide over crypto. Crypto is only used because it supports certain
 // legacy crypto algorithms which sodiumoxide omits.

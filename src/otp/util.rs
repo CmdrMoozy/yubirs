@@ -36,5 +36,7 @@ pub fn generate_signature(key: &[u8], data: String) -> Vec<u8> {
 /// Generates a signature as per generate_signature(), and then encodes it in such a way that it
 /// will be accepted by Yubico's API (base64 + percent-encoded).
 pub fn generate_encoded_signature(key: &[u8], data: String) -> String {
-    url_encode(base64::encode_config(generate_signature(key, data).as_slice(), base64::STANDARD).as_str())
+    url_encode(
+        base64::encode_config(generate_signature(key, data).as_slice(), base64::STANDARD).as_str(),
+    )
 }
