@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use base64;
 use chrono::DateTime;
 use chrono::offset::Utc;
-use data_encoding::base64;
 use error::Result;
 use otp::Otp;
 use otp::util;
@@ -143,9 +143,7 @@ fn get_cloned_string_field(fields: &HashMap<Field, &str>, field: Field) -> Optio
 }
 
 fn get_signature(fields: &HashMap<Field, &str>) -> Result<Vec<u8>> {
-    Ok(base64::decode(
-        get_required_field(fields, Field::Signature)?.as_bytes(),
-    )?)
+    Ok(base64::decode_config(get_required_field(fields, Field::Signature)?.as_bytes(), base64::STANDARD)?)
 }
 
 lazy_static! {

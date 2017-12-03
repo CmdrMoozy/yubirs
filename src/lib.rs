@@ -21,7 +21,6 @@ extern crate chrono;
 
 extern crate crypto;
 extern crate curl;
-extern crate data_encoding;
 #[macro_use]
 extern crate error_chain;
 extern crate isatty;

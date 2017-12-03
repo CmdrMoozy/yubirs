@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use data_encoding::base64url;
+use base64;
 use otp::Otp;
 use otp::util;
 use sodiumoxide::randombytes::randombytes;
@@ -24,7 +24,7 @@ use std::fmt;
 fn gen_yubico_api_nonce() -> String {
     let mut nonce = String::new();
     while nonce.len() < 40 {
-        let s = base64url::encode(randombytes(30).as_slice());
+        let s = base64::encode_config(randombytes(30).as_slice(), base64::URL_SAFE);
         let s: String = s.chars().filter(|c| *c != '-' && *c != '_').collect();
         nonce.push_str(s.as_str());
     }
