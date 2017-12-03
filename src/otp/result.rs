@@ -163,9 +163,10 @@ fn get_timestamp(fields: &HashMap<Field, &str>) -> Result<DateTime<Utc>> {
             captures.name("t").unwrap().as_str(),
             nanoseconds
         );
-        return Ok(
-            Utc.datetime_from_str(reformatted.as_str(), "%Y-%m-%d %H:%M:%S %f")?,
-        );
+        return Ok(Utc.datetime_from_str(
+            reformatted.as_str(),
+            "%Y-%m-%d %H:%M:%S %f",
+        )?);
     }
     bail!("Response contained incorrectly formatted 't' field");
 }

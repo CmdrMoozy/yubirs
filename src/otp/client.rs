@@ -118,9 +118,7 @@ impl Client {
         }
         handle.http_headers(headers)?;
         handle.get(true)?;
-        handle.url(
-            build_url(self.protocol, self.api_server.as_str(), &request).as_str(),
-        )?;
+        handle.url(build_url(self.protocol, self.api_server.as_str(), &request).as_str())?;
 
         let mut response = Vec::new();
         {

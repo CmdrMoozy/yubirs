@@ -358,9 +358,9 @@ impl State {
             }
         }
         result?;
-        Ok(
-            unsafe { CStr::from_ptr(buffer.as_ptr()) }.to_str()?.parse()?,
-        )
+        Ok(unsafe { CStr::from_ptr(buffer.as_ptr()) }
+            .to_str()?
+            .parse()?)
     }
 
     /// This function provides the common implementation for the various functions which can be
