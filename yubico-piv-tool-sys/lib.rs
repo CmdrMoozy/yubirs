@@ -443,12 +443,22 @@ fn send_data(
             .map(|b| format!("{:02x}", b))
             .collect::<String>()
     );
+    recv_buffer.truncate(recv_length as usize);
     Ok(if recv_buffer.len() >= 2 {
         ((recv_buffer[recv_length as usize - 2] as c_int) << 8)
             | (recv_buffer[recv_length as usize - 1] as c_int)
     } else {
         0
     })
+}
+
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Version(u8, u8, u8);
+
+impl fmt::Display for Version {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}.{}.{}", self.0, self.1, self.2)
+    }
 }
 
 #[repr(C)]
@@ -581,6 +591,27 @@ impl ykpiv_state {
             unsafe { pcsc_sys::SCardReleaseContext(self.context) };
             self.context = pcsc_sys::SCARD_E_INVALID_HANDLE;
         }
+    }
+
+    pub fn get_version(&self) -> Result<Version> {
+        let apdu = Apdu {
+            st: StructuredApdu {
+                cla: 0,
+                ins: YKPIV_INS_GET_VERSION,
+                p1: 0,
+                p2: 0,
+                lc: 0,
+                data: [0; 255],
+            },
+        };
+        let mut buffer: Vec<u8> = vec![0; 261];
+
+        let sw = send_data(self.card, &apdu, &mut buffer)?;
+        if sw != SW_SUCCESS {
+            bail!("Get version instruction returned error: {:x}", sw);
+        }
+
+        Ok(Version(buffer[0], buffer[1], buffer[2]))
     }
 }
 
@@ -773,11 +804,6 @@ extern "C" {
         out_len: *mut size_t,
         algorithm: c_uchar,
         key: c_uchar,
-    ) -> ykpiv_rc;
-    pub fn ykpiv_get_version(
-        state: *mut ykpiv_state,
-        version: *mut c_char,
-        len: size_t,
     ) -> ykpiv_rc;
     pub fn ykpiv_verify(state: *mut ykpiv_state, pin: *const c_char, tries: *mut c_int)
         -> ykpiv_rc;
