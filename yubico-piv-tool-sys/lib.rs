@@ -310,6 +310,7 @@ pub struct ykpiv_state {
 }
 
 impl ykpiv_state {
+    // TODO: Remove verbose flag.
     pub fn new(verbose: bool) -> Self {
         ykpiv_state {
             context: pcsc_sys::SCARD_E_INVALID_HANDLE,
@@ -320,13 +321,23 @@ impl ykpiv_state {
             },
         }
     }
+
+    pub fn disconnect(&mut self) {
+        if self.card != 0 {
+            unsafe { pcsc_sys::SCardDisconnect(self.card, pcsc_sys::SCARD_RESET_CARD); }
+            self.card = 0;
+        }
+
+        if unsafe { pcsc_sys::SCardIsValidContext(self.context) } == pcsc_sys::SCARD_S_SUCCESS {
+            unsafe { pcsc_sys::SCardReleaseContext(self.context) };
+            self.context = pcsc_sys::SCARD_E_INVALID_HANDLE;
+        }
+    }
 }
 
 impl Drop for ykpiv_state {
     fn drop(&mut self) {
-        unsafe {
-            ykpiv_disconnect(self);
-        }
+        self.disconnect();
     }
 }
 
@@ -463,7 +474,6 @@ extern "C" {
         readers: *mut c_char,
         len: *mut size_t,
     ) -> ykpiv_rc;
-    pub fn ykpiv_disconnect(state: *mut ykpiv_state) -> ykpiv_rc;
     pub fn ykpiv_transfer_data(
         state: *mut ykpiv_state,
         templ: *const c_uchar,
@@ -474,7 +484,6 @@ extern "C" {
         sw: *mut c_int,
     ) -> ykpiv_rc;
     pub fn ykpiv_authenticate(state: *mut ykpiv_state, key: *const c_uchar) -> ykpiv_rc;
-    pub fn ykpiv_set_mgmkey(state: *mut ykpiv_state, new_key: *const c_uchar) -> ykpiv_rc;
     pub fn ykpiv_hex_decode(
         hex_in: *const c_char,
         in_len: size_t,
@@ -489,16 +498,6 @@ extern "C" {
         out_len: *mut size_t,
         algorithm: c_uchar,
         key: c_uchar,
-    ) -> ykpiv_rc;
-    pub fn ykpiv_sign_data2(
-        state: *mut ykpiv_state,
-        sign_in: *const c_uchar,
-        in_len: size_t,
-        sign_out: *mut c_uchar,
-        out_len: *mut size_t,
-        algorithm: c_uchar,
-        key: c_uchar,
-        padding: c_int,
     ) -> ykpiv_rc;
     pub fn ykpiv_decipher_data(
         state: *mut ykpiv_state,

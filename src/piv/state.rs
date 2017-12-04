@@ -327,10 +327,8 @@ impl State {
 
     /// Disconnect from the currently connected PC/SC reader. This is only necessary if you want to
     /// re-use this State to interact with a different reader.
-    pub fn disconnect(&mut self) -> Result<()> {
-        Ok(try_ykpiv(
-            unsafe { ykpiv::ykpiv_disconnect(&mut self.state) },
-        )?)
+    pub fn disconnect(&mut self) {
+        self.state.disconnect()
     }
 
     /// This function returns the version number the connected reader reports. Note that connect()
@@ -548,7 +546,7 @@ impl State {
 
         let new_mgm_key = decode_management_key(new_mgm_key, NEW_MGM_KEY_PROMPT, true)?;
         try_ykpiv(unsafe {
-            ykpiv::ykpiv_set_mgmkey(&mut self.state, new_mgm_key.as_ptr())
+            ykpiv::ykpiv_set_mgmkey2(&mut self.state, new_mgm_key.as_ptr(), 0)
         })?;
         Ok(())
     }
