@@ -49,6 +49,27 @@ pub struct ykpiv_state {
     pub verbose: c_int,
 }
 
+impl ykpiv_state {
+    pub fn new(verbose: bool) -> Self {
+        ykpiv_state {
+            context: pcsc_sys::SCARD_E_INVALID_HANDLE,
+            card: 0,
+            verbose: match verbose {
+                false => 0,
+                true => 1,
+            },
+        }
+    }
+}
+
+impl Drop for ykpiv_state {
+    fn drop(&mut self) {
+        unsafe {
+            ykpiv_disconnect(self);
+        }
+    }
+}
+
 ykpiv_enum! {
     pub enum ykpiv_rc: c_int {
         YKPIV_OK = 0,
@@ -176,8 +197,6 @@ extern "C" {
     pub fn ykpiv_strerror(err: ykpiv_rc) -> *const c_char;
     pub fn ykpiv_strerror_name(err: ykpiv_rc) -> *const c_char;
 
-    pub fn ykpiv_init(state: *mut *mut ykpiv_state, verbose: c_int) -> ykpiv_rc;
-    pub fn ykpiv_done(state: *mut ykpiv_state) -> ykpiv_rc;
     pub fn ykpiv_connect(state: *mut ykpiv_state, wanted: *const c_char) -> ykpiv_rc;
     pub fn ykpiv_list_readers(
         state: *mut ykpiv_state,

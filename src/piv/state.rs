@@ -183,31 +183,18 @@ fn build_data_object(
 }
 
 pub struct State {
-    state: *mut ykpiv::ykpiv_state,
+    state: ykpiv::ykpiv_state,
     authenticated_pin: bool,
     authenticated_mgm: bool,
 }
 
 impl State {
-    pub fn new(verbose: bool) -> Result<State> {
-        let mut state: *mut ykpiv::ykpiv_state = ptr::null_mut();
-        try_ykpiv(unsafe {
-            ykpiv::ykpiv_init(
-                &mut state,
-                match verbose {
-                    false => 0,
-                    true => 1,
-                },
-            )
-        })?;
-        if state.is_null() {
-            bail!("Initializing ykpiv state resulted in null ptr");
-        }
-        Ok(State {
-            state: state,
+    pub fn new(verbose: bool) -> State {
+        State {
+            state: ykpiv::ykpiv_state::new(verbose),
             authenticated_pin: false,
             authenticated_mgm: false,
-        })
+        }
     }
 
     /// This is a generic function which provides the boilerplate needed to execute some other
@@ -226,7 +213,7 @@ impl State {
         loop {
             let value = MaybePromptedString::new(value, prompt, false)?;
             let mut tries: c_int = 0;
-            let result = verify_fn(self.state, value.as_ptr(), value.len(), &mut tries);
+            let result = verify_fn(&mut self.state, value.as_ptr(), value.len(), &mut tries);
 
             // If we called the function successfully, stop here.
             if result.is_ok() {
@@ -277,7 +264,7 @@ impl State {
 
         let mgm_key = decode_management_key(mgm_key, MGM_KEY_PROMPT, false)?;
         try_ykpiv(unsafe {
-            ykpiv::ykpiv_authenticate(self.state, mgm_key.as_ptr())
+            ykpiv::ykpiv_authenticate(&mut self.state, mgm_key.as_ptr())
         })?;
         Ok(())
     }
@@ -294,12 +281,13 @@ impl State {
     ///
     /// So, to be safe (and not report spurious errors), this function pre-allocates a rather large
     /// buffer (64 KiB) to avoid this condition.
-    pub fn list_readers(&self) -> Result<Vec<String>> {
+    pub fn list_readers(&mut self) -> Result<Vec<String>> {
         let mut buffer: Vec<u8> = vec![0_u8; READER_BUFFER_SIZE];
         let mut buffer_len: size_t = READER_BUFFER_SIZE as size_t;
         let result = try_ykpiv(unsafe {
+            // TODO: Pass self.state as an immutable borrow.
             ykpiv::ykpiv_list_readers(
-                self.state,
+                &mut self.state,
                 buffer.as_mut_ptr() as *mut c_char,
                 &mut buffer_len,
             )
@@ -332,23 +320,26 @@ impl State {
     /// be used.
     pub fn connect(&mut self, reader: Option<&str>) -> Result<()> {
         let reader = CString::new(reader.unwrap_or(DEFAULT_READER)).unwrap();
-        Ok(try_ykpiv(
-            unsafe { ykpiv::ykpiv_connect(self.state, reader.as_ptr()) },
-        )?)
+        Ok(try_ykpiv(unsafe {
+            ykpiv::ykpiv_connect(&mut self.state, reader.as_ptr())
+        })?)
     }
 
     /// Disconnect from the currently connected PC/SC reader. This is only necessary if you want to
     /// re-use this State to interact with a different reader.
     pub fn disconnect(&mut self) -> Result<()> {
-        Ok(try_ykpiv(unsafe { ykpiv::ykpiv_disconnect(self.state) })?)
+        Ok(try_ykpiv(
+            unsafe { ykpiv::ykpiv_disconnect(&mut self.state) },
+        )?)
     }
 
     /// This function returns the version number the connected reader reports. Note that connect()
     /// must be called before this function, or an error will be returned.
-    pub fn get_version(&self) -> Result<Version> {
+    pub fn get_version(&mut self) -> Result<Version> {
         let mut buffer: Vec<c_char> = vec![0_i8; VERSION_BUFFER_SIZE];
         let result = try_ykpiv(unsafe {
-            ykpiv::ykpiv_get_version(self.state, buffer.as_mut_ptr(), VERSION_BUFFER_SIZE)
+            // TODO: Pass self.state as an immutable borrow.
+            ykpiv::ykpiv_get_version(&mut self.state, buffer.as_mut_ptr(), VERSION_BUFFER_SIZE)
         });
         if let Some(err) = result.as_ref().err() {
             if *err == ::piv::Error::from(ykpiv::YKPIV_PCSC_ERROR) {
@@ -488,7 +479,7 @@ impl State {
 
         try_ykpiv(unsafe {
             ykpiv::ykpiv_transfer_data(
-                self.state,
+                &mut self.state,
                 templ.as_ptr(),
                 ptr::null(),
                 0,
@@ -531,7 +522,7 @@ impl State {
 
         try_ykpiv(unsafe {
             ykpiv::ykpiv_transfer_data(
-                self.state,
+                &mut self.state,
                 templ.as_ptr(),
                 ptr::null(),
                 0,
@@ -557,7 +548,7 @@ impl State {
 
         let new_mgm_key = decode_management_key(new_mgm_key, NEW_MGM_KEY_PROMPT, true)?;
         try_ykpiv(unsafe {
-            ykpiv::ykpiv_set_mgmkey(self.state, new_mgm_key.as_ptr())
+            ykpiv::ykpiv_set_mgmkey(&mut self.state, new_mgm_key.as_ptr())
         })?;
         Ok(())
     }
@@ -576,7 +567,7 @@ impl State {
             build_data_object(CHUID_TEMPLATE, CHUID_RANDOM_OFFSET, CHUID_RANDOM_BYTES);
         try_ykpiv(unsafe {
             ykpiv::ykpiv_save_object(
-                self.state,
+                &mut self.state,
                 ykpiv::YKPIV_OBJ_CHUID,
                 object.as_mut_ptr(),
                 object.len(),
@@ -595,7 +586,7 @@ impl State {
             build_data_object(CCC_TEMPLATE, CCC_RANDOM_OFFSET, CCC_RANDOM_BYTES);
         try_ykpiv(unsafe {
             ykpiv::ykpiv_save_object(
-                self.state,
+                &mut self.state,
                 ykpiv::YKPIV_OBJ_CAPABILITY,
                 object.as_mut_ptr(),
                 object.len(),
@@ -605,11 +596,17 @@ impl State {
     }
 
     /// Read a data object from the Yubikey, returning the byte contents.
-    pub fn read_object(&self, id: Object) -> Result<Vec<u8>> {
+    pub fn read_object(&mut self, id: Object) -> Result<Vec<u8>> {
         let mut buffer: Vec<u8> = vec![0; OBJECT_BUFFER_SIZE];
         let mut len: c_ulong = OBJECT_BUFFER_SIZE as c_ulong;
         try_ykpiv(unsafe {
-            ykpiv::ykpiv_fetch_object(self.state, id.to_value(), buffer.as_mut_ptr(), &mut len)
+            // TODO: Pass self.state as an immutable borrow.
+            ykpiv::ykpiv_fetch_object(
+                &mut self.state,
+                id.to_value(),
+                buffer.as_mut_ptr(),
+                &mut len,
+            )
         })?;
         buffer.truncate(len as usize);
         Ok(buffer)
@@ -625,23 +622,20 @@ impl State {
     ) -> Result<()> {
         self.authenticate_mgm(mgm_key)?;
         try_ykpiv(unsafe {
-            ykpiv::ykpiv_save_object(self.state, id.to_value(), buffer.as_mut_ptr(), buffer.len())
+            ykpiv::ykpiv_save_object(
+                &mut self.state,
+                id.to_value(),
+                buffer.as_mut_ptr(),
+                buffer.len(),
+            )
         })?;
         Ok(())
     }
 
     /// This is a convenience function to read a certificate's data object from the Yubikey, and
     /// then return it formatted in a specified way.
-    pub fn read_certificate(&self, id: Key, format: Format) -> Result<String> {
+    pub fn read_certificate(&mut self, id: Key, format: Format) -> Result<String> {
         let data = self.read_object(id.to_object()?)?;
         format_certificate(data.as_slice(), format)
-    }
-}
-
-impl Drop for State {
-    fn drop(&mut self) {
-        if let Err(e) = try_ykpiv(unsafe { ykpiv::ykpiv_done(self.state) }) {
-            error!("Cleaning up ykpiv state failed: {}", e);
-        }
     }
 }
