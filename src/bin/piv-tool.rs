@@ -47,7 +47,7 @@ fn read_data(path: &str, is_base64: bool) -> Result<Vec<u8>> {
 }
 
 fn list_readers(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"));
+    let state = State::new(values.get_boolean("verbose"))?;
     let readers: Vec<String> = state.list_readers()?;
     for reader in readers {
         println!("{}", reader);
@@ -56,32 +56,32 @@ fn list_readers(values: Values) -> Result<()> {
 }
 
 fn get_version(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"));
+    let mut state = State::new(values.get_boolean("verbose"))?;
     state.connect(Some(values.get_required("reader")))?;
     println!("{}", state.get_version()?);
     Ok(())
 }
 
 fn change_pin(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"));
+    let mut state = State::new(values.get_boolean("verbose"))?;
     state.connect(Some(values.get_required("reader")))?;
     state.change_pin(None, None)
 }
 
 fn unblock_pin(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"));
+    let mut state = State::new(values.get_boolean("verbose"))?;
     state.connect(Some(values.get_required("reader")))?;
     state.unblock_pin(None, None)
 }
 
 fn change_puk(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"));
+    let mut state = State::new(values.get_boolean("verbose"))?;
     state.connect(Some(values.get_required("reader")))?;
     state.change_puk(None, None)
 }
 
 fn reset(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"));
+    let mut state = State::new(values.get_boolean("verbose"))?;
     state.connect(Some(values.get_required("reader")))?;
     state.reset()
 }
@@ -89,35 +89,35 @@ fn reset(values: Values) -> Result<()> {
 fn set_retries(values: Values) -> Result<()> {
     let pin_retries: u8 = values.get_required_parsed("pin_retries")?;
     let puk_retries: u8 = values.get_required_parsed("puk_retries")?;
-    let mut state = State::new(values.get_boolean("verbose"));
+    let mut state = State::new(values.get_boolean("verbose"))?;
     state.connect(Some(values.get_required("reader")))?;
     state.set_retries(None, None, pin_retries, puk_retries)?;
     Ok(())
 }
 
 fn change_mgm_key(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"));
+    let mut state = State::new(values.get_boolean("verbose"))?;
     state.connect(Some(values.get_required("reader")))?;
     state.set_management_key(None, None)?;
     Ok(())
 }
 
 fn set_chuid(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"));
+    let mut state = State::new(values.get_boolean("verbose"))?;
     state.connect(Some(values.get_required("reader")))?;
     state.set_chuid(None)?;
     Ok(())
 }
 
 fn set_ccc(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"));
+    let mut state = State::new(values.get_boolean("verbose"))?;
     state.connect(Some(values.get_required("reader")))?;
     state.set_ccc(None)?;
     Ok(())
 }
 
 fn read_object(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"));
+    let mut state = State::new(values.get_boolean("verbose"))?;
     state.connect(Some(values.get_required("reader")))?;
     let data = state.read_object(values.get_required_parsed("object_id")?)?;
     print_data(data.as_slice())?;
@@ -126,14 +126,14 @@ fn read_object(values: Values) -> Result<()> {
 
 fn write_object(values: Values) -> Result<()> {
     let data = read_data(values.get_required("input"), values.get_boolean("base64"))?;
-    let mut state = State::new(values.get_boolean("verbose"));
+    let mut state = State::new(values.get_boolean("verbose"))?;
     state.connect(Some(values.get_required("reader")))?;
     state.write_object(None, values.get_required_parsed("object_id")?, data)?;
     Ok(())
 }
 
 fn read_certificate(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"));
+    let mut state = State::new(values.get_boolean("verbose"))?;
     state.connect(Some(values.get_required("reader")))?;
     println!(
         "{}",

@@ -25,7 +25,6 @@ use std::ptr;
 use std::str::FromStr;
 use yubico_piv_tool_sys as ykpiv;
 
-const READER_BUFFER_SIZE: usize = 65536; // 64 KiB
 /// The default reader string to use. The first reader (as returned by list_readers) which contains
 /// this string as a substring is the one which will be used. So, this default will result in us
 /// using the first connected Yubikey we find.
@@ -189,12 +188,12 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(verbose: bool) -> State {
-        State {
-            state: ykpiv::ykpiv_state::new(verbose),
+    pub fn new(verbose: bool) -> Result<State> {
+        Ok(State {
+            state: ykpiv::ykpiv_state::new(verbose)?,
             authenticated_pin: false,
             authenticated_mgm: false,
-        }
+        })
     }
 
     /// This is a generic function which provides the boilerplate needed to execute some other
@@ -270,49 +269,8 @@ impl State {
     }
 
     /// This function returns the list of valid reader strings which can be passed to State::new.
-    ///
-    /// Warning: this function is, generally speaking, very inefficient in terms of memory usage.
-    /// Upstream's ykpiv_list_readers function is truly awful. It requires the caller to
-    /// pre-allocate a buffer, and it will return an error (which is indistinguishable from a
-    /// "real" error) if the caller guesses wrong and allocates a buffer that's too small. The
-    /// especially frustrating thing is that the underlying API this function wraps has a
-    /// mechanism which tells us exactly how long the buffer needs to be, but it wraps it in
-    /// such a way that this functionality is inaccessible.
-    ///
-    /// So, to be safe (and not report spurious errors), this function pre-allocates a rather large
-    /// buffer (64 KiB) to avoid this condition.
-    pub fn list_readers(&mut self) -> Result<Vec<String>> {
-        let mut buffer: Vec<u8> = vec![0_u8; READER_BUFFER_SIZE];
-        let mut buffer_len: size_t = READER_BUFFER_SIZE as size_t;
-        let result = try_ykpiv(unsafe {
-            // TODO: Pass self.state as an immutable borrow.
-            ykpiv::ykpiv_list_readers(
-                &mut self.state,
-                buffer.as_mut_ptr() as *mut c_char,
-                &mut buffer_len,
-            )
-        });
-        if let Some(err) = result.as_ref().err() {
-            if *err == ::piv::Error::from(ykpiv::YKPIV_PCSC_ERROR) {
-                error!(
-                    "Listing readers returned a PC/SC error. Usually this means pcscd is not \
-                     running, or no readers are available. Try running with --verbose for more \
-                     details."
-                );
-            }
-        }
-        result?;
-
-        buffer.truncate(buffer_len);
-        let ret: ::std::result::Result<Vec<String>, ::std::str::Utf8Error> = buffer
-            .split(|b| *b == 0)
-            .filter_map(|slice| match slice.len() {
-                0 => None,
-                _ => Some(::std::str::from_utf8(slice).map(|s| s.to_owned())),
-            })
-            .collect();
-
-        Ok(ret?)
+    pub fn list_readers(&self) -> Result<Vec<String>> {
+        Ok(self.state.list_readers()?)
     }
 
     /// Connect to the PC/SC reader which matches the given reader string (or DEFAULT_READER, if

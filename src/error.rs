@@ -16,6 +16,7 @@ error_chain! {
     foreign_links {
         Base64(::base64::DecodeError);
         Curl(::curl::Error);
+        Internal(::yubico_piv_tool_sys::Error);
         Io(::std::io::Error);
         Nul(::std::ffi::NulError);
         ParseDateTime(::chrono::ParseError);

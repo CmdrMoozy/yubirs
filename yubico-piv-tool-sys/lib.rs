@@ -15,6 +15,8 @@
 #![allow(non_camel_case_types)]
 
 #[macro_use]
+extern crate error_chain;
+#[macro_use]
 extern crate lazy_static;
 extern crate libc;
 extern crate pcsc_sys;
@@ -22,6 +24,7 @@ extern crate pcsc_sys;
 use libc::{c_char, c_int, c_long, c_uchar, c_ulong, size_t};
 use std::collections::HashMap;
 use std::fmt;
+use std::ptr;
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum SmartCardError {
@@ -172,7 +175,7 @@ lazy_static! {
 }
 
 impl SmartCardError {
-    pub fn new(code: pcsc_sys::LONG) -> Result<(), SmartCardError> {
+    pub fn new(code: pcsc_sys::LONG) -> std::result::Result<(), SmartCardError> {
         match code {
             pcsc_sys::SCARD_S_SUCCESS => Ok(()),
             _ => if let Some(e) = FROM_SCARDERR_H_MAPPING.get(&code) {
@@ -339,20 +342,27 @@ impl std::error::Error for SmartCardError {
 }
 
 impl fmt::Display for SmartCardError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
         use std::error::Error;
         write!(f, "{}", self.description())
     }
 }
 
 impl fmt::Debug for SmartCardError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
         write!(
             f,
             "{:#x} {}",
             TO_SCARDERR_H_MAPPING.get(self).unwrap(),
             self
         )
+    }
+}
+
+error_chain! {
+    foreign_links {
+        SCard(SmartCardError);
+        Utf8Slice(std::str::Utf8Error);
     }
 }
 
@@ -388,15 +398,54 @@ pub struct ykpiv_state {
 
 impl ykpiv_state {
     // TODO: Remove verbose flag.
-    pub fn new(verbose: bool) -> Self {
-        ykpiv_state {
-            context: pcsc_sys::SCARD_E_INVALID_HANDLE,
+    pub fn new(verbose: bool) -> Result<Self> {
+        let mut context: pcsc_sys::SCARDCONTEXT = pcsc_sys::SCARD_E_INVALID_HANDLE;
+        SmartCardError::new(unsafe {
+            pcsc_sys::SCardEstablishContext(
+                pcsc_sys::SCARD_SCOPE_SYSTEM,
+                ptr::null(),
+                ptr::null(),
+                &mut context,
+            )
+        })?;
+        Ok(ykpiv_state {
+            context: context,
             card: 0,
             verbose: match verbose {
                 false => 0,
                 true => 1,
             },
+        })
+    }
+
+    pub fn list_readers(&self) -> Result<Vec<String>> {
+        let mut readers_len: pcsc_sys::DWORD = 0;
+        SmartCardError::new(unsafe {
+            pcsc_sys::SCardListReaders(self.context, ptr::null(), ptr::null_mut(), &mut readers_len)
+        })?;
+
+        let mut buffer: Vec<u8> = vec![0_u8; readers_len as usize];
+        SmartCardError::new(unsafe {
+            pcsc_sys::SCardListReaders(
+                self.context,
+                ptr::null(),
+                buffer.as_mut_ptr() as *mut c_char,
+                &mut readers_len,
+            )
+        })?;
+        if readers_len as usize != buffer.len() {
+            bail!("Failed to retrieve full reader list due to buffer size race.");
         }
+
+        let ret: std::result::Result<Vec<String>, std::str::Utf8Error> = buffer
+            .split(|b| *b == 0)
+            .filter_map(|slice| match slice.len() {
+                0 => None,
+                _ => Some(std::str::from_utf8(slice).map(|s| s.to_owned())),
+            })
+            .collect();
+
+        Ok(ret?)
     }
 
     pub fn disconnect(&mut self) {
@@ -548,11 +597,6 @@ extern "C" {
     pub fn ykpiv_strerror_name(err: ykpiv_rc) -> *const c_char;
 
     pub fn ykpiv_connect(state: *mut ykpiv_state, wanted: *const c_char) -> ykpiv_rc;
-    pub fn ykpiv_list_readers(
-        state: *mut ykpiv_state,
-        readers: *mut c_char,
-        len: *mut size_t,
-    ) -> ykpiv_rc;
     pub fn ykpiv_transfer_data(
         state: *mut ykpiv_state,
         templ: *const c_uchar,
