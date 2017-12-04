@@ -15,13 +15,15 @@
 extern crate base64;
 extern crate bdrck;
 extern crate isatty;
+extern crate yubico_piv_tool_sys;
 extern crate yubirs;
 
 use bdrck::flags::*;
 use std::fs::File;
 use std::io::Read;
+use yubico_piv_tool_sys::DEFAULT_READER;
 use yubirs::error::*;
-use yubirs::piv::state::{State, DEFAULT_READER};
+use yubirs::piv::state::State;
 
 fn print_data(data: &[u8]) -> Result<()> {
     if isatty::stdout_isatty() {

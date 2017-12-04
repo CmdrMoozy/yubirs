@@ -25,10 +25,6 @@ use std::ptr;
 use std::str::FromStr;
 use yubico_piv_tool_sys as ykpiv;
 
-/// The default reader string to use. The first reader (as returned by list_readers) which contains
-/// this string as a substring is the one which will be used. So, this default will result in us
-/// using the first connected Yubikey we find.
-pub const DEFAULT_READER: &'static str = "Yubikey";
 
 // The version format is "%d.%d.%d", where each number is an 8-bit unsigned integer. So, we need
 // three digits per number * three numbers + two .'s + one null-terminator, which gives 12 bytes.
@@ -277,10 +273,7 @@ impl State {
     /// one was not provided). The first reader which includes the given string as a substring will
     /// be used.
     pub fn connect(&mut self, reader: Option<&str>) -> Result<()> {
-        let reader = CString::new(reader.unwrap_or(DEFAULT_READER)).unwrap();
-        Ok(try_ykpiv(unsafe {
-            ykpiv::ykpiv_connect(&mut self.state, reader.as_ptr())
-        })?)
+        Ok(self.state.connect(reader)?)
     }
 
     /// Disconnect from the currently connected PC/SC reader. This is only necessary if you want to

@@ -19,12 +19,20 @@ extern crate error_chain;
 #[macro_use]
 extern crate lazy_static;
 extern crate libc;
+#[macro_use]
+extern crate log;
 extern crate pcsc_sys;
 
 use libc::{c_char, c_int, c_long, c_uchar, c_ulong, size_t};
 use std::collections::HashMap;
+use std::ffi;
 use std::fmt;
 use std::ptr;
+
+/// The default reader string to use. The first reader (as returned by list_readers) which contains
+/// this string as a substring is the one which will be used. So, this default will result in us
+/// using the first connected Yubikey we find.
+pub const DEFAULT_READER: &'static str = "Yubikey";
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum SmartCardError {
@@ -361,32 +369,86 @@ impl fmt::Debug for SmartCardError {
 
 error_chain! {
     foreign_links {
+        Nul(::std::ffi::NulError);
         SCard(SmartCardError);
         Utf8Slice(std::str::Utf8Error);
     }
 }
 
-macro_rules! ykpiv_enum {
-    (pub enum $name:ident { $($variants:tt)* }) => {
-        #[cfg(target_env = "msvc")]
-        pub type $name = i32;
-        #[cfg(not(target_env = "msvc"))]
-        pub type $name = u32;
-        ykpiv_enum!(gen, $name, 0, $($variants)*);
-    };
-    (pub enum $name:ident: $t:ty { $($variants:tt)* }) => {
-        pub type $name = $t;
-        ykpiv_enum!(gen, $name, 0, $($variants)*);
-    };
-    (gen, $name:ident, $val:expr, $variant:ident, $($rest:tt)*) => {
-        pub const $variant: $name = $val;
-        ykpiv_enum!(gen, $name, $val+1, $($rest)*);
-    };
-    (gen, $name:ident, $val:expr, $variant:ident = $e:expr, $($rest:tt)*) => {
-        pub const $variant: $name = $e;
-        ykpiv_enum!(gen, $name, $e+1, $($rest)*);
-    };
-    (gen, $name:ident, $val:expr, ) => {}
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct StructuredApdu {
+    /// Instruction class - indicates the type of command, e.g. interindustry or
+    /// proprietary.
+    pub cla: c_uchar,
+    /// Instruction code - indicates the specific command, e.g. "write data".
+    pub ins: c_uchar,
+    /// First instruction parameter for the command, e.g. offset into file at
+    /// which to write the data.
+    pub p1: c_uchar,
+    /// Second instruction parameter for the command, e.g. offset into file at
+    /// which to write the data.
+    pub p2: c_uchar,
+    /// Encodes the number (N_c) of bytes of command data to follow. The
+    /// official specification says that this field can be variable length, but
+    /// upstream specifies it statically at 1 byte.
+    pub lc: c_uchar,
+    /// The command data. The official specification says this can be up to
+    /// 65535 bytes long, but upstream defines it as a static 255 bytes.
+    pub data: [c_uchar; 255],
+}
+
+/// APDU stands for "smart card Application Protocol Data Unit". This union
+/// definition is used by upstream's library to alternate between treating APDU
+/// data in a structured or unstructured way.
+#[repr(C)]
+#[derive(Clone, Copy)]
+union Apdu {
+    st: StructuredApdu,
+    raw: [c_uchar; 230],
+}
+
+/// The Application ID to send in an APDU when connecting to a Yubikey.
+const APDU_AID: [c_uchar; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
+
+fn send_data(
+    card: pcsc_sys::SCARDHANDLE,
+    apdu: *const Apdu,
+    recv_buffer: &mut Vec<u8>,
+) -> Result<c_int> {
+    let send_len: pcsc_sys::DWORD = unsafe { (*apdu).st.lc as pcsc_sys::DWORD + 5 };
+    debug!(
+        "> {}",
+        (unsafe { &(*apdu).raw[0..(send_len as usize)] })
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>()
+    );
+    let mut recv_length = recv_buffer.len() as pcsc_sys::DWORD;
+    SmartCardError::new(unsafe {
+        pcsc_sys::SCardTransmit(
+            card,
+            &pcsc_sys::g_rgSCardT1Pci,
+            (*apdu).raw.as_ptr(),
+            send_len,
+            ptr::null_mut(),
+            recv_buffer.as_mut_ptr(),
+            &mut recv_length,
+        )
+    })?;
+    debug!(
+        "< {}",
+        recv_buffer
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>()
+    );
+    Ok(if recv_buffer.len() >= 2 {
+        ((recv_buffer[recv_length as usize - 2] as c_int) << 8)
+            | (recv_buffer[recv_length as usize - 1] as c_int)
+    } else {
+        0
+    })
 }
 
 #[repr(C)]
@@ -448,6 +510,65 @@ impl ykpiv_state {
         Ok(ret?)
     }
 
+    pub fn connect(&mut self, reader: Option<&str>) -> Result<()> {
+        let reader = reader.unwrap_or(DEFAULT_READER);
+        let readers = self.list_readers()?;
+        for potential_reader in readers {
+            if !potential_reader.contains(reader) {
+                info!(
+                    "Skipping reader '{}' since it doesn't match '{}'",
+                    potential_reader,
+                    reader
+                );
+                continue;
+            }
+
+            info!("Attempting to connect to reader '{}'", potential_reader);
+            let potential_reader = ffi::CString::new(potential_reader)?;
+            let mut active_protocol: pcsc_sys::DWORD = pcsc_sys::SCARD_PROTOCOL_UNDEFINED;
+            SmartCardError::new(unsafe {
+                pcsc_sys::SCardConnect(
+                    self.context,
+                    potential_reader.as_ptr(),
+                    pcsc_sys::SCARD_SHARE_SHARED,
+                    pcsc_sys::SCARD_PROTOCOL_T1,
+                    &mut self.card,
+                    &mut active_protocol,
+                )
+            })?;
+
+            let mut data: [c_uchar; 255] = [0; 255];
+            for (dst, src) in data.iter_mut().zip(APDU_AID.iter()) {
+                *dst = *src;
+            }
+            let apdu = Apdu {
+                st: StructuredApdu {
+                    cla: 0,
+                    ins: 0xa4,
+                    p1: 0x04,
+                    p2: 0,
+                    lc: APDU_AID.len() as c_uchar,
+                    data: data,
+                },
+            };
+
+            let mut recv_buffer: Vec<u8> = vec![0; 255];
+            let sw = send_data(self.card, &apdu, &mut recv_buffer)?;
+            if sw != SW_SUCCESS {
+                bail!("Failed selecting application: {:x}", sw);
+            }
+
+            return Ok(());
+        }
+
+        Err(
+            SmartCardError::new(pcsc_sys::SCARD_E_UNKNOWN_READER)
+                .err()
+                .unwrap()
+                .into(),
+        )
+    }
+
     pub fn disconnect(&mut self) {
         if self.card != 0 {
             unsafe {
@@ -467,6 +588,29 @@ impl Drop for ykpiv_state {
     fn drop(&mut self) {
         self.disconnect();
     }
+}
+
+macro_rules! ykpiv_enum {
+    (pub enum $name:ident { $($variants:tt)* }) => {
+        #[cfg(target_env = "msvc")]
+        pub type $name = i32;
+        #[cfg(not(target_env = "msvc"))]
+        pub type $name = u32;
+        ykpiv_enum!(gen, $name, 0, $($variants)*);
+    };
+    (pub enum $name:ident: $t:ty { $($variants:tt)* }) => {
+        pub type $name = $t;
+        ykpiv_enum!(gen, $name, 0, $($variants)*);
+    };
+    (gen, $name:ident, $val:expr, $variant:ident, $($rest:tt)*) => {
+        pub const $variant: $name = $val;
+        ykpiv_enum!(gen, $name, $val+1, $($rest)*);
+    };
+    (gen, $name:ident, $val:expr, $variant:ident = $e:expr, $($rest:tt)*) => {
+        pub const $variant: $name = $e;
+        ykpiv_enum!(gen, $name, $e+1, $($rest)*);
+    };
+    (gen, $name:ident, $val:expr, ) => {}
 }
 
 ykpiv_enum! {
@@ -596,7 +740,6 @@ extern "C" {
     pub fn ykpiv_strerror(err: ykpiv_rc) -> *const c_char;
     pub fn ykpiv_strerror_name(err: ykpiv_rc) -> *const c_char;
 
-    pub fn ykpiv_connect(state: *mut ykpiv_state, wanted: *const c_char) -> ykpiv_rc;
     pub fn ykpiv_transfer_data(
         state: *mut ykpiv_state,
         templ: *const c_uchar,
