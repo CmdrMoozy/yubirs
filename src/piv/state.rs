@@ -18,11 +18,9 @@ use libc::{c_char, c_int, c_uchar, c_ulong, size_t};
 use piv::try_ykpiv;
 use piv::id::{Key, Object};
 use rand::{self, Rng};
-use rpassword;
-use std::ffi::CString;
 use std::ptr;
 use yubico_piv_tool_sys as ykpiv;
-use yubico_piv_tool_sys::Version;
+use yubico_piv_tool_sys::{MaybePromptedString, Version};
 
 const OBJECT_BUFFER_SIZE: usize = 3072;
 
@@ -61,55 +59,6 @@ const CCC_TEMPLATE: &'static [c_uchar] = &[
 ];
 const CCC_RANDOM_OFFSET: usize = 9;
 const CCC_RANDOM_BYTES: usize = 14;
-
-/// This is a utility function to prompt the user for a sensitive string, probably a PIN or a PUK.
-fn prompt_for_string(prompt: &str, confirm: bool) -> Result<String> {
-    loop {
-        let string = rpassword::prompt_password_stderr(prompt)?;
-        if !confirm || string == rpassword::prompt_password_stderr("Confirm: ")? {
-            return Ok(string);
-        }
-    }
-}
-
-struct MaybePromptedString {
-    value: CString,
-    length: usize,
-    was_provided: bool,
-}
-
-impl MaybePromptedString {
-    pub fn new(provided: Option<&str>, prompt: &str, confirm: bool) -> Result<Self> {
-        let prompted: Option<String> = match provided {
-            None => Some(prompt_for_string(prompt, confirm)?),
-            Some(_) => None,
-        };
-        let length: usize =
-            provided.map_or_else(|| prompted.as_ref().map_or(0, |s| s.len()), |s| s.len());
-
-        Ok(MaybePromptedString {
-            value: CString::new(
-                provided.map_or_else(|| prompted.as_ref().map_or("", |s| s.as_str()), |s| s),
-            )?,
-            length: length,
-            was_provided: provided.is_some(),
-        })
-    }
-
-    pub fn was_provided(&self) -> bool {
-        self.was_provided
-    }
-
-    /// Returns a pointer to the string's bytes. This pointer is guaranteed to point to a
-    /// NUL-terminated string.
-    pub fn as_ptr(&self) -> *const c_char {
-        self.value.as_ptr()
-    }
-
-    pub fn len(&self) -> usize {
-        self.length
-    }
-}
 
 fn decode_management_key(
     mgm_key: Option<&str>,

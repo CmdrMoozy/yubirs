@@ -22,10 +22,11 @@ extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate pcsc_sys;
+extern crate rpassword;
 
 use libc::{c_char, c_int, c_long, c_uchar, c_ulong, size_t};
 use std::collections::HashMap;
-use std::ffi;
+use std::ffi::CString;
 use std::fmt;
 use std::ptr;
 
@@ -369,7 +370,8 @@ impl fmt::Debug for SmartCardError {
 
 error_chain! {
     foreign_links {
-        Nul(::std::ffi::NulError);
+        Io(std::io::Error);
+        Nul(std::ffi::NulError);
         SCard(SmartCardError);
         Utf8Slice(std::str::Utf8Error);
     }
@@ -450,6 +452,56 @@ fn send_data(
     } else {
         0
     })
+}
+
+/// This is a utility function to prompt the user for a sensitive string, probably a PIN or a PUK.
+fn prompt_for_string(prompt: &str, confirm: bool) -> Result<String> {
+    loop {
+        let string = rpassword::prompt_password_stderr(prompt)?;
+        if !confirm || string == rpassword::prompt_password_stderr("Confirm: ")? {
+            return Ok(string);
+        }
+    }
+}
+
+// TODO: Make this private.
+pub struct MaybePromptedString {
+    value: CString,
+    length: usize,
+    was_provided: bool,
+}
+
+impl MaybePromptedString {
+    pub fn new(provided: Option<&str>, prompt: &str, confirm: bool) -> Result<Self> {
+        let prompted: Option<String> = match provided {
+            None => Some(prompt_for_string(prompt, confirm)?),
+            Some(_) => None,
+        };
+        let length: usize =
+            provided.map_or_else(|| prompted.as_ref().map_or(0, |s| s.len()), |s| s.len());
+
+        Ok(MaybePromptedString {
+            value: CString::new(
+                provided.map_or_else(|| prompted.as_ref().map_or("", |s| s.as_str()), |s| s),
+            )?,
+            length: length,
+            was_provided: provided.is_some(),
+        })
+    }
+
+    pub fn was_provided(&self) -> bool {
+        self.was_provided
+    }
+
+    /// Returns a pointer to the string's bytes. This pointer is guaranteed to point to a
+    /// NUL-terminated string.
+    pub fn as_ptr(&self) -> *const c_char {
+        self.value.as_ptr()
+    }
+
+    pub fn len(&self) -> usize {
+        self.length
+    }
 }
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -534,7 +586,7 @@ impl ykpiv_state {
             }
 
             info!("Attempting to connect to reader '{}'", potential_reader);
-            let potential_reader = ffi::CString::new(potential_reader)?;
+            let potential_reader = CString::new(potential_reader)?;
             let mut active_protocol: pcsc_sys::DWORD = pcsc_sys::SCARD_PROTOCOL_UNDEFINED;
             SmartCardError::new(unsafe {
                 pcsc_sys::SCardConnect(
