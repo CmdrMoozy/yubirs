@@ -24,6 +24,7 @@ use yubico_piv_tool_sys::{MaybePromptedString, Version};
 
 const OBJECT_BUFFER_SIZE: usize = 3072;
 
+// TODO: Remove all of these constants.
 const PIN_NAME: &'static str = "PIN";
 const PIN_PROMPT: &'static str = "PIN: ";
 const NEW_PIN_PROMPT: &'static str = "New PIN: ";
@@ -97,7 +98,6 @@ fn build_data_object(
 
 pub struct State {
     state: ykpiv::ykpiv_state,
-    authenticated_pin: bool,
     authenticated_mgm: bool,
 }
 
@@ -105,7 +105,6 @@ impl State {
     pub fn new(verbose: bool) -> Result<State> {
         Ok(State {
             state: ykpiv::ykpiv_state::new(verbose)?,
-            authenticated_pin: false,
             authenticated_mgm: false,
         })
     }
@@ -151,20 +150,6 @@ impl State {
                 }
             }
         }
-    }
-
-    /// This function authenticates this State with the current PIN (ykpiv calls this ykpiv_verify,
-    /// essentially). This can only be done once per State, so if it has been done before this
-    /// function is a no-op.
-    fn authenticate_pin(&mut self, pin: Option<&str>) -> Result<()> {
-        if self.authenticated_pin {
-            return Ok(());
-        }
-
-        self.verify_pin_or_puk(PIN_NAME, pin, PIN_PROMPT, |state, pin, _, tries| {
-            try_ykpiv(unsafe { ykpiv::ykpiv_verify(state, pin, tries) })
-        })?;
-        Ok(())
     }
 
     /// This function authenticates this state with the management key, unlocking various
@@ -360,7 +345,7 @@ impl State {
         puk_retries: u8,
     ) -> Result<()> {
         self.authenticate_mgm(mgm_key)?;
-        self.authenticate_pin(pin)?;
+        self.state.authenticate_pin(pin)?;
 
         let templ: Vec<c_uchar> = vec![
             0,

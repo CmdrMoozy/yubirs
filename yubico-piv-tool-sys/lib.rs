@@ -35,6 +35,9 @@ use std::ptr;
 /// using the first connected Yubikey we find.
 pub const DEFAULT_READER: &'static str = "Yubikey";
 
+const PIN_NAME: &'static str = "PIN";
+const PIN_PROMPT: &'static str = "PIN: ";
+
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum SmartCardError {
     BadSeek,
@@ -493,6 +496,10 @@ impl MaybePromptedString {
         self.was_provided
     }
 
+    pub fn as_bytes(&self) -> &[u8] {
+        self.value.as_bytes()
+    }
+
     /// Returns a pointer to the string's bytes. This pointer is guaranteed to point to a
     /// NUL-terminated string.
     pub fn as_ptr(&self) -> *const c_char {
@@ -501,6 +508,48 @@ impl MaybePromptedString {
 
     pub fn len(&self) -> usize {
         self.length
+    }
+}
+
+enum VerificationResult {
+    /// The verification was successful.
+    Success,
+    /// The verification failed, but can be reattempted some number of times.
+    Failure(usize, Error),
+    /// Verification failed, and there are no more retries available, so the failure is permanent.
+    PermanentFailure(Error),
+    /// The verification failed for some other reason. There may or may not be retries left for
+    /// other types of failures.
+    OtherFailure(Error),
+}
+
+/// This is a generic function which implements the boilerplate needed to execute some other
+/// function which requires verification of some sort. This function will prompt for a value if one
+/// is not provided, using the given prompt string. The name parameter should describe what the
+/// value is, for human-readable error messages in case of failure.
+fn verification_loop<F>(name: &str, value: Option<&str>, prompt: &str, callback: F) -> Result<()>
+where
+    F: Fn(&MaybePromptedString) -> VerificationResult,
+{
+    loop {
+        let value = MaybePromptedString::new(value, prompt, false)?;
+        match callback(&value) {
+            VerificationResult::Success => return Ok(()),
+            VerificationResult::Failure(tries, err) => {
+                debug!("Incorrect {}, {} tries remaining: {}", name, tries, err);
+                // If we didn't prompt for a value, retrying won't help, because we'd just be
+                // retrying with the same value over again. In this case, just bail now.
+                match value.was_provided() {
+                    false => eprintln!("Incorrect {}, try again - {} tries remaining", name, tries),
+                    true => bail!(err),
+                };
+            }
+            VerificationResult::PermanentFailure(err) => {
+                debug!("Incorrect {}, 0 tries remaining: {}", name, err);
+                bail!("Verifying {} failed: no more retries", name);
+            }
+            VerificationResult::OtherFailure(err) => bail!(err),
+        }
     }
 }
 
@@ -518,6 +567,7 @@ pub struct ykpiv_state {
     pub context: pcsc_sys::SCARDCONTEXT,
     pub card: pcsc_sys::SCARDHANDLE,
     pub verbose: c_int,
+    authenticated_pin: bool,
 }
 
 impl ykpiv_state {
@@ -539,7 +589,74 @@ impl ykpiv_state {
                 false => 0,
                 true => 1,
             },
+            authenticated_pin: false,
         })
+    }
+
+    // TODO: Make this function private.
+    pub fn authenticate_pin(&mut self, pin: Option<&str>) -> Result<()> {
+        if self.authenticated_pin {
+            return Ok(());
+        }
+
+        verification_loop(PIN_NAME, pin, PIN_PROMPT, |pin| {
+            if pin.len() > 8 {
+                return VerificationResult::OtherFailure(
+                    "Invalid PIN; it exceeds 8 characters".into(),
+                );
+            }
+
+            let mut data: [c_uchar; 255] = [0; 255];
+            for (dst, src) in data.iter_mut().zip(pin.as_bytes()) {
+                *dst = *src;
+            }
+            for b in data.iter_mut().skip(pin.len()).take(8 - pin.len()) {
+                *b = 0xff;
+            }
+
+            let apdu = Apdu {
+                st: StructuredApdu {
+                    cla: 0,
+                    ins: YKPIV_INS_VERIFY,
+                    p1: 0x00,
+                    p2: 0x80,
+                    lc: 0x80,
+                    data: data,
+                },
+            };
+
+            let mut buffer: Vec<c_uchar> = vec![0; 261];
+            let sw = match send_data(self.card, &apdu, &mut buffer) {
+                Err(e) => return VerificationResult::OtherFailure(e),
+                Ok(sw) => sw,
+            };
+            if sw == SW_SUCCESS {
+                VerificationResult::Success
+            } else if (sw >> 8) == 0x63 {
+                VerificationResult::Failure(
+                    (sw & 0xf) as usize,
+                    SmartCardError::new(pcsc_sys::SCARD_E_INVALID_CHV)
+                        .err()
+                        .unwrap()
+                        .into(),
+                )
+            } else if sw == SW_ERR_AUTH_BLOCKED {
+                VerificationResult::PermanentFailure(
+                    SmartCardError::new(pcsc_sys::SCARD_W_CHV_BLOCKED)
+                        .err()
+                        .unwrap()
+                        .into(),
+                )
+            } else {
+                VerificationResult::OtherFailure(
+                    SmartCardError::new(pcsc_sys::SCARD_E_UNKNOWN_RES_MNG)
+                        .err()
+                        .unwrap()
+                        .into(),
+                )
+            }
+        })?;
+        Ok(())
     }
 
     pub fn list_readers(&self) -> Result<Vec<String>> {
@@ -857,8 +974,6 @@ extern "C" {
         algorithm: c_uchar,
         key: c_uchar,
     ) -> ykpiv_rc;
-    pub fn ykpiv_verify(state: *mut ykpiv_state, pin: *const c_char, tries: *mut c_int)
-        -> ykpiv_rc;
     pub fn ykpiv_change_pin(
         state: *mut ykpiv_state,
         current_pin: *const c_char,
