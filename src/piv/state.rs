@@ -14,24 +14,14 @@
 
 use cert::{format_certificate, Format};
 use error::*;
-use libc::{c_char, c_int, c_uchar, c_ulong, size_t};
+use libc::{c_uchar, c_ulong, size_t};
 use piv::try_ykpiv;
 use piv::id::{Key, Object};
 use rand::{self, Rng};
-use std::ptr;
 use yubico_piv_tool_sys as ykpiv;
 use yubico_piv_tool_sys::{MaybePromptedString, Version};
 
 const OBJECT_BUFFER_SIZE: usize = 3072;
-
-// TODO: Remove all of these constants.
-const PIN_NAME: &'static str = "PIN";
-const PIN_PROMPT: &'static str = "PIN: ";
-const NEW_PIN_PROMPT: &'static str = "New PIN: ";
-
-const PUK_NAME: &'static str = "PUK";
-const PUK_PROMPT: &'static str = "PUK: ";
-const NEW_PUK_PROMPT: &'static str = "New PUK: ";
 
 const MGM_KEY_PROMPT: &'static str = "Management Key: ";
 const NEW_MGM_KEY_PROMPT: &'static str = "New Management Key: ";
@@ -109,49 +99,6 @@ impl State {
         })
     }
 
-    /// This is a generic function which provides the boilerplate needed to execute some other
-    /// function which requires PIN or PUK verification.
-    fn verify_pin_or_puk<F>(
-        &mut self,
-        name: &str,
-        value: Option<&str>,
-        prompt: &str,
-        verify_fn: F,
-    ) -> Result<()>
-    where
-        F: Fn(*mut ykpiv::ykpiv_state, *const c_char, size_t, *mut c_int)
-            -> ::std::result::Result<(), ::piv::Error>,
-    {
-        loop {
-            let value = MaybePromptedString::new(value, prompt, false)?;
-            let mut tries: c_int = 0;
-            let result = verify_fn(&mut self.state, value.as_ptr(), value.len(), &mut tries);
-
-            // If we called the function successfully, stop here.
-            if result.is_ok() {
-                return Ok(());
-            }
-
-            if let Some(err) = result.err() {
-                if err != ::piv::Error::from(ykpiv::YKPIV_WRONG_PIN) {
-                    // We got some error other than the existing PIN or PUK being wrong (the same
-                    // error is used for both). Return the error.
-                    bail!(err);
-                } else if value.was_provided() {
-                    // The given existing PIN or PUK was wrong, but it is static. Return the error
-                    // without retrying.
-                    bail!(err);
-                } else if tries <= 0 {
-                    // If we have no more tries available, return an error.
-                    bail!("Verifying {} failed: no more retries", name);
-                } else {
-                    // Otherwise, loop and re-prompt the user so they can try again.
-                    error!("Incorrect {}, try again - {} tries remaining", name, tries);
-                }
-            }
-        }
-    }
-
     /// This function authenticates this state with the management key, unlocking various
     /// administrative / management functions. For details on what features require authentication,
     /// see: https://developers.yubico.com/PIV/Introduction/Admin_access.html
@@ -191,46 +138,6 @@ impl State {
         Ok(self.state.get_version()?)
     }
 
-    /// This function provides the common implementation for the various functions which can be
-    /// used to change or unblock the Yubikey's PIN or PUK.
-    fn change_pin_or_puk<F>(
-        &mut self,
-        existing_name: &str,
-        existing: Option<&str>,
-        new_name: &str,
-        new: Option<&str>,
-        existing_prompt: &str,
-        new_prompt: &str,
-        change_fn: F,
-    ) -> Result<()>
-    where
-        F: Fn(*mut ykpiv::ykpiv_state, *const c_char, size_t, *const c_char, size_t, *mut c_int)
-            -> ::std::result::Result<(), ::piv::Error>,
-    {
-        self.verify_pin_or_puk(
-            existing_name,
-            existing,
-            existing_prompt,
-            |state, existing, existing_len, tries| {
-                let new = match MaybePromptedString::new(new.clone(), new_prompt, true) {
-                    Ok(new) => new,
-                    Err(err) => {
-                        error!("Reading {} user input failed: {}", new_name, err);
-                        bail!(::piv::Error::from(ykpiv::YKPIV_GENERIC_ERROR));
-                    }
-                };
-                change_fn(
-                    state,
-                    existing,
-                    existing_len,
-                    new.as_ptr(),
-                    new.len(),
-                    tries,
-                )
-            },
-        )
-    }
-
     /// This function allows the user to change the Yubikey's PIN, given that the user knows the
     /// existing PIN. The old and new PINs can be provided as function arguments. If they are not
     /// provided, this function will prompt for them on stdin.
@@ -239,19 +146,7 @@ impl State {
     /// until there are no more available retries. At that point, the PIN can be unblocked using
     /// the PUK.
     pub fn change_pin(&mut self, old_pin: Option<&str>, new_pin: Option<&str>) -> Result<()> {
-        self.change_pin_or_puk(
-            PIN_NAME,
-            old_pin,
-            PIN_NAME,
-            new_pin,
-            PIN_PROMPT,
-            NEW_PIN_PROMPT,
-            |state, existing, existing_len, new, new_len, tries| {
-                try_ykpiv(unsafe {
-                    ykpiv::ykpiv_change_pin(state, existing, existing_len, new, new_len, tries)
-                })
-            },
-        )
+        Ok(self.state.change_pin(old_pin, new_pin)?)
     }
 
     /// This function allows the user to reset the Yubikey's PIN using the PUK, after the user has
@@ -263,19 +158,7 @@ impl State {
     /// until there are no more available retries. At that point, the Yubiey can be reset to
     /// factory defaults using the reset function.
     pub fn unblock_pin(&mut self, puk: Option<&str>, new_pin: Option<&str>) -> Result<()> {
-        self.change_pin_or_puk(
-            PUK_NAME,
-            puk,
-            PIN_NAME,
-            new_pin,
-            PUK_PROMPT,
-            NEW_PIN_PROMPT,
-            |state, existing, existing_len, new, new_len, tries| {
-                try_ykpiv(unsafe {
-                    ykpiv::ykpiv_unblock_pin(state, existing, existing_len, new, new_len, tries)
-                })
-            },
-        )
+        Ok(self.state.unblock_pin(puk, new_pin)?)
     }
 
     /// This function allows the user to change the Yubikey's PUK, given that the user knows the
@@ -286,19 +169,7 @@ impl State {
     /// until there are no more available retries. At that point, the PIN and PUK can both be
     /// unblocked using the reset function.
     pub fn change_puk(&mut self, old_puk: Option<&str>, new_puk: Option<&str>) -> Result<()> {
-        self.change_pin_or_puk(
-            PUK_NAME,
-            old_puk,
-            PUK_NAME,
-            new_puk,
-            PUK_PROMPT,
-            NEW_PUK_PROMPT,
-            |state, existing, existing_len, new, new_len, tries| {
-                try_ykpiv(unsafe {
-                    ykpiv::ykpiv_change_puk(state, existing, existing_len, new, new_len, tries)
-                })
-            },
-        )
+        Ok(self.state.change_puk(old_puk, new_puk)?)
     }
 
     /// This function resets the PIN, PUK, and management key to their factory default values, as
@@ -310,25 +181,11 @@ impl State {
     /// change_pin, unblock_pin, and change_puk functions should be used instead of this function.
     pub fn reset(&mut self) -> Result<()> {
         let templ: Vec<c_uchar> = vec![0, ykpiv::YKPIV_INS_RESET, 0, 0];
-        let mut data: Vec<c_uchar> = vec![0; 255];
-        let mut data_len: c_ulong = 0;
-        let mut sw: c_int = 0;
-
-        try_ykpiv(unsafe {
-            ykpiv::ykpiv_transfer_data(
-                &mut self.state,
-                templ.as_ptr(),
-                ptr::null(),
-                0,
-                data.as_mut_ptr(),
-                &mut data_len,
-                &mut sw,
-            )
-        })?;
-        if sw != ykpiv::SW_SUCCESS {
-            bail!("Reset failed, probably because PIN or PUK retries are still available");
+        let (sw, _) = self.state.transfer_data(templ.as_slice(), &[])?;
+        match sw {
+            ykpiv::SW_SUCCESS => Ok(()),
+            _ => bail!("Reset failed, probably because PIN or PUK retries are still available"),
         }
-        Ok(())
     }
 
     /// This function sets the number of retries available for PIN or PUK verification. This also
@@ -353,25 +210,12 @@ impl State {
             pin_retries,
             puk_retries,
         ];
-        let mut data: Vec<c_uchar> = vec![0; 255];
-        let mut data_len: c_ulong = data.len() as c_ulong;
-        let mut sw: c_int = 0;
 
-        try_ykpiv(unsafe {
-            ykpiv::ykpiv_transfer_data(
-                &mut self.state,
-                templ.as_ptr(),
-                ptr::null(),
-                0,
-                data.as_mut_ptr(),
-                &mut data_len,
-                &mut sw,
-            )
-        })?;
-        if sw != ykpiv::SW_SUCCESS {
-            bail!("Setting PIN and PUK retries failed");
+        let (sw, _) = self.state.transfer_data(templ.as_slice(), &[])?;
+        match sw {
+            ykpiv::SW_SUCCESS => Ok(()),
+            _ => bail!("Setting PIN and PUK retries failed"),
         }
-        Ok(())
     }
 
     /// This function changes the management key stored on the device. This is the key used to

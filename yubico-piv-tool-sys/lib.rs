@@ -24,7 +24,7 @@ extern crate log;
 extern crate pcsc_sys;
 extern crate rpassword;
 
-use libc::{c_char, c_int, c_long, c_uchar, c_ulong, size_t};
+use libc::{c_char, c_int, c_uchar, c_ulong, size_t};
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::fmt;
@@ -37,6 +37,11 @@ pub const DEFAULT_READER: &'static str = "Yubikey";
 
 const PIN_NAME: &'static str = "PIN";
 const PIN_PROMPT: &'static str = "PIN: ";
+const NEW_PIN_PROMPT: &'static str = "New PIN: ";
+
+const PUK_NAME: &'static str = "PUK";
+const PUK_PROMPT: &'static str = "PUK: ";
+const NEW_PUK_PROMPT: &'static str = "New PUK: ";
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum SmartCardError {
@@ -416,7 +421,8 @@ union Apdu {
 /// The Application ID to send in an APDU when connecting to a Yubikey.
 const APDU_AID: [c_uchar; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
 
-fn send_data(
+// TODO: Remove this function, leaving only send_data.
+fn send_data_impl(
     card: pcsc_sys::SCARDHANDLE,
     apdu: *const Apdu,
     recv_buffer: &mut Vec<u8>,
@@ -455,6 +461,13 @@ fn send_data(
     } else {
         0
     })
+}
+
+fn send_data(card: pcsc_sys::SCARDHANDLE, apdu: &Apdu) -> Result<(c_int, Vec<u8>)> {
+    // Upstream uses a 261-byte buffer in all cases, even though this number seems mostly made up.
+    // It seems like a sane default for now.
+    let mut recv: Vec<u8> = vec![0; 261];
+    Ok((send_data_impl(card, apdu, &mut recv)?, recv))
 }
 
 /// This is a utility function to prompt the user for a sensitive string, probably a PIN or a PUK.
@@ -523,6 +536,36 @@ enum VerificationResult {
     OtherFailure(Error),
 }
 
+impl VerificationResult {
+    pub fn from_status(sw: c_int) -> VerificationResult {
+        if sw == SW_SUCCESS {
+            VerificationResult::Success
+        } else if (sw >> 8) == 0x63 {
+            VerificationResult::Failure(
+                (sw & 0xf) as usize,
+                SmartCardError::new(pcsc_sys::SCARD_E_INVALID_CHV)
+                    .err()
+                    .unwrap()
+                    .into(),
+            )
+        } else if sw == SW_ERR_AUTH_BLOCKED {
+            VerificationResult::PermanentFailure(
+                SmartCardError::new(pcsc_sys::SCARD_W_CHV_BLOCKED)
+                    .err()
+                    .unwrap()
+                    .into(),
+            )
+        } else {
+            VerificationResult::OtherFailure(
+                SmartCardError::new(pcsc_sys::SCARD_E_UNKNOWN_RES_MNG)
+                    .err()
+                    .unwrap()
+                    .into(),
+            )
+        }
+    }
+}
+
 /// This is a generic function which implements the boilerplate needed to execute some other
 /// function which requires verification of some sort. This function will prompt for a value if one
 /// is not provided, using the given prompt string. The name parameter should describe what the
@@ -551,6 +594,182 @@ where
             VerificationResult::OtherFailure(err) => bail!(err),
         }
     }
+}
+
+/// This is a generic function which implements the boilerplate needed to verify and then change
+/// some value. For example, changing the Yubikey's PIN or PUK after verifying the PIN or PUK. This
+/// function will prompt for both an existing and a new value if they are not provided, using the
+/// given names for human-readable error messages and the prompt strings for prompting the user.
+fn verification_change_loop<F>(
+    existing_name: &str,
+    existing: Option<&str>,
+    new_name: &str,
+    new: Option<&str>,
+    existing_prompt: &str,
+    new_prompt: &str,
+    callback: F,
+) -> Result<()>
+where
+    F: Fn(&MaybePromptedString, &MaybePromptedString) -> VerificationResult,
+{
+    verification_loop(existing_name, existing, existing_prompt, |existing| {
+        let new = match MaybePromptedString::new(new.clone(), new_prompt, true) {
+            Err(err) => return VerificationResult::OtherFailure(err),
+            Ok(new) => new,
+        };
+        callback(existing, &new)
+    })
+}
+
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+enum ChangeAction {
+    ChangePin,
+    UnblockPin,
+    ChangePuk,
+}
+
+fn ykpiv_transfer_data(
+    card: pcsc_sys::SCARDHANDLE,
+    templ: &[c_uchar],
+    in_data: &[c_uchar],
+) -> Result<(c_int, Vec<c_uchar>)> {
+    SmartCardError::new(unsafe { pcsc_sys::SCardBeginTransaction(card) })?;
+
+    let mut out_data: Vec<c_uchar> = Vec::new();
+    let mut sw: c_int = SW_SUCCESS;
+
+    for chunk in in_data.chunks(255) {
+        let mut data: [c_uchar; 255] = [0; 255];
+        for (dst, src) in data.iter_mut().zip(chunk.iter()) {
+            *dst = *src;
+        }
+        let apdu = Apdu {
+            st: StructuredApdu {
+                cla: if chunk.len() == 255 {
+                    0x10
+                } else {
+                    *templ.get(0).unwrap_or(&0)
+                },
+                ins: *templ.get(1).unwrap_or(&0),
+                p1: *templ.get(2).unwrap_or(&0),
+                p2: *templ.get(3).unwrap_or(&0),
+                lc: chunk.len() as u8,
+                data: data,
+            },
+        };
+
+        debug!(
+            "Sending chunk of {} out of {} total bytes",
+            chunk.len(),
+            in_data.len()
+        );
+        let (sw_new, mut recv) = send_data(card, &apdu)?;
+        sw = sw_new;
+        if sw != SW_SUCCESS && sw >> 8 != 0x61 {
+            return Ok((sw, out_data));
+        }
+        let recv_len = recv.len() - 2;
+        recv.truncate(recv_len);
+        out_data.append(&mut recv);
+    }
+
+    while sw >> 8 == 0x61 {
+        let apdu = Apdu {
+            st: StructuredApdu {
+                cla: 0,
+                ins: 0xc0,
+                p1: 0,
+                p2: 0,
+                lc: 0,
+                data: [0; 255],
+            },
+        };
+
+        debug!(
+            "The card indicates there are {} more bytes of data to read",
+            sw & 0xff
+        );
+        let (sw_new, mut recv) = send_data(card, &apdu)?;
+        sw = sw_new;
+        if sw != SW_SUCCESS && sw >> 8 != 0x61 {
+            return Ok((sw, out_data));
+        }
+        let recv_len = recv.len() - 2;
+        recv.truncate(recv_len);
+        out_data.append(&mut recv);
+    }
+
+    SmartCardError::new(unsafe {
+        pcsc_sys::SCardEndTransaction(card, pcsc_sys::SCARD_LEAVE_CARD)
+    })?;
+    Ok((sw, out_data))
+}
+
+/// This function provides the common implementation for all of the various ways we can change the
+/// PIN or PUK on a Yubikey. The way we do this using low-level PC/SC functions is identical,
+/// except we send a different action value depending on the requested change type.
+fn change_impl(
+    card: pcsc_sys::SCARDHANDLE,
+    action: ChangeAction,
+    existing: &MaybePromptedString,
+    new: &MaybePromptedString,
+) -> VerificationResult {
+    if existing.len() > 8 {
+        return VerificationResult::OtherFailure(
+            format!(
+                "Invalid existing {}; it exceeds 8 characters",
+                match action {
+                    ChangeAction::ChangePin => "PIN",
+                    ChangeAction::UnblockPin => "PUK",
+                    ChangeAction::ChangePuk => "PUK",
+                }
+            ).into(),
+        );
+    }
+    if new.len() > 8 {
+        return VerificationResult::OtherFailure(
+            format!(
+                "Invalid new {}; it exceeds 8 characters",
+                match action {
+                    ChangeAction::ChangePin => "PIN",
+                    ChangeAction::UnblockPin => "PIN",
+                    ChangeAction::ChangePuk => "PUK",
+                }
+            ).into(),
+        );
+    }
+
+    let mut templ: Vec<c_uchar> = vec![0, YKPIV_INS_CHANGE_REFERENCE, 0, 0x80];
+    if action == ChangeAction::UnblockPin {
+        templ[1] = YKPIV_INS_RESET_RETRY;
+    }
+    if action == ChangeAction::ChangePuk {
+        templ[3] = 0x81;
+    }
+
+    let mut in_data: Vec<c_uchar> = vec![0; 16];
+    for (dst, src) in in_data.iter_mut().zip(existing.as_bytes()) {
+        *dst = *src;
+    }
+    for b in in_data
+        .iter_mut()
+        .skip(existing.len())
+        .take(8 - existing.len())
+    {
+        *b = 0xff;
+    }
+    for (dst, src) in in_data.iter_mut().skip(8).zip(new.as_bytes()) {
+        *dst = *src;
+    }
+    for b in in_data.iter_mut().skip(8 + new.len()).take(8 - new.len()) {
+        *b = 0xff;
+    }
+
+    let (sw, _) = match ykpiv_transfer_data(card, templ.as_slice(), in_data.as_slice()) {
+        Err(e) => return VerificationResult::OtherFailure(e),
+        Ok(tuple) => tuple,
+    };
+    VerificationResult::from_status(sw)
 }
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -626,35 +845,10 @@ impl ykpiv_state {
             };
 
             let mut buffer: Vec<c_uchar> = vec![0; 261];
-            let sw = match send_data(self.card, &apdu, &mut buffer) {
+            VerificationResult::from_status(match send_data_impl(self.card, &apdu, &mut buffer) {
                 Err(e) => return VerificationResult::OtherFailure(e),
                 Ok(sw) => sw,
-            };
-            if sw == SW_SUCCESS {
-                VerificationResult::Success
-            } else if (sw >> 8) == 0x63 {
-                VerificationResult::Failure(
-                    (sw & 0xf) as usize,
-                    SmartCardError::new(pcsc_sys::SCARD_E_INVALID_CHV)
-                        .err()
-                        .unwrap()
-                        .into(),
-                )
-            } else if sw == SW_ERR_AUTH_BLOCKED {
-                VerificationResult::PermanentFailure(
-                    SmartCardError::new(pcsc_sys::SCARD_W_CHV_BLOCKED)
-                        .err()
-                        .unwrap()
-                        .into(),
-                )
-            } else {
-                VerificationResult::OtherFailure(
-                    SmartCardError::new(pcsc_sys::SCARD_E_UNKNOWN_RES_MNG)
-                        .err()
-                        .unwrap()
-                        .into(),
-                )
-            }
+            })
         })?;
         Ok(())
     }
@@ -732,7 +926,7 @@ impl ykpiv_state {
             };
 
             let mut recv_buffer: Vec<u8> = vec![0; 255];
-            let sw = send_data(self.card, &apdu, &mut recv_buffer)?;
+            let sw = send_data_impl(self.card, &apdu, &mut recv_buffer)?;
             if sw != SW_SUCCESS {
                 bail!("Failed selecting application: {:x}", sw);
             }
@@ -762,6 +956,15 @@ impl ykpiv_state {
         }
     }
 
+    // TODO: Remove this function.
+    pub fn transfer_data(
+        &mut self,
+        templ: &[c_uchar],
+        in_data: &[c_uchar],
+    ) -> Result<(c_int, Vec<c_uchar>)> {
+        ykpiv_transfer_data(self.card, templ, in_data)
+    }
+
     pub fn get_version(&self) -> Result<Version> {
         let apdu = Apdu {
             st: StructuredApdu {
@@ -775,12 +978,48 @@ impl ykpiv_state {
         };
         let mut buffer: Vec<u8> = vec![0; 261];
 
-        let sw = send_data(self.card, &apdu, &mut buffer)?;
+        let sw = send_data_impl(self.card, &apdu, &mut buffer)?;
         if sw != SW_SUCCESS {
             bail!("Get version instruction returned error: {:x}", sw);
         }
 
         Ok(Version(buffer[0], buffer[1], buffer[2]))
+    }
+
+    pub fn change_pin(&mut self, old_pin: Option<&str>, new_pin: Option<&str>) -> Result<()> {
+        verification_change_loop(
+            PIN_NAME,
+            old_pin,
+            PIN_NAME,
+            new_pin,
+            PIN_PROMPT,
+            NEW_PIN_PROMPT,
+            |existing, new| change_impl(self.card, ChangeAction::ChangePin, existing, new),
+        )
+    }
+
+    pub fn unblock_pin(&mut self, puk: Option<&str>, new_pin: Option<&str>) -> Result<()> {
+        verification_change_loop(
+            PUK_NAME,
+            puk,
+            PIN_NAME,
+            new_pin,
+            PUK_PROMPT,
+            NEW_PIN_PROMPT,
+            |existing, new| change_impl(self.card, ChangeAction::UnblockPin, existing, new),
+        )
+    }
+
+    pub fn change_puk(&mut self, old_puk: Option<&str>, new_puk: Option<&str>) -> Result<()> {
+        verification_change_loop(
+            PUK_NAME,
+            old_puk,
+            PUK_NAME,
+            new_puk,
+            PUK_PROMPT,
+            NEW_PUK_PROMPT,
+            |existing, new| change_impl(self.card, ChangeAction::ChangePuk, existing, new),
+        )
     }
 }
 
@@ -940,15 +1179,6 @@ extern "C" {
     pub fn ykpiv_strerror(err: ykpiv_rc) -> *const c_char;
     pub fn ykpiv_strerror_name(err: ykpiv_rc) -> *const c_char;
 
-    pub fn ykpiv_transfer_data(
-        state: *mut ykpiv_state,
-        templ: *const c_uchar,
-        in_data: *const c_uchar,
-        in_len: c_long,
-        out_data: *mut c_uchar,
-        out_len: *mut c_ulong,
-        sw: *mut c_int,
-    ) -> ykpiv_rc;
     pub fn ykpiv_authenticate(state: *mut ykpiv_state, key: *const c_uchar) -> ykpiv_rc;
     pub fn ykpiv_hex_decode(
         hex_in: *const c_char,
@@ -973,30 +1203,6 @@ extern "C" {
         out_len: *mut size_t,
         algorithm: c_uchar,
         key: c_uchar,
-    ) -> ykpiv_rc;
-    pub fn ykpiv_change_pin(
-        state: *mut ykpiv_state,
-        current_pin: *const c_char,
-        current_pin_len: size_t,
-        new_pin: *const c_char,
-        new_pin_len: size_t,
-        tries: *mut c_int,
-    ) -> ykpiv_rc;
-    pub fn ykpiv_change_puk(
-        state: *mut ykpiv_state,
-        current_puk: *const c_char,
-        current_puk_len: size_t,
-        new_puk: *const c_char,
-        new_puk_len: size_t,
-        tries: *mut c_int,
-    ) -> ykpiv_rc;
-    pub fn ykpiv_unblock_pin(
-        state: *mut ykpiv_state,
-        puk: *const c_char,
-        puk_len: size_t,
-        new_pin: *const c_char,
-        new_pin_len: size_t,
-        tries: *mut c_int,
     ) -> ykpiv_rc;
     pub fn ykpiv_fetch_object(
         state: *mut ykpiv_state,
