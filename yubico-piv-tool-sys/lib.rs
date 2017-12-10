@@ -25,9 +25,11 @@ extern crate libc;
 extern crate log;
 extern crate openssl;
 extern crate pcsc_sys;
+extern crate rand;
 extern crate rpassword;
 
 use libc::{c_char, c_int, c_uchar, c_ulong, size_t};
+use rand::Rng;
 use std::collections::{HashMap, HashSet};
 use std::ffi::CString;
 use std::fmt;
@@ -49,6 +51,30 @@ const NEW_PUK_PROMPT: &'static str = "New PUK: ";
 const MGM_KEY_PROMPT: &'static str = "Management Key: ";
 const NEW_MGM_KEY_PROMPT: &'static str = "New Management Key: ";
 const MGM_KEY_BYTES: usize = 24;
+
+// TODO: This CHUID has an expiry of 2030-01-01, it should be configurable instead.
+/// FASC-N containing S9999F9999F999999F0F1F0000000000300001E encoded in 4-bit BCD with 1-bit
+/// parity. This can be run through
+/// https://github.com/Yubico/yubico-piv-tool/blob/master/tools/fasc.pl to get bytes.
+#[cfg_attr(rustfmt, rustfmt_skip)]
+const CHUID_TEMPLATE: &'static [c_uchar] = &[
+    0x30, 0x19, 0xd4, 0xe7, 0x39, 0xda, 0x73, 0x9c, 0xed, 0x39, 0xce, 0x73, 0x9d, 0x83, 0x68,
+    0x58, 0x21, 0x08, 0x42, 0x10, 0x84, 0x21, 0x38, 0x42, 0x10, 0xc3, 0xf5, 0x34, 0x10, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x35, 0x08, 0x32, 0x30, 0x33, 0x30, 0x30, 0x31, 0x30, 0x31, 0x3e, 0x00, 0xfe, 0x00,
+];
+const CHUID_RANDOM_OFFSET: usize = 29;
+const CHUID_RANDOM_BYTES: usize = 16;
+
+#[cfg_attr(rustfmt, rustfmt_skip)]
+const CCC_TEMPLATE: &'static [c_uchar] = &[
+    0xf0, 0x15, 0xa0, 0x00, 0x00, 0x01, 0x16, 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf1, 0x01, 0x21, 0xf2, 0x01, 0x21, 0xf3,
+    0x00, 0xf4, 0x01, 0x00, 0xf5, 0x01, 0x10, 0xf6, 0x00, 0xf7, 0x00, 0xfa, 0x00, 0xfb, 0x00,
+    0xfc, 0x00, 0xfd, 0x00, 0xfe, 0x00,
+];
+const CCC_RANDOM_OFFSET: usize = 9;
+const CCC_RANDOM_BYTES: usize = 14;
 
 lazy_static! {
     // Weak DES keys, from: https://en.wikipedia.org/wiki/Weak_key#Weak_keys_in_DES.
@@ -771,6 +797,57 @@ fn ykpiv_transfer_data(
     Ok((sw, out_data))
 }
 
+fn build_data_object(
+    template: &'static [c_uchar],
+    random_offset: usize,
+    random_bytes_len: usize,
+) -> Vec<u8> {
+    let mut object: Vec<c_uchar> = Vec::with_capacity(template.len());
+    object.extend_from_slice(&template[..random_offset]);
+    let random_bytes: Vec<c_uchar> = rand::weak_rng().gen_iter().take(random_bytes_len).collect();
+    object.extend(random_bytes.into_iter());
+    object.extend_from_slice(&template[random_offset + random_bytes_len..]);
+    object
+}
+
+// TODO: This should accept a Rust-style enum instead of an int.
+fn ykpiv_save_object(
+    card: pcsc_sys::SCARDHANDLE,
+    object_id: c_int,
+    mut object: Vec<u8>,
+) -> Result<()> {
+    let mut data: Vec<u8> = vec![0x5c];
+    if object_id == YKPIV_OBJ_DISCOVERY {
+        data.extend_from_slice(&[1, YKPIV_OBJ_DISCOVERY as u8]);
+    } else if object_id > 0xffff && object_id <= 0xffffff {
+        data.extend_from_slice(&[
+            3,
+            ((object_id >> 16) & 0xff) as u8,
+            ((object_id >> 8) & 0xff) as u8,
+            (object_id & 0xff) as u8,
+        ]);
+    }
+    data.push(0x53);
+    if object.len() < 0x80 {
+        data.push(object.len() as u8);
+    } else if object.len() < 0xff {
+        data.extend_from_slice(&[0x81, object.len() as u8]);
+    } else {
+        data.extend_from_slice(&[
+            0x82,
+            ((object.len() >> 8) & 0xff) as u8,
+            (object.len() & 0xff) as u8,
+        ]);
+    }
+    data.append(&mut object);
+
+    let (sw, _) = ykpiv_transfer_data(card, &[0, YKPIV_INS_PUT_DATA, 0x3f, 0xff], data.as_slice())?;
+    if sw != SW_SUCCESS {
+        bail!("Failed to save data object");
+    }
+    Ok(())
+}
+
 /// This function provides the common implementation for all of the various ways we can change the
 /// PIN or PUK on a Yubikey. The way we do this using low-level PC/SC functions is identical,
 /// except we send a different action value depending on the requested change type.
@@ -920,8 +997,7 @@ impl ykpiv_state {
         Ok(())
     }
 
-    // TODO: Make this function private.
-    pub fn authenticate_mgm(&mut self, mgm_key: Option<&str>) -> Result<()> {
+    fn authenticate_mgm(&mut self, mgm_key: Option<&str>) -> Result<()> {
         if self.authenticated_mgm {
             return Ok(());
         }
@@ -1223,6 +1299,31 @@ impl ykpiv_state {
         }
         Ok(())
     }
+
+    pub fn set_chuid(&mut self, mgm_key: Option<&str>) -> Result<()> {
+        self.authenticate_mgm(mgm_key)?;
+        let object = build_data_object(CHUID_TEMPLATE, CHUID_RANDOM_OFFSET, CHUID_RANDOM_BYTES);
+        ykpiv_save_object(self.card, YKPIV_OBJ_CHUID, object)?;
+        Ok(())
+    }
+
+    pub fn set_ccc(&mut self, mgm_key: Option<&str>) -> Result<()> {
+        self.authenticate_mgm(mgm_key)?;
+        let object = build_data_object(CCC_TEMPLATE, CCC_RANDOM_OFFSET, CCC_RANDOM_BYTES);
+        ykpiv_save_object(self.card, YKPIV_OBJ_CAPABILITY, object)?;
+        Ok(())
+    }
+
+    pub fn write_object(
+        &mut self,
+        mgm_key: Option<&str>,
+        object_id: c_int,
+        buffer: Vec<u8>,
+    ) -> Result<()> {
+        self.authenticate_mgm(mgm_key)?;
+        ykpiv_save_object(self.card, object_id, buffer)?;
+        Ok(())
+    }
 }
 
 impl Drop for ykpiv_state {
@@ -1404,12 +1505,6 @@ extern "C" {
         object_id: c_int,
         data: *mut c_uchar,
         len: *mut c_ulong,
-    ) -> ykpiv_rc;
-    pub fn ykpiv_save_object(
-        state: *mut ykpiv_state,
-        object_id: c_int,
-        indata: *mut c_uchar,
-        len: size_t,
     ) -> ykpiv_rc;
     pub fn ykpiv_import_private_key(
         state: *mut ykpiv_state,
