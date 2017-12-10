@@ -880,8 +880,7 @@ impl ykpiv_state {
         })
     }
 
-    // TODO: Make this function private.
-    pub fn authenticate_pin(&mut self, pin: Option<&str>) -> Result<()> {
+    fn authenticate_pin(&mut self, pin: Option<&str>) -> Result<()> {
         if self.authenticated_pin {
             return Ok(());
         }
@@ -1103,15 +1102,6 @@ impl ykpiv_state {
         }
     }
 
-    // TODO: Remove this function.
-    pub fn transfer_data(
-        &mut self,
-        templ: &[c_uchar],
-        in_data: &[c_uchar],
-    ) -> Result<(c_int, Vec<c_uchar>)> {
-        ykpiv_transfer_data(self.card, templ, in_data)
-    }
-
     pub fn get_version(&self) -> Result<Version> {
         let apdu = Apdu {
             st: StructuredApdu {
@@ -1167,6 +1157,34 @@ impl ykpiv_state {
             NEW_PUK_PROMPT,
             |existing, new| change_impl(self.card, ChangeAction::ChangePuk, existing, new),
         )
+    }
+
+    pub fn reset(&mut self) -> Result<()> {
+        let (sw, _) = ykpiv_transfer_data(self.card, &[0, YKPIV_INS_RESET, 0, 0], &[])?;
+        if sw != SW_SUCCESS {
+            bail!("Reset failed, probably because PIN or PUK retries are still available");
+        }
+        Ok(())
+    }
+
+    pub fn set_retries(
+        &mut self,
+        mgm_key: Option<&str>,
+        pin: Option<&str>,
+        pin_retries: u8,
+        puk_retries: u8,
+    ) -> Result<()> {
+        self.authenticate_mgm(mgm_key)?;
+        self.authenticate_pin(pin)?;
+        let (sw, _) = ykpiv_transfer_data(
+            self.card,
+            &[0, YKPIV_INS_SET_PIN_RETRIES, pin_retries, puk_retries],
+            &[],
+        )?;
+        if sw != SW_SUCCESS {
+            bail!("Setting PIN and PUK retries failed");
+        }
+        Ok(())
     }
 
     pub fn set_management_key(

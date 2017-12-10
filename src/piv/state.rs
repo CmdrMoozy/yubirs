@@ -23,7 +23,6 @@ use yubico_piv_tool_sys::Version;
 
 const OBJECT_BUFFER_SIZE: usize = 3072;
 
-
 // TODO: This CHUID has an expiry of 2030-01-01, it should be configurable instead.
 /// FASC-N containing S9999F9999F999999F0F1F0000000000300001E encoded in 4-bit BCD with 1-bit
 /// parity. This can be run through
@@ -138,12 +137,7 @@ impl State {
     /// have both been fully exhausted (e.g., the Yubikey is now unusable). Otherwise, the
     /// change_pin, unblock_pin, and change_puk functions should be used instead of this function.
     pub fn reset(&mut self) -> Result<()> {
-        let templ: Vec<c_uchar> = vec![0, ykpiv::YKPIV_INS_RESET, 0, 0];
-        let (sw, _) = self.state.transfer_data(templ.as_slice(), &[])?;
-        match sw {
-            ykpiv::SW_SUCCESS => Ok(()),
-            _ => bail!("Reset failed, probably because PIN or PUK retries are still available"),
-        }
+        Ok(self.state.reset()?)
     }
 
     /// This function sets the number of retries available for PIN or PUK verification. This also
@@ -159,21 +153,12 @@ impl State {
         pin_retries: u8,
         puk_retries: u8,
     ) -> Result<()> {
-        self.state.authenticate_mgm(mgm_key)?;
-        self.state.authenticate_pin(pin)?;
-
-        let templ: Vec<c_uchar> = vec![
-            0,
-            ykpiv::YKPIV_INS_SET_PIN_RETRIES,
+        Ok(self.state.set_retries(
+            mgm_key,
+            pin,
             pin_retries,
             puk_retries,
-        ];
-
-        let (sw, _) = self.state.transfer_data(templ.as_slice(), &[])?;
-        match sw {
-            ykpiv::SW_SUCCESS => Ok(()),
-            _ => bail!("Setting PIN and PUK retries failed"),
-        }
+        )?)
     }
 
     /// This function changes the management key stored on the device. This is the key used to
