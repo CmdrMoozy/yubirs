@@ -14,18 +14,15 @@
 
 use cert::{format_certificate, Format};
 use error::*;
-use libc::{c_uchar, c_ulong, size_t};
+use libc::{c_uchar, c_ulong};
 use piv::try_ykpiv;
 use piv::id::{Key, Object};
 use rand::{self, Rng};
 use yubico_piv_tool_sys as ykpiv;
-use yubico_piv_tool_sys::{MaybePromptedString, Version};
+use yubico_piv_tool_sys::Version;
 
 const OBJECT_BUFFER_SIZE: usize = 3072;
 
-const MGM_KEY_PROMPT: &'static str = "Management Key: ";
-const NEW_MGM_KEY_PROMPT: &'static str = "New Management Key: ";
-const MGM_KEY_BYTES: usize = 24;
 
 // TODO: This CHUID has an expiry of 2030-01-01, it should be configurable instead.
 /// FASC-N containing S9999F9999F999999F0F1F0000000000300001E encoded in 4-bit BCD with 1-bit
@@ -51,28 +48,6 @@ const CCC_TEMPLATE: &'static [c_uchar] = &[
 const CCC_RANDOM_OFFSET: usize = 9;
 const CCC_RANDOM_BYTES: usize = 14;
 
-fn decode_management_key(
-    mgm_key: Option<&str>,
-    prompt: &'static str,
-    confirm: bool,
-) -> Result<Vec<c_uchar>> {
-    let mgm_key = MaybePromptedString::new(mgm_key, prompt, confirm)?;
-    let mut decoded: Vec<c_uchar> = vec![0; MGM_KEY_BYTES];
-    let mut decoded_len: size_t = MGM_KEY_BYTES;
-    if decoded_len != MGM_KEY_BYTES {
-        bail!("Hex decoding failed: decoded length doesn't match expectations");
-    }
-    try_ykpiv(unsafe {
-        ykpiv::ykpiv_hex_decode(
-            mgm_key.as_ptr(),
-            mgm_key.len(),
-            decoded.as_mut_ptr(),
-            &mut decoded_len,
-        )
-    })?;
-    Ok(decoded)
-}
-
 fn build_data_object(
     template: &'static [c_uchar],
     random_offset: usize,
@@ -88,30 +63,13 @@ fn build_data_object(
 
 pub struct State {
     state: ykpiv::ykpiv_state,
-    authenticated_mgm: bool,
 }
 
 impl State {
     pub fn new(verbose: bool) -> Result<State> {
         Ok(State {
             state: ykpiv::ykpiv_state::new(verbose)?,
-            authenticated_mgm: false,
         })
-    }
-
-    /// This function authenticates this state with the management key, unlocking various
-    /// administrative / management functions. For details on what features require authentication,
-    /// see: https://developers.yubico.com/PIV/Introduction/Admin_access.html
-    fn authenticate_mgm(&mut self, mgm_key: Option<&str>) -> Result<()> {
-        if self.authenticated_mgm {
-            return Ok(());
-        }
-
-        let mgm_key = decode_management_key(mgm_key, MGM_KEY_PROMPT, false)?;
-        try_ykpiv(unsafe {
-            ykpiv::ykpiv_authenticate(&mut self.state, mgm_key.as_ptr())
-        })?;
-        Ok(())
     }
 
     /// This function returns the list of valid reader strings which can be passed to State::new.
@@ -201,7 +159,7 @@ impl State {
         pin_retries: u8,
         puk_retries: u8,
     ) -> Result<()> {
-        self.authenticate_mgm(mgm_key)?;
+        self.state.authenticate_mgm(mgm_key)?;
         self.state.authenticate_pin(pin)?;
 
         let templ: Vec<c_uchar> = vec![
@@ -224,14 +182,13 @@ impl State {
         &mut self,
         old_mgm_key: Option<&str>,
         new_mgm_key: Option<&str>,
+        touch: bool,
     ) -> Result<()> {
-        self.authenticate_mgm(old_mgm_key)?;
-
-        let new_mgm_key = decode_management_key(new_mgm_key, NEW_MGM_KEY_PROMPT, true)?;
-        try_ykpiv(unsafe {
-            ykpiv::ykpiv_set_mgmkey2(&mut self.state, new_mgm_key.as_ptr(), 0)
-        })?;
-        Ok(())
+        Ok(self.state.set_management_key(
+            old_mgm_key,
+            new_mgm_key,
+            touch,
+        )?)
     }
 
     /// This function writes a new, randomly-generated Card Holder Unique Identifier (CHUID) to the
@@ -242,7 +199,7 @@ impl State {
     /// Windows. In order to invalidate the cached data, e.g. after changing stored certificates,
     /// the CHUID must also be changed.
     pub fn set_chuid(&mut self, mgm_key: Option<&str>) -> Result<()> {
-        self.authenticate_mgm(mgm_key)?;
+        self.state.authenticate_mgm(mgm_key)?;
 
         let mut object: Vec<c_uchar> =
             build_data_object(CHUID_TEMPLATE, CHUID_RANDOM_OFFSET, CHUID_RANDOM_BYTES);
@@ -261,7 +218,7 @@ impl State {
     /// device. Some systems (MacOS) require a CCC to be present before they will recognize the
     /// Yubikey. This data object is not present on Yubikeys by default (from the factory).
     pub fn set_ccc(&mut self, mgm_key: Option<&str>) -> Result<()> {
-        self.authenticate_mgm(mgm_key)?;
+        self.state.authenticate_mgm(mgm_key)?;
 
         let mut object: Vec<c_uchar> =
             build_data_object(CCC_TEMPLATE, CCC_RANDOM_OFFSET, CCC_RANDOM_BYTES);
@@ -301,7 +258,7 @@ impl State {
         id: Object,
         mut buffer: Vec<u8>,
     ) -> Result<()> {
-        self.authenticate_mgm(mgm_key)?;
+        self.state.authenticate_mgm(mgm_key)?;
         try_ykpiv(unsafe {
             ykpiv::ykpiv_save_object(
                 &mut self.state,

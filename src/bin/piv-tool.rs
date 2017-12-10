@@ -100,7 +100,7 @@ fn set_retries(values: Values) -> Result<()> {
 fn change_mgm_key(values: Values) -> Result<()> {
     let mut state = State::new(values.get_boolean("verbose"))?;
     state.connect(Some(values.get_required("reader")))?;
-    state.set_management_key(None, None)?;
+    state.set_management_key(None, None, false)?;
     Ok(())
 }
 

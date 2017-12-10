@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// TODO: Remove this.
 #![allow(non_camel_case_types)]
 
+extern crate data_encoding;
 #[macro_use]
 extern crate error_chain;
 #[macro_use]
@@ -21,11 +23,12 @@ extern crate lazy_static;
 extern crate libc;
 #[macro_use]
 extern crate log;
+extern crate openssl;
 extern crate pcsc_sys;
 extern crate rpassword;
 
 use libc::{c_char, c_int, c_uchar, c_ulong, size_t};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ffi::CString;
 use std::fmt;
 use std::ptr;
@@ -42,6 +45,74 @@ const NEW_PIN_PROMPT: &'static str = "New PIN: ";
 const PUK_NAME: &'static str = "PUK";
 const PUK_PROMPT: &'static str = "PUK: ";
 const NEW_PUK_PROMPT: &'static str = "New PUK: ";
+
+const MGM_KEY_PROMPT: &'static str = "Management Key: ";
+const NEW_MGM_KEY_PROMPT: &'static str = "New Management Key: ";
+const MGM_KEY_BYTES: usize = 24;
+
+lazy_static! {
+    // Weak DES keys, from: https://en.wikipedia.org/wiki/Weak_key#Weak_keys_in_DES.
+    static ref DES_WEAK_KEYS: HashSet<[u8; 8]> = {
+        let mut s = HashSet::new();
+        s.insert([0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01]);
+        s.insert([0xFE,0xFE,0xFE,0xFE,0xFE,0xFE,0xFE,0xFE]);
+        s.insert([0xE0,0xE0,0xE0,0xE0,0xF1,0xF1,0xF1,0xF1]);
+        s.insert([0x1F,0x1F,0x1F,0x1F,0x0E,0x0E,0x0E,0x0E]);
+        s.insert([0x01,0x1F,0x01,0x1F,0x01,0x0E,0x01,0x0E]);
+        s.insert([0x1F,0x01,0x1F,0x01,0x0E,0x01,0x0E,0x01]);
+        s.insert([0x01,0xE0,0x01,0xE0,0x01,0xF1,0x01,0xF1]);
+        s.insert([0xE0,0x01,0xE0,0x01,0xF1,0x01,0xF1,0x01]);
+        s.insert([0x01,0xFE,0x01,0xFE,0x01,0xFE,0x01,0xFE]);
+        s.insert([0xFE,0x01,0xFE,0x01,0xFE,0x01,0xFE,0x01]);
+        s.insert([0x1F,0xE0,0x1F,0xE0,0x0E,0xF1,0x0E,0xF1]);
+        s.insert([0xE0,0x1F,0xE0,0x1F,0xF1,0x0E,0xF1,0x0E]);
+        s.insert([0x1F,0xFE,0x1F,0xFE,0x0E,0xFE,0x0E,0xFE]);
+        s.insert([0xFE,0x1F,0xFE,0x1F,0xFE,0x0E,0xFE,0x0E]);
+        s.insert([0xE0,0xFE,0xE0,0xFE,0xF1,0xFE,0xF1,0xFE]);
+        s.insert([0xFE,0xE0,0xFE,0xE0,0xFE,0xF1,0xFE,0xF1]);
+        s
+    };
+}
+
+#[cfg_attr(rustfmt, rustfmt_skip)]
+const ODD_PARITY_BYTES: [u8; 256] = [
+    1,   1,   2,   2,   4,   4,   7,   7,   8,   8,   11,  11,  13,  13,  14,  14,  16,  16,  19,
+    19,  21,  21,  22,  22,  25,  25,  26,  26,  28,  28,  31,  31,  32,  32,  35,  35,  37,  37,
+    38,  38,  41,  41,  42,  42,  44,  44,  47,  47,  49,  49,  50,  50,  52,  52,  55,  55,  56,
+    56,  59,  59,  61,  61,  62,  62,  64,  64,  67,  67,  69,  69,  70,  70,  73,  73,  74,  74,
+    76,  76,  79,  79,  81,  81,  82,  82,  84,  84,  87,  87,  88,  88,  91,  91,  93,  93,  94,
+    94,  97,  97,  98,  98,  100, 100, 103, 103, 104, 104, 107, 107, 109, 109, 110, 110, 112, 112,
+    115, 115, 117, 117, 118, 118, 121, 121, 122, 122, 124, 124, 127, 127, 128, 128, 131, 131, 133,
+    133, 134, 134, 137, 137, 138, 138, 140, 140, 143, 143, 145, 145, 146, 146, 148, 148, 151, 151,
+    152, 152, 155, 155, 157, 157, 158, 158, 161, 161, 162, 162, 164, 164, 167, 167, 168, 168, 171,
+    171, 173, 173, 174, 174, 176, 176, 179, 179, 181, 181, 182, 182, 185, 185, 186, 186, 188, 188,
+    191, 191, 193, 193, 194, 194, 196, 196, 199, 199, 200, 200, 203, 203, 205, 205, 206, 206, 208,
+    208, 211, 211, 213, 213, 214, 214, 217, 217, 218, 218, 220, 220, 223, 223, 224, 224, 227, 227,
+    229, 229, 230, 230, 233, 233, 234, 234, 236, 236, 239, 239, 241, 241, 242, 242, 244, 244, 247,
+    247, 248, 248, 251, 251, 253, 253, 254, 254,
+];
+
+/// Returns true if the given managment key's 3 DES keys are "weak", and therefore shouldn't be
+/// used. The given input management key should have been decoded from hex, but no parity bits
+/// should have been added yet (this is done implicitly).
+fn is_weak_mgm_key(mgm_key: &[u8]) -> Result<bool> {
+    if mgm_key.len() != MGM_KEY_BYTES {
+        bail!(
+            "Invalid management key; must be {} bytes long",
+            MGM_KEY_BYTES
+        );
+    }
+    let mgm_key: Vec<u8> = mgm_key
+        .iter()
+        .map(|b| ODD_PARITY_BYTES[*b as usize])
+        .collect();
+    for key in mgm_key.as_slice().chunks(8) {
+        if DES_WEAK_KEYS.contains(key) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum SmartCardError {
@@ -378,8 +449,10 @@ impl fmt::Debug for SmartCardError {
 
 error_chain! {
     foreign_links {
+        Decode(data_encoding::DecodeError);
         Io(std::io::Error);
         Nul(std::ffi::NulError);
+        Openssl(openssl::error::ErrorStack);
         SCard(SmartCardError);
         Utf8Slice(std::str::Utf8Error);
     }
@@ -480,8 +553,7 @@ fn prompt_for_string(prompt: &str, confirm: bool) -> Result<String> {
     }
 }
 
-// TODO: Make this private.
-pub struct MaybePromptedString {
+struct MaybePromptedString {
     value: CString,
     length: usize,
     was_provided: bool,
@@ -511,12 +583,6 @@ impl MaybePromptedString {
 
     pub fn as_bytes(&self) -> &[u8] {
         self.value.as_bytes()
-    }
-
-    /// Returns a pointer to the string's bytes. This pointer is guaranteed to point to a
-    /// NUL-terminated string.
-    pub fn as_ptr(&self) -> *const c_char {
-        self.value.as_ptr()
     }
 
     pub fn len(&self) -> usize {
@@ -787,6 +853,7 @@ pub struct ykpiv_state {
     pub card: pcsc_sys::SCARDHANDLE,
     pub verbose: c_int,
     authenticated_pin: bool,
+    authenticated_mgm: bool,
 }
 
 impl ykpiv_state {
@@ -809,6 +876,7 @@ impl ykpiv_state {
                 true => 1,
             },
             authenticated_pin: false,
+            authenticated_mgm: false,
         })
     }
 
@@ -850,6 +918,85 @@ impl ykpiv_state {
                 Ok(sw) => sw,
             })
         })?;
+        Ok(())
+    }
+
+    // TODO: Make this function private.
+    pub fn authenticate_mgm(&mut self, mgm_key: Option<&str>) -> Result<()> {
+        if self.authenticated_mgm {
+            return Ok(());
+        }
+
+        let mgm_key: Vec<u8> = data_encoding::HEXLOWER_PERMISSIVE
+            .decode(MaybePromptedString::new(mgm_key, MGM_KEY_PROMPT, false)?.as_bytes())?;
+        // For 3DES, we should have three key portions of 8 bytes each, for a total of 24 bytes.
+        debug_assert!(mgm_key.len() == MGM_KEY_BYTES);
+
+        // Get a challenge from the card.
+        let mut data: [c_uchar; 255] = [0; 255];
+        data[0] = 0x7c;
+        data[1] = 0x02;
+        data[2] = 0x80;
+        let apdu = Apdu {
+            st: StructuredApdu {
+                cla: 0,
+                ins: YKPIV_INS_AUTHENTICATE,
+                p1: YKPIV_ALGO_3DES,
+                p2: YKPIV_KEY_CARDMGM,
+                lc: 0x04,
+                data: data,
+            },
+        };
+        let (sw, response) = send_data(self.card, &apdu)?;
+        if sw != SW_SUCCESS {
+            bail!("Failed to get management key challenge from card");
+        }
+        let card_challenge: Vec<u8> = (&response[4..13]).into();
+        debug_assert!(card_challenge.len() == 8);
+
+        // Send a response to the card's challenge, and a challenge of our own.
+        let our_challenge = openssl::symm::encrypt(
+            openssl::symm::Cipher::des_ecb(),
+            mgm_key.as_slice(),
+            None,
+            card_challenge.as_slice(),
+        )?;
+        debug_assert!(our_challenge.len() == 8);
+        let mut data: [c_uchar; 255] = [0; 255];
+        data[0] = 0x7c;
+        data[1] = 20; // 2 + 8 + 2 + 8
+        data[2] = 0x80;
+        data[3] = 8;
+        (&mut data[4..13]).copy_from_slice(our_challenge.as_slice());
+        data[12] = 0x81;
+        openssl::rand::rand_bytes(&mut data[13..21])?;
+        let expected_card_reply: Vec<u8> = (&data[13..21]).into();
+        let apdu = Apdu {
+            st: StructuredApdu {
+                cla: 0,
+                ins: YKPIV_INS_AUTHENTICATE,
+                p1: YKPIV_ALGO_3DES,
+                p2: YKPIV_KEY_CARDMGM,
+                lc: 21,
+                data: [0; 255],
+            },
+        };
+        let (sw, response) = send_data(self.card, &apdu)?;
+        if sw != SW_SUCCESS {
+            bail!("Failed to send management key challenge back to card");
+        }
+
+        // Compare the response from the card with our expected response.
+        let expected_card_reply = openssl::symm::encrypt(
+            openssl::symm::Cipher::des_ecb(),
+            mgm_key.as_slice(),
+            None,
+            expected_card_reply.as_slice(),
+        )?;
+        if expected_card_reply.as_slice() != &response[4..13] {
+            bail!("Management key authentication failed");
+        }
+
         Ok(())
     }
 
@@ -1021,6 +1168,43 @@ impl ykpiv_state {
             |existing, new| change_impl(self.card, ChangeAction::ChangePuk, existing, new),
         )
     }
+
+    pub fn set_management_key(
+        &mut self,
+        old_mgm_key: Option<&str>,
+        new_mgm_key: Option<&str>,
+        touch: bool,
+    ) -> Result<()> {
+        self.authenticate_mgm(old_mgm_key)?;
+
+        let new_mgm_key: Vec<u8> = data_encoding::HEXLOWER_PERMISSIVE
+            .decode(MaybePromptedString::new(new_mgm_key, NEW_MGM_KEY_PROMPT, true)?.as_bytes())?;
+        if is_weak_mgm_key(new_mgm_key.as_slice())? {
+            bail!("Refusing to set new management key because it contains weak DES keys");
+        }
+
+        let mut data: [c_uchar; 255] = [0; 255];
+        data[0] = YKPIV_ALGO_3DES;
+        data[1] = YKPIV_KEY_CARDMGM;
+        data[2] = MGM_KEY_BYTES as c_uchar; // Key length
+        (&mut data[3..(3 + MGM_KEY_BYTES)]).copy_from_slice(new_mgm_key.as_slice());
+        let apdu = Apdu {
+            st: StructuredApdu {
+                cla: 0,
+                ins: YKPIV_INS_SET_MGMKEY,
+                p1: 0xff,
+                p2: if touch { 0xfe } else { 0xff },
+                lc: (MGM_KEY_BYTES as c_uchar) + 3, // Key length + 3 extra bytes in data
+                data: data,
+            },
+        };
+
+        let (sw, _) = send_data(self.card, &apdu)?;
+        if sw != SW_SUCCESS {
+            bail!("Failed to set new card management key");
+        }
+        Ok(())
+    }
 }
 
 impl Drop for ykpiv_state {
@@ -1179,13 +1363,6 @@ extern "C" {
     pub fn ykpiv_strerror(err: ykpiv_rc) -> *const c_char;
     pub fn ykpiv_strerror_name(err: ykpiv_rc) -> *const c_char;
 
-    pub fn ykpiv_authenticate(state: *mut ykpiv_state, key: *const c_uchar) -> ykpiv_rc;
-    pub fn ykpiv_hex_decode(
-        hex_in: *const c_char,
-        in_len: size_t,
-        hex_out: *mut c_uchar,
-        out_len: *mut size_t,
-    ) -> ykpiv_rc;
     pub fn ykpiv_sign_data(
         state: *mut ykpiv_state,
         sign_in: *const c_uchar,
@@ -1209,11 +1386,6 @@ extern "C" {
         object_id: c_int,
         data: *mut c_uchar,
         len: *mut c_ulong,
-    ) -> ykpiv_rc;
-    pub fn ykpiv_set_mgmkey2(
-        state: *mut ykpiv_state,
-        new_key: *const c_uchar,
-        touch: c_uchar,
     ) -> ykpiv_rc;
     pub fn ykpiv_save_object(
         state: *mut ykpiv_state,
