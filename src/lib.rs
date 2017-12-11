@@ -20,6 +20,7 @@ extern crate chrono;
 
 extern crate crypto;
 extern crate curl;
+extern crate data_encoding;
 #[macro_use]
 extern crate error_chain;
 extern crate isatty;
@@ -28,12 +29,13 @@ extern crate lazy_static;
 extern crate libc;
 #[macro_use]
 extern crate log;
+extern crate openssl;
 extern crate pcsc;
+extern crate pcsc_sys;
 extern crate rand;
 extern crate regex;
 extern crate rpassword;
 extern crate sodiumoxide;
-extern crate yubico_piv_tool_sys;
 
 pub mod cert;
 pub mod error;

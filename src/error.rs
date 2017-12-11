@@ -16,11 +16,13 @@ error_chain! {
     foreign_links {
         Base64(::base64::DecodeError);
         Curl(::curl::Error);
-        Internal(::yubico_piv_tool_sys::Error);
+        Decode(::data_encoding::DecodeError);
         Io(::std::io::Error);
         Nul(::std::ffi::NulError);
+        Openssl(::openssl::error::ErrorStack);
         ParseDateTime(::chrono::ParseError);
         ParseInt(::std::num::ParseIntError);
+        SmartCard(::piv::scarderr::SmartCardError);
         Utf8(::std::string::FromUtf8Error);
         Utf8Slice(::std::str::Utf8Error);
     }

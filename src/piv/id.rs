@@ -14,10 +14,11 @@
 
 use error::*;
 use libc::{c_int, c_uchar};
+// TODO: Rename.
+use piv::piv_impl as ykpiv;
 use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
-use yubico_piv_tool_sys as ykpiv;
 
 /// This enumeration describes the identifiers for the various objects a YubiKey can store.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]

@@ -15,8 +15,9 @@
 use cert::{format_certificate, Format};
 use error::*;
 use piv::id::{Key, Object};
-use yubico_piv_tool_sys as ykpiv;
-use yubico_piv_tool_sys::Version;
+// TODO: Rename.
+use piv::piv_impl as ykpiv;
+use piv::piv_impl::Version;
 
 pub struct State {
     state: ykpiv::ykpiv_state,

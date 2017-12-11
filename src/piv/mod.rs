@@ -13,4 +13,11 @@
 // limitations under the License.
 
 pub mod id;
+mod piv_impl;
+pub mod scarderr;
 pub mod state;
+
+/// The default reader string to use. The first reader (as returned by list_readers) which contains
+/// this string as a substring is the one which will be used. So, this default will result in us
+/// using the first connected Yubikey we find.
+pub const DEFAULT_READER: &'static str = "Yubikey";
