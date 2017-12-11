@@ -848,6 +848,111 @@ fn ykpiv_save_object(
     Ok(())
 }
 
+// TODO: This function should accept Rust-style enums instead of IDs. This would let us clean up
+// some assorted input validation code.
+pub fn ykpiv_import_private_key(
+    card: pcsc_sys::SCARDHANDLE,
+    key_id: c_uchar,
+    algorithm_id: c_uchar,
+    p: &[u8],
+    q: &[u8],
+    dp: &[u8],
+    dq: &[u8],
+    qinv: &[u8],
+    ec_data: &[u8],
+    pin_policy_id: c_uchar,
+    touch_policy_id: c_uchar,
+) -> Result<()> {
+    if key_id == YKPIV_KEY_CARDMGM || key_id < YKPIV_KEY_RETIRED1
+        || (key_id > YKPIV_KEY_RETIRED20 && key_id < YKPIV_KEY_AUTHENTICATION)
+        || (key_id > YKPIV_KEY_CARDAUTH && key_id != YKPIV_KEY_ATTESTATION)
+    {
+        bail!("The specified key type is not supported by this function");
+    }
+
+    if pin_policy_id != YKPIV_PINPOLICY_DEFAULT && pin_policy_id != YKPIV_PINPOLICY_NEVER
+        && pin_policy_id != YKPIV_PINPOLICY_ONCE && pin_policy_id != YKPIV_PINPOLICY_ALWAYS
+    {
+        bail!("Invalid PIN policy");
+    }
+
+    if touch_policy_id != YKPIV_TOUCHPOLICY_DEFAULT && touch_policy_id != YKPIV_TOUCHPOLICY_NEVER
+        && touch_policy_id != YKPIV_TOUCHPOLICY_ALWAYS
+        && touch_policy_id != YKPIV_TOUCHPOLICY_CACHED
+    {
+        bail!("Invalid touch policy");
+    }
+
+    if algorithm_id != YKPIV_ALGO_RSA1024 && algorithm_id != YKPIV_ALGO_RSA2048
+        && algorithm_id != YKPIV_ALGO_ECCP256 && algorithm_id != YKPIV_ALGO_ECCP384
+    {
+        bail!("Invalid cryptographic algorithm");
+    }
+
+    let elem_len: usize = match algorithm_id {
+        YKPIV_ALGO_RSA1024 => 64,
+        YKPIV_ALGO_RSA2048 => 128,
+        YKPIV_ALGO_ECCP256 => 32,
+        YKPIV_ALGO_ECCP384 => 48,
+        _ => 0,
+    };
+
+    let params: Vec<&[u8]> =
+        if algorithm_id == YKPIV_ALGO_RSA1024 || algorithm_id == YKPIV_ALGO_RSA2048 {
+            vec![p, q, dp, dq, qinv]
+        } else if algorithm_id == YKPIV_ALGO_ECCP256 || algorithm_id == YKPIV_ALGO_ECCP384 {
+            vec![ec_data]
+        } else {
+            vec![]
+        };
+
+    let param_tag: u8 = match algorithm_id {
+        YKPIV_ALGO_RSA1024 => 0x01,
+        YKPIV_ALGO_RSA2048 => 0x01,
+        YKPIV_ALGO_ECCP256 => 0x06,
+        YKPIV_ALGO_ECCP384 => 0x06,
+        _ => 0,
+    };
+
+    let mut key_data: Vec<u8> = Vec::with_capacity(1024);
+    for i in 0..params.len() {
+        key_data.push(param_tag + (i as u8));
+        if elem_len < 0x80 {
+            key_data.push(elem_len as u8);
+        } else if elem_len < 0xff {
+            key_data.extend_from_slice(&[0x81, elem_len as u8]);
+        } else {
+            key_data.extend_from_slice(&[
+                0x82,
+                ((elem_len >> 8) & 0xff) as u8,
+                (elem_len & 0xff) as u8,
+            ]);
+        }
+        let new_len = key_data.len() + (elem_len - params[i].len());
+        key_data.resize(new_len, 0);
+        key_data.extend_from_slice(params[i]);
+    }
+
+    if pin_policy_id != YKPIV_PINPOLICY_DEFAULT {
+        key_data.extend_from_slice(&[YKPIV_PINPOLICY_TAG, 0x01, pin_policy_id]);
+    }
+
+    if touch_policy_id != YKPIV_TOUCHPOLICY_DEFAULT {
+        key_data.extend_from_slice(&[YKPIV_TOUCHPOLICY_TAG, 0x01, touch_policy_id]);
+    }
+
+    let (sw, _) = ykpiv_transfer_data(
+        card,
+        &[0, YKPIV_INS_IMPORT_KEY, algorithm_id, key_id],
+        key_data.as_slice(),
+    )?;
+    match sw {
+        SW_ERR_SECURITY_STATUS => bail!("Failed to import private key due to authentication error"),
+        SW_SUCCESS => Ok(()),
+        _ => bail!("Failed to import private key due to unknown error"),
+    }
+}
+
 /// This function provides the common implementation for all of the various ways we can change the
 /// PIN or PUK on a Yubikey. The way we do this using low-level PC/SC functions is identical,
 /// except we send a different action value depending on the requested change type.
@@ -1542,24 +1647,5 @@ extern "C" {
         out_len: *mut size_t,
         algorithm: c_uchar,
         key: c_uchar,
-    ) -> ykpiv_rc;
-    pub fn ykpiv_import_private_key(
-        state: *mut ykpiv_state,
-        key: c_uchar,
-        algorithm: c_uchar,
-        p: *const c_uchar,
-        p_len: size_t,
-        q: *const c_uchar,
-        q_len: size_t,
-        dp: *const c_uchar,
-        dp_len: size_t,
-        dq: *const c_uchar,
-        dq_len: size_t,
-        qinv: *const c_uchar,
-        qinv_len: size_t,
-        ec_data: *const c_uchar,
-        ec_data_len: c_uchar,
-        pin_policy: c_uchar,
-        touch_policy: c_uchar,
     ) -> ykpiv_rc;
 }
