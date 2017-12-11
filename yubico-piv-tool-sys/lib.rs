@@ -28,7 +28,7 @@ extern crate pcsc_sys;
 extern crate rand;
 extern crate rpassword;
 
-use libc::{c_char, c_int, c_uchar, size_t};
+use libc::{c_char, c_int, c_uchar};
 use rand::Rng;
 use std::collections::{HashMap, HashSet};
 use std::ffi::CString;
@@ -848,6 +848,152 @@ fn ykpiv_save_object(
     Ok(())
 }
 
+// TODO: This function can be cleaned up / code can be reused.
+// TODO: This function should accept Rust-style enums instead of IDs. This would let us clean up
+// some assorted input validation code.
+fn sign_decipher_impl(
+    card: pcsc_sys::SCARDHANDLE,
+    data: &[u8],
+    algorithm_id: c_uchar,
+    key_id: c_uchar,
+    decipher: bool,
+) -> Result<Vec<u8>> {
+    if algorithm_id != YKPIV_ALGO_RSA1024 && algorithm_id != YKPIV_ALGO_RSA2048
+        && algorithm_id != YKPIV_ALGO_ECCP256 && algorithm_id != YKPIV_ALGO_ECCP384
+    {
+        bail!("Invalid cryptographic algorithm");
+    }
+
+    let key_len: usize = match algorithm_id {
+        YKPIV_ALGO_RSA1024 => 128,
+        YKPIV_ALGO_RSA2048 => 256,
+        YKPIV_ALGO_ECCP256 => 32,
+        YKPIV_ALGO_ECCP384 => 48,
+        _ => 0,
+    };
+
+    if (algorithm_id == YKPIV_ALGO_RSA1024 || algorithm_id == YKPIV_ALGO_RSA2048)
+        && data.len() != key_len
+    {
+        bail!("Invalid input data; expected {} bytes", key_len);
+    } else if algorithm_id == YKPIV_ALGO_ECCP256 || algorithm_id == YKPIV_ALGO_ECCP384 {
+        if !decipher && data.len() > key_len {
+            bail!("Invalid input data; expected at most {} bytes", key_len);
+        } else if decipher && data.len() != (key_len * 2) + 1 {
+            bail!("Invalid input data; expected {} bytes", (key_len * 2) + 1);
+        }
+    }
+
+    // TODO: It's unclear what this length really represents? Rename it.
+    let len_to_send: usize = if data.len() < 0x80 {
+        data.len() + 1 + 3
+    } else if data.len() < 0xff {
+        data.len() + 2 + 3
+    } else {
+        data.len() + 3 + 3
+    };
+
+    let mut data_to_send: Vec<u8> = Vec::new();
+    data_to_send.push(0x7c);
+    if len_to_send < 0x80 {
+        data_to_send.push(len_to_send as u8);
+    } else if len_to_send < 0xff {
+        data_to_send.extend_from_slice(&[0x81, len_to_send as u8]);
+    } else {
+        data_to_send.extend_from_slice(&[
+            0x82,
+            ((len_to_send >> 8) & 0xff) as u8,
+            (len_to_send & 0xff) as u8,
+        ]);
+    }
+    data_to_send.extend_from_slice(&[
+        0x82,
+        0x00,
+        if (algorithm_id == YKPIV_ALGO_ECCP256 || algorithm_id == YKPIV_ALGO_ECCP384) && decipher {
+            0x85
+        } else {
+            0x81
+        },
+    ]);
+    if data.len() < 0x80 {
+        data_to_send.push(data.len() as u8);
+    } else if data.len() < 0xff {
+        data_to_send.extend_from_slice(&[0x81, data.len() as u8]);
+    } else {
+        data_to_send.extend_from_slice(&[
+            0x82,
+            ((data.len() >> 8) & 0xff) as u8,
+            (data.len() & 0xff) as u8,
+        ]);
+    }
+    data_to_send.extend_from_slice(data);
+
+    let (sw, recv) = ykpiv_transfer_data(
+        card,
+        &[0, YKPIV_INS_AUTHENTICATE, algorithm_id, key_id],
+        data,
+    )?;
+    if sw == SW_ERR_SECURITY_STATUS {
+        bail!("Authenticating for sign / decipher failed");
+    } else if sw != SW_SUCCESS {
+        bail!("Authenticating for sign / decipher failed due to an unknown error");
+    }
+
+    // Skip the first 7c tag.
+    if recv[0] != 0x7c {
+        bail!("Failed to parse tag from signature reply");
+    }
+    let recv_slice = if recv[1] < 0x81 {
+        let len = recv[1] as usize;
+        &recv[2 + len..]
+    } else if (recv[1] & 0x7f) == 1 {
+        let len = recv[2] as usize;
+        &recv[3 + len..]
+    } else if (recv[1] & 0x7f) == 2 {
+        let len = ((recv[2] as usize) << 8) + (recv[3] as usize);
+        &recv[4 + len..]
+    } else {
+        bail!("Failed to parse tag length from signature reply");
+    };
+
+    // Skip the 82 tag.
+    if recv_slice[0] != 0x82 {
+        bail!("Failed to parse tag from signature reply");
+    }
+    let recv_slice = if recv_slice[1] < 0x81 {
+        let len = recv_slice[1] as usize;
+        &recv_slice[2 + len..]
+    } else if (recv_slice[1] & 0x7f) == 1 {
+        let len = recv_slice[2] as usize;
+        &recv_slice[3 + len..]
+    } else if (recv_slice[1] & 0x7f) == 2 {
+        let len = ((recv_slice[2] as usize) << 8) + (recv_slice[3] as usize);
+        &recv_slice[4 + len..]
+    } else {
+        bail!("Failed to parse tag length from signature reply");
+    };
+
+    Ok(recv_slice.into())
+}
+
+pub fn ykpiv_sign_data(
+    card: pcsc_sys::SCARDHANDLE,
+    data: &[u8],
+    algorithm_id: c_uchar,
+    key_id: c_uchar,
+) -> Result<Vec<u8>> {
+    sign_decipher_impl(card, data, algorithm_id, key_id, false)
+}
+
+pub fn ykpiv_decipher_data(
+    card: pcsc_sys::SCARDHANDLE,
+    data: &[u8],
+    algorithm_id: c_uchar,
+    key_id: c_uchar,
+) -> Result<Vec<u8>> {
+    sign_decipher_impl(card, data, algorithm_id, key_id, true)
+}
+
 // TODO: This function should accept Rust-style enums instead of IDs. This would let us clean up
 // some assorted input validation code.
 pub fn ykpiv_import_private_key(
@@ -1628,24 +1774,3 @@ pub const YKPIV_TOUCHPOLICY_DEFAULT: c_uchar = 0;
 pub const YKPIV_TOUCHPOLICY_NEVER: c_uchar = 1;
 pub const YKPIV_TOUCHPOLICY_ALWAYS: c_uchar = 2;
 pub const YKPIV_TOUCHPOLICY_CACHED: c_uchar = 3;
-
-extern "C" {
-    pub fn ykpiv_sign_data(
-        state: *mut ykpiv_state,
-        sign_in: *const c_uchar,
-        in_len: size_t,
-        sign_out: *mut c_uchar,
-        out_len: *mut size_t,
-        algorithm: c_uchar,
-        key: c_uchar,
-    ) -> ykpiv_rc;
-    pub fn ykpiv_decipher_data(
-        state: *mut ykpiv_state,
-        enc_in: *const c_uchar,
-        in_len: size_t,
-        enc_out: *mut c_uchar,
-        out_len: *mut size_t,
-        algorithm: c_uchar,
-        key: c_uchar,
-    ) -> ykpiv_rc;
-}
