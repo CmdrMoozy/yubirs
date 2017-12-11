@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// TODO: Remove this.
-#![allow(non_camel_case_types)]
-
 extern crate data_encoding;
 #[macro_use]
 extern crate error_chain;
@@ -1588,7 +1585,7 @@ impl ykpiv_state {
             bail!("Failed to read data object");
         }
 
-        recv.remove(0); // The first byte is not part of the object or length.
+        recv.remove(0); // The first byte is not part of the object or length?
         if recv[0] < 0x81 {
             let length = recv[0] as usize;
             recv.remove(0);
@@ -1626,48 +1623,6 @@ impl ykpiv_state {
 impl Drop for ykpiv_state {
     fn drop(&mut self) {
         self.disconnect();
-    }
-}
-
-macro_rules! ykpiv_enum {
-    (pub enum $name:ident { $($variants:tt)* }) => {
-        #[cfg(target_env = "msvc")]
-        pub type $name = i32;
-        #[cfg(not(target_env = "msvc"))]
-        pub type $name = u32;
-        ykpiv_enum!(gen, $name, 0, $($variants)*);
-    };
-    (pub enum $name:ident: $t:ty { $($variants:tt)* }) => {
-        pub type $name = $t;
-        ykpiv_enum!(gen, $name, 0, $($variants)*);
-    };
-    (gen, $name:ident, $val:expr, $variant:ident, $($rest:tt)*) => {
-        pub const $variant: $name = $val;
-        ykpiv_enum!(gen, $name, $val+1, $($rest)*);
-    };
-    (gen, $name:ident, $val:expr, $variant:ident = $e:expr, $($rest:tt)*) => {
-        pub const $variant: $name = $e;
-        ykpiv_enum!(gen, $name, $e+1, $($rest)*);
-    };
-    (gen, $name:ident, $val:expr, ) => {}
-}
-
-ykpiv_enum! {
-    pub enum ykpiv_rc: c_int {
-        YKPIV_OK = 0,
-        YKPIV_MEMORY_ERROR = -1,
-        YKPIV_PCSC_ERROR = -2,
-        YKPIV_SIZE_ERROR = -3,
-        YKPIV_APPLET_ERROR = -4,
-        YKPIV_AUTHENTICATION_ERROR = -5,
-        YKPIV_RANDOMNESS_ERROR = -6,
-        YKPIV_GENERIC_ERROR = -7,
-        YKPIV_KEY_ERROR = -8,
-        YKPIV_PARSE_ERROR = -9,
-        YKPIV_WRONG_PIN = -10,
-        YKPIV_INVALID_OBJECT = -11,
-        YKPIV_ALGORITHM_ERROR = -12,
-        YKPIV_PIN_LOCKED = -13,
     }
 }
 

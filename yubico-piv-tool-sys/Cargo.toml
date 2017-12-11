@@ -6,8 +6,6 @@ description = "Low-level bindings to Yubico's PIV tool library"
 homepage = "https://github.com/CmdrMoozy/yubirs"
 repository = "https://github.com/CmdrMoozy/yubirs"
 license = "Apache-2.0"
-links = "pcsclite ykpiv"
-build = "build.rs"
 
 [lib]
 name = "yubico_piv_tool_sys"
@@ -23,6 +21,3 @@ openssl = "0.9"
 pcsc-sys = "0.1"
 rand = "0.3"
 rpassword = "2.0"
-
-[build-dependencies]
-cmake = "0.1"
