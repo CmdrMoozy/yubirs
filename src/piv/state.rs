@@ -14,13 +14,9 @@
 
 use cert::{format_certificate, Format};
 use error::*;
-use libc::c_ulong;
-use piv::try_ykpiv;
 use piv::id::{Key, Object};
 use yubico_piv_tool_sys as ykpiv;
 use yubico_piv_tool_sys::Version;
-
-const OBJECT_BUFFER_SIZE: usize = 3072;
 
 pub struct State {
     state: ykpiv::ykpiv_state,
@@ -157,20 +153,8 @@ impl State {
     }
 
     /// Read a data object from the Yubikey, returning the byte contents.
-    pub fn read_object(&mut self, id: Object) -> Result<Vec<u8>> {
-        let mut buffer: Vec<u8> = vec![0; OBJECT_BUFFER_SIZE];
-        let mut len: c_ulong = OBJECT_BUFFER_SIZE as c_ulong;
-        try_ykpiv(unsafe {
-            // TODO: Pass self.state as an immutable borrow.
-            ykpiv::ykpiv_fetch_object(
-                &mut self.state,
-                id.to_value(),
-                buffer.as_mut_ptr(),
-                &mut len,
-            )
-        })?;
-        buffer.truncate(len as usize);
-        Ok(buffer)
+    pub fn read_object(&self, id: Object) -> Result<Vec<u8>> {
+        Ok(self.state.read_object(id.to_value())?)
     }
 
     /// Write a data object to the Yubikey. This function takes ownership of the data, because

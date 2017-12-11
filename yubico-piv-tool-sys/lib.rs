@@ -28,7 +28,7 @@ extern crate pcsc_sys;
 extern crate rand;
 extern crate rpassword;
 
-use libc::{c_char, c_int, c_uchar, c_ulong, size_t};
+use libc::{c_char, c_int, c_uchar, size_t};
 use rand::Rng;
 use std::collections::{HashMap, HashSet};
 use std::ffi::CString;
@@ -1314,6 +1314,52 @@ impl ykpiv_state {
         Ok(())
     }
 
+    pub fn read_object(&self, object_id: c_int) -> Result<Vec<u8>> {
+        let mut data: Vec<u8> = Vec::new();
+        // TODO: Deduplicate this if statement? It appears in one other place.
+        if object_id == YKPIV_OBJ_DISCOVERY {
+            data.extend_from_slice(&[1, YKPIV_OBJ_DISCOVERY as u8]);
+        } else if object_id > 0xffff && object_id <= 0xffffff {
+            data.extend_from_slice(&[
+                3,
+                ((object_id >> 16) & 0xff) as u8,
+                ((object_id >> 8) & 0xff) as u8,
+                (object_id & 0xff) as u8,
+            ]);
+        }
+
+        let (sw, mut recv) = ykpiv_transfer_data(
+            self.card,
+            &[0, YKPIV_INS_GET_DATA, 0x3f, 0xff],
+            data.as_slice(),
+        )?;
+        if sw != SW_SUCCESS {
+            bail!("Failed to read data object");
+        }
+
+        recv.remove(0); // The first byte is not part of the object or length.
+        if recv[0] < 0x81 {
+            let length = recv[0] as usize;
+            recv.remove(0);
+            recv.truncate(length);
+        } else if (recv[0] & 0x7f) == 1 {
+            let length = recv[1] as usize;
+            recv.remove(0);
+            recv.remove(0);
+            recv.truncate(length);
+        } else if (recv[0] & 0x7f) == 2 {
+            let length = ((recv[1] as usize) << 8) + (recv[2] as usize);
+            recv.remove(0);
+            recv.remove(0);
+            recv.remove(0);
+            recv.truncate(length);
+        } else {
+            bail!("Failed to determine size of returned data object");
+        }
+
+        Ok(recv)
+    }
+
     pub fn write_object(
         &mut self,
         mgm_key: Option<&str>,
@@ -1479,9 +1525,6 @@ pub const YKPIV_TOUCHPOLICY_ALWAYS: c_uchar = 2;
 pub const YKPIV_TOUCHPOLICY_CACHED: c_uchar = 3;
 
 extern "C" {
-    pub fn ykpiv_strerror(err: ykpiv_rc) -> *const c_char;
-    pub fn ykpiv_strerror_name(err: ykpiv_rc) -> *const c_char;
-
     pub fn ykpiv_sign_data(
         state: *mut ykpiv_state,
         sign_in: *const c_uchar,
@@ -1499,12 +1542,6 @@ extern "C" {
         out_len: *mut size_t,
         algorithm: c_uchar,
         key: c_uchar,
-    ) -> ykpiv_rc;
-    pub fn ykpiv_fetch_object(
-        state: *mut ykpiv_state,
-        object_id: c_int,
-        data: *mut c_uchar,
-        len: *mut c_ulong,
     ) -> ykpiv_rc;
     pub fn ykpiv_import_private_key(
         state: *mut ykpiv_state,
@@ -1525,13 +1562,4 @@ extern "C" {
         pin_policy: c_uchar,
         touch_policy: c_uchar,
     ) -> ykpiv_rc;
-}
-
-#[inline]
-pub fn ykpiv_is_ec(a: c_uchar) -> bool {
-    a == YKPIV_ALGO_ECCP256 || a == YKPIV_ALGO_ECCP384
-}
-#[inline]
-pub fn ykpiv_is_rsa(a: c_uchar) -> bool {
-    a == YKPIV_ALGO_RSA1024 || a == YKPIV_ALGO_RSA2048
 }
