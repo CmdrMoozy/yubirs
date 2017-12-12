@@ -30,7 +30,7 @@ extern crate rand;
 extern crate regex;
 extern crate rpassword;
 
-pub mod cert;
+pub mod crypto;
 pub mod error;
 pub mod otp;
 pub mod piv;

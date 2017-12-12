@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use cert::{format_certificate, Format};
+use crypto::{format_certificate, Format};
 use error::*;
 use piv::id::{Key, Object};
 // TODO: Rename.
