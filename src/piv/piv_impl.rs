@@ -20,11 +20,11 @@ use pcsc_sys;
 use piv::DEFAULT_READER;
 use piv::scarderr::SmartCardError;
 use rand::{self, Rng};
-use rpassword;
 use std::collections::HashSet;
 use std::ffi::CString;
 use std::fmt;
 use std::ptr;
+use util::MaybePromptedString;
 
 const PIN_NAME: &'static str = "PIN";
 const PIN_PROMPT: &'static str = "PIN: ";
@@ -209,53 +209,6 @@ fn send_data(card: pcsc_sys::SCARDHANDLE, apdu: &Apdu) -> Result<(c_int, Vec<u8>
     // It seems like a sane default for now.
     let mut recv: Vec<u8> = vec![0; 261];
     Ok((send_data_impl(card, apdu, &mut recv)?, recv))
-}
-
-/// This is a utility function to prompt the user for a sensitive string, probably a PIN or a PUK.
-fn prompt_for_string(prompt: &str, confirm: bool) -> Result<String> {
-    loop {
-        let string = rpassword::prompt_password_stderr(prompt)?;
-        if !confirm || string == rpassword::prompt_password_stderr("Confirm: ")? {
-            return Ok(string);
-        }
-    }
-}
-
-struct MaybePromptedString {
-    value: CString,
-    length: usize,
-    was_provided: bool,
-}
-
-impl MaybePromptedString {
-    pub fn new(provided: Option<&str>, prompt: &str, confirm: bool) -> Result<Self> {
-        let prompted: Option<String> = match provided {
-            None => Some(prompt_for_string(prompt, confirm)?),
-            Some(_) => None,
-        };
-        let length: usize =
-            provided.map_or_else(|| prompted.as_ref().map_or(0, |s| s.len()), |s| s.len());
-
-        Ok(MaybePromptedString {
-            value: CString::new(
-                provided.map_or_else(|| prompted.as_ref().map_or("", |s| s.as_str()), |s| s),
-            )?,
-            length: length,
-            was_provided: provided.is_some(),
-        })
-    }
-
-    pub fn was_provided(&self) -> bool {
-        self.was_provided
-    }
-
-    pub fn as_bytes(&self) -> &[u8] {
-        self.value.as_bytes()
-    }
-
-    pub fn len(&self) -> usize {
-        self.length
-    }
 }
 
 enum VerificationResult {

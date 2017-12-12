@@ -34,6 +34,7 @@ pub mod cert;
 pub mod error;
 pub mod otp;
 pub mod piv;
+mod util;
 
 #[cfg(test)]
 mod tests;
