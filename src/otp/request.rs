@@ -12,24 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use base64;
+use data_encoding;
 use otp::Otp;
 use otp::util;
 use sodiumoxide::randombytes::randombytes;
 use std::fmt;
 
+
 /// Generate a 40 character long string with random unique data. Note that the Yubico API will only
 /// accept nonces which contain the characters [a-zA-Z0-9]. If the nonce contains other characters,
 /// the misleading error code MISSING_PARAMETER will be returned.
 fn gen_yubico_api_nonce() -> String {
-    let mut nonce = String::new();
-    while nonce.len() < 40 {
-        let s = base64::encode_config(randombytes(30).as_slice(), base64::URL_SAFE);
-        let s: String = s.chars().filter(|c| *c != '-' && *c != '_').collect();
-        nonce.push_str(s.as_str());
+    let mut s = String::with_capacity(40);
+    while s.len() < 40 {
+        let remaining: usize = 40 - s.len();
+        s.extend(
+            data_encoding::BASE64URL_NOPAD
+                .encode(randombytes(30).as_slice())
+                .chars()
+                .filter(|c| *c != '-' && *c != '_')
+                .take(remaining),
+        )
     }
-    nonce.truncate(40);
-    nonce
+    s
 }
 
 /// The possible values for the "success percentage" request parameter. From the validation server

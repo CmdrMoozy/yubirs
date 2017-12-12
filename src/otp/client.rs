@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use base64;
 use curl::easy::{Easy, List};
+use data_encoding;
 use error::Result;
 use otp::Otp;
 use otp::request::{Request, SuccessPercentage};
@@ -74,7 +74,7 @@ impl Client {
         client_id: &str,
         api_key: &str,
     ) -> Result<Client> {
-        let api_key = base64::decode_config(api_key.as_bytes(), base64::STANDARD)?;
+        let api_key = data_encoding::BASE64.decode(api_key.as_bytes())?;
         Ok(Client {
             protocol: protocol,
             api_server: api_server.to_owned(),

@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate base64;
 extern crate bdrck;
 extern crate chrono;
 // NOTE: Strongly prefer sodiumoxide over crypto. Crypto is only used because it supports certain

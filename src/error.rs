@@ -14,7 +14,6 @@
 
 error_chain! {
     foreign_links {
-        Base64(::base64::DecodeError);
         Curl(::curl::Error);
         Decode(::data_encoding::DecodeError);
         Io(::std::io::Error);

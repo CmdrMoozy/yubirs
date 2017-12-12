@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate base64;
 extern crate bdrck;
+extern crate data_encoding;
 extern crate isatty;
 extern crate yubirs;
 
@@ -26,7 +26,7 @@ use yubirs::piv::state::State;
 
 fn print_data(data: &[u8]) -> Result<()> {
     if isatty::stdout_isatty() {
-        println!("{}", base64::encode(data));
+        println!("{}", data_encoding::BASE64.encode(data));
     } else {
         use std::io::Write;
         let mut stdout = ::std::io::stdout();
@@ -43,7 +43,7 @@ fn read_data(path: &str, is_base64: bool) -> Result<Vec<u8>> {
             f.read_to_end(&mut buffer)?;
             buffer
         }
-        true => base64::decode(path)?,
+        true => data_encoding::BASE64.decode(path.as_bytes())?,
     })
 }
 

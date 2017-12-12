@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use base64;
 use crypto::sha1::Sha1;
 use crypto::hmac::Hmac;
 use curl::easy::Easy;
+use data_encoding;
 
 /// URL-encode the given string. That is, replacing any characters which are not allowed to appear
 /// in URLs with their percent-encoded versions.
@@ -37,6 +37,8 @@ pub fn generate_signature(key: &[u8], data: String) -> Vec<u8> {
 /// will be accepted by Yubico's API (base64 + percent-encoded).
 pub fn generate_encoded_signature(key: &[u8], data: String) -> String {
     url_encode(
-        base64::encode_config(generate_signature(key, data).as_slice(), base64::STANDARD).as_str(),
+        data_encoding::BASE64
+            .encode(generate_signature(key, data).as_slice())
+            .as_str(),
     )
 }
