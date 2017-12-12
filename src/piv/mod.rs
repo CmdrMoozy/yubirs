@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub mod id;
+mod nid;
 mod piv_impl;
 pub mod scarderr;
 pub mod state;
