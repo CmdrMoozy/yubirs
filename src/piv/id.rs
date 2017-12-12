@@ -401,3 +401,55 @@ impl Object {
         }
     }
 }
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub enum PinPolicy {
+    Default,
+    Never,
+    Once,
+    Always,
+}
+
+lazy_static! {
+    static ref PIN_POLICY_STRINGS: HashMap<PinPolicy, &'static str> = {
+        let mut m = HashMap::new();
+        m.insert(PinPolicy::Default, "Default");
+        m.insert(PinPolicy::Never, "Never");
+        m.insert(PinPolicy::Once, "Once");
+        m.insert(PinPolicy::Always, "Always");
+        m
+    };
+
+    static ref STRING_PIN_POLICIES: HashMap<String, PinPolicy> = {
+        PIN_POLICY_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
+    };
+}
+
+impl fmt::Display for PinPolicy {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", PIN_POLICY_STRINGS.get(self).map_or("", |s| *s))
+    }
+}
+
+impl FromStr for PinPolicy {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let s = s.to_uppercase();
+        Ok(match STRING_PIN_POLICIES.get(&s) {
+            None => bail!("Invalid PIN policy '{}'", s),
+            Some(pp) => *pp,
+        })
+    }
+}
+
+impl PinPolicy {
+    pub fn to_value(&self) -> c_uchar {
+        match *self {
+            PinPolicy::Default => nid::YKPIV_PINPOLICY_DEFAULT,
+            PinPolicy::Never => nid::YKPIV_PINPOLICY_NEVER,
+            PinPolicy::Once => nid::YKPIV_PINPOLICY_ONCE,
+            PinPolicy::Always => nid::YKPIV_PINPOLICY_ALWAYS,
+        }
+    }
+}

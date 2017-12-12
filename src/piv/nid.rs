@@ -60,7 +60,6 @@ pub const YKPIV_OBJ_CARD_AUTH: c_int = 0x5fc101;
 pub const YKPIV_OBJ_DISCOVERY: c_int = 0x7e;
 pub const YKPIV_OBJ_KEY_HISTORY: c_int = 0x5fc10c;
 pub const YKPIV_OBJ_IRIS: c_int = 0x5fc121;
-
 pub const YKPIV_OBJ_RETIRED1: c_int = 0x5fc10d;
 pub const YKPIV_OBJ_RETIRED2: c_int = 0x5fc10e;
 pub const YKPIV_OBJ_RETIRED3: c_int = 0x5fc10f;
@@ -81,7 +80,6 @@ pub const YKPIV_OBJ_RETIRED17: c_int = 0x5fc11d;
 pub const YKPIV_OBJ_RETIRED18: c_int = 0x5fc11e;
 pub const YKPIV_OBJ_RETIRED19: c_int = 0x5fc11f;
 pub const YKPIV_OBJ_RETIRED20: c_int = 0x5fc120;
-
 pub const YKPIV_OBJ_ATTESTATION: c_int = 0x5fff01;
 
 pub const YKPIV_INS_VERIFY: c_uchar = 0x20;
