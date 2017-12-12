@@ -453,3 +453,55 @@ impl PinPolicy {
         }
     }
 }
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub enum TouchPolicy {
+    Default,
+    Never,
+    Always,
+    Cached,
+}
+
+lazy_static! {
+    static ref TOUCH_POLICY_STRINGS: HashMap<TouchPolicy, &'static str> = {
+        let mut m = HashMap::new();
+        m.insert(TouchPolicy::Default, "Default");
+        m.insert(TouchPolicy::Never, "Never");
+        m.insert(TouchPolicy::Always, "Always");
+        m.insert(TouchPolicy::Cached, "Cached");
+        m
+    };
+
+    static ref STRING_TOUCH_POLICIES: HashMap<String, TouchPolicy> = {
+        TOUCH_POLICY_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
+    };
+}
+
+impl fmt::Display for TouchPolicy {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", TOUCH_POLICY_STRINGS.get(self).map_or("", |s| *s))
+    }
+}
+
+impl FromStr for TouchPolicy {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let s = s.to_uppercase();
+        Ok(match STRING_TOUCH_POLICIES.get(&s) {
+            None => bail!("Invalid touch policy '{}'", s),
+            Some(tp) => *tp,
+        })
+    }
+}
+
+impl TouchPolicy {
+    pub fn to_value(&self) -> c_uchar {
+        match *self {
+            TouchPolicy::Default => nid::YKPIV_TOUCHPOLICY_DEFAULT,
+            TouchPolicy::Never => nid::YKPIV_TOUCHPOLICY_NEVER,
+            TouchPolicy::Always => nid::YKPIV_TOUCHPOLICY_ALWAYS,
+            TouchPolicy::Cached => nid::YKPIV_TOUCHPOLICY_CACHED,
+        }
+    }
+}

@@ -19,7 +19,7 @@ use libc::{c_char, c_int, c_uchar};
 use openssl;
 use pcsc_sys;
 use piv::DEFAULT_READER;
-use piv::id::{Algorithm, PinPolicy};
+use piv::id::{Algorithm, PinPolicy, TouchPolicy};
 use piv::nid::*;
 use piv::scarderr::SmartCardError;
 use rand::{self, Rng};
@@ -535,20 +535,13 @@ pub fn ykpiv_import_private_key(
     qinv: &[u8],
     ec_data: &[u8],
     pin_policy: PinPolicy,
-    touch_policy_id: c_uchar,
+    touch_policy: TouchPolicy,
 ) -> Result<()> {
     if key_id == YKPIV_KEY_CARDMGM || key_id < YKPIV_KEY_RETIRED1
         || (key_id > YKPIV_KEY_RETIRED20 && key_id < YKPIV_KEY_AUTHENTICATION)
         || (key_id > YKPIV_KEY_CARDAUTH && key_id != YKPIV_KEY_ATTESTATION)
     {
         bail!("The specified key type is not supported by this function");
-    }
-
-    if touch_policy_id != YKPIV_TOUCHPOLICY_DEFAULT && touch_policy_id != YKPIV_TOUCHPOLICY_NEVER
-        && touch_policy_id != YKPIV_TOUCHPOLICY_ALWAYS
-        && touch_policy_id != YKPIV_TOUCHPOLICY_CACHED
-    {
-        bail!("Invalid touch policy");
     }
 
     if !algorithm.is_rsa() && !algorithm.is_ecc() {
@@ -602,8 +595,8 @@ pub fn ykpiv_import_private_key(
         key_data.extend_from_slice(&[YKPIV_PINPOLICY_TAG, 0x01, pin_policy.to_value()]);
     }
 
-    if touch_policy_id != YKPIV_TOUCHPOLICY_DEFAULT {
-        key_data.extend_from_slice(&[YKPIV_TOUCHPOLICY_TAG, 0x01, touch_policy_id]);
+    if touch_policy != TouchPolicy::Default {
+        key_data.extend_from_slice(&[YKPIV_TOUCHPOLICY_TAG, 0x01, touch_policy.to_value()]);
     }
 
     let (sw, _) = ykpiv_transfer_data(
