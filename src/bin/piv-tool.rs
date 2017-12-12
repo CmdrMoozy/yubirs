@@ -47,8 +47,8 @@ fn read_data(path: &str, is_base64: bool) -> Result<Vec<u8>> {
     })
 }
 
-fn list_readers(values: Values) -> Result<()> {
-    let state = State::new(values.get_boolean("verbose"))?;
+fn list_readers(_: Values) -> Result<()> {
+    let state = State::new()?;
     let readers: Vec<String> = state.list_readers()?;
     for reader in readers {
         println!("{}", reader);
@@ -57,32 +57,32 @@ fn list_readers(values: Values) -> Result<()> {
 }
 
 fn get_version(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"))?;
+    let mut state = State::new()?;
     state.connect(Some(values.get_required("reader")))?;
     println!("{}", state.get_version()?);
     Ok(())
 }
 
 fn change_pin(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"))?;
+    let mut state = State::new()?;
     state.connect(Some(values.get_required("reader")))?;
     state.change_pin(None, None)
 }
 
 fn unblock_pin(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"))?;
+    let mut state = State::new()?;
     state.connect(Some(values.get_required("reader")))?;
     state.unblock_pin(None, None)
 }
 
 fn change_puk(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"))?;
+    let mut state = State::new()?;
     state.connect(Some(values.get_required("reader")))?;
     state.change_puk(None, None)
 }
 
 fn reset(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"))?;
+    let mut state = State::new()?;
     state.connect(Some(values.get_required("reader")))?;
     state.reset()
 }
@@ -90,35 +90,35 @@ fn reset(values: Values) -> Result<()> {
 fn set_retries(values: Values) -> Result<()> {
     let pin_retries: u8 = values.get_required_parsed("pin_retries")?;
     let puk_retries: u8 = values.get_required_parsed("puk_retries")?;
-    let mut state = State::new(values.get_boolean("verbose"))?;
+    let mut state = State::new()?;
     state.connect(Some(values.get_required("reader")))?;
     state.set_retries(None, None, pin_retries, puk_retries)?;
     Ok(())
 }
 
 fn change_mgm_key(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"))?;
+    let mut state = State::new()?;
     state.connect(Some(values.get_required("reader")))?;
     state.set_management_key(None, None, false)?;
     Ok(())
 }
 
 fn set_chuid(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"))?;
+    let mut state = State::new()?;
     state.connect(Some(values.get_required("reader")))?;
     state.set_chuid(None)?;
     Ok(())
 }
 
 fn set_ccc(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"))?;
+    let mut state = State::new()?;
     state.connect(Some(values.get_required("reader")))?;
     state.set_ccc(None)?;
     Ok(())
 }
 
 fn read_object(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"))?;
+    let mut state = State::new()?;
     state.connect(Some(values.get_required("reader")))?;
     let data = state.read_object(values.get_required_parsed("object_id")?)?;
     print_data(data.as_slice())?;
@@ -127,14 +127,14 @@ fn read_object(values: Values) -> Result<()> {
 
 fn write_object(values: Values) -> Result<()> {
     let data = read_data(values.get_required("input"), values.get_boolean("base64"))?;
-    let mut state = State::new(values.get_boolean("verbose"))?;
+    let mut state = State::new()?;
     state.connect(Some(values.get_required("reader")))?;
     state.write_object(None, values.get_required_parsed("object_id")?, data)?;
     Ok(())
 }
 
 fn read_certificate(values: Values) -> Result<()> {
-    let mut state = State::new(values.get_boolean("verbose"))?;
+    let mut state = State::new()?;
     state.connect(Some(values.get_required("reader")))?;
     println!(
         "{}",
@@ -154,16 +154,13 @@ fn main() {
         Command::new(
             "list_readers",
             "List the available PC/SC readers",
-            Specs::new(vec![
-                Spec::boolean("verbose", "Enable verbose output", Some('v')),
-            ]).unwrap(),
+            Specs::new(vec![]).unwrap(),
             Box::new(list_readers),
         ),
         Command::new(
             "get_version",
             "Retrieve the version number from the Yubikey",
             Specs::new(vec![
-                Spec::boolean("verbose", "Enable verbose output", Some('v')),
                 Spec::required(
                     "reader",
                     concat!(
@@ -180,7 +177,6 @@ fn main() {
             "change_pin",
             "Change the Yubikey's PIN, using the existing PIN",
             Specs::new(vec![
-                Spec::boolean("verbose", "Enable verbose output", Some('v')),
                 Spec::required(
                     "reader",
                     concat!(
@@ -200,7 +196,6 @@ fn main() {
                 "enter a valid PIN",
             ),
             Specs::new(vec![
-                Spec::boolean("verbose", "Enable verbose output", Some('v')),
                 Spec::required(
                     "reader",
                     concat!(
@@ -217,7 +212,6 @@ fn main() {
             "change_puk",
             "Change the Yubikey's PUK, using the existing PUK",
             Specs::new(vec![
-                Spec::boolean("verbose", "Enable verbose output", Some('v')),
                 Spec::required(
                     "reader",
                     concat!(
@@ -237,7 +231,6 @@ fn main() {
                 "retry counters",
             ),
             Specs::new(vec![
-                Spec::boolean("verbose", "Enable verbose output", Some('v')),
                 Spec::required(
                     "reader",
                     concat!(
@@ -254,7 +247,6 @@ fn main() {
             "set_retries",
             "Set the PIN and PUK retry counters, and reset the PIN and PUK back to defaults",
             Specs::new(vec![
-                Spec::boolean("verbose", "Enable verbose output", Some('v')),
                 Spec::required(
                     "reader",
                     concat!(
@@ -283,7 +275,6 @@ fn main() {
             "change_mgm_key",
             "Change the Yubikey's management key",
             Specs::new(vec![
-                Spec::boolean("verbose", "Enable verbose output", Some('v')),
                 Spec::required(
                     "reader",
                     concat!(
@@ -300,7 +291,6 @@ fn main() {
             "set_chuid",
             "Write a new Card Holder Unique Identifier (CHUID) to the Yubikey",
             Specs::new(vec![
-                Spec::boolean("verbose", "Enable verbose output", Some('v')),
                 Spec::required(
                     "reader",
                     concat!(
@@ -317,7 +307,6 @@ fn main() {
             "set_ccc",
             "Write a new Card Capability Container (CCC) to the Yubikey",
             Specs::new(vec![
-                Spec::boolean("verbose", "Enable verbose output", Some('v')),
                 Spec::required(
                     "reader",
                     concat!(
@@ -334,7 +323,6 @@ fn main() {
             "read_object",
             "Read the contents of a data object from the Yubikey",
             Specs::new(vec![
-                Spec::boolean("verbose", "Enable verbose output", Some('v')),
                 Spec::required(
                     "reader",
                     concat!(
@@ -357,7 +345,6 @@ fn main() {
             "write_object",
             "Write a data object to the Yubikey",
             Specs::new(vec![
-                Spec::boolean("verbose", "Enable verbose output", Some('v')),
                 Spec::required(
                     "reader",
                     concat!(
@@ -391,7 +378,6 @@ fn main() {
             "read_certificate",
             "Read a certificate from the Yubikey",
             Specs::new(vec![
-                Spec::boolean("verbose", "Enable verbose output", Some('v')),
                 Spec::required(
                     "reader",
                     concat!(

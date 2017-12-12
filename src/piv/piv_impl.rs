@@ -698,14 +698,12 @@ impl fmt::Display for Version {
 pub struct ykpiv_state {
     pub context: pcsc_sys::SCARDCONTEXT,
     pub card: pcsc_sys::SCARDHANDLE,
-    pub verbose: c_int,
     authenticated_pin: bool,
     authenticated_mgm: bool,
 }
 
 impl ykpiv_state {
-    // TODO: Remove verbose flag.
-    pub fn new(verbose: bool) -> Result<Self> {
+    pub fn new() -> Result<Self> {
         let mut context: pcsc_sys::SCARDCONTEXT = pcsc_sys::SCARD_E_INVALID_HANDLE;
         SmartCardError::new(unsafe {
             pcsc_sys::SCardEstablishContext(
@@ -718,10 +716,6 @@ impl ykpiv_state {
         Ok(ykpiv_state {
             context: context,
             card: 0,
-            verbose: match verbose {
-                false => 0,
-                true => 1,
-            },
             authenticated_pin: false,
             authenticated_mgm: false,
         })

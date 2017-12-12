@@ -24,9 +24,9 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(verbose: bool) -> Result<State> {
+    pub fn new() -> Result<State> {
         Ok(State {
-            state: ykpiv::ykpiv_state::new(verbose)?,
+            state: ykpiv::ykpiv_state::new()?,
         })
     }
 
