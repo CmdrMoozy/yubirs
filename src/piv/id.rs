@@ -19,6 +19,77 @@ use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
 
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Algorithm {
+    Des,
+    Rsa1024,
+    Rsa2048,
+    Eccp256,
+    Eccp384,
+}
+
+lazy_static! {
+    static ref ALGORITHM_STRINGS: HashMap<Algorithm, &'static str> = {
+        let mut m = HashMap::new();
+        m.insert(Algorithm::Des, "3DES");
+        m.insert(Algorithm::Rsa1024, "RSA1024");
+        m.insert(Algorithm::Rsa2048, "RSA2048");
+        m.insert(Algorithm::Eccp256, "ECCP256");
+        m.insert(Algorithm::Eccp384, "ECCP384");
+        m
+    };
+
+    static ref STRING_ALGORITHMS: HashMap<String, Algorithm> = {
+        ALGORITHM_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
+    };
+}
+
+impl fmt::Display for Algorithm {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", ALGORITHM_STRINGS.get(self).map_or("", |s| *s))
+    }
+}
+
+impl FromStr for Algorithm {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let s = s.to_uppercase();
+        Ok(match STRING_ALGORITHMS.get(&s) {
+            None => bail!("Invalid algorithm '{}'", s),
+            Some(a) => *a,
+        })
+    }
+}
+
+impl Algorithm {
+    pub fn to_value(&self) -> c_uchar {
+        match *self {
+            Algorithm::Des => nid::YKPIV_ALGO_3DES,
+            Algorithm::Rsa1024 => nid::YKPIV_ALGO_RSA1024,
+            Algorithm::Rsa2048 => nid::YKPIV_ALGO_RSA2048,
+            Algorithm::Eccp256 => nid::YKPIV_ALGO_ECCP256,
+            Algorithm::Eccp384 => nid::YKPIV_ALGO_ECCP384,
+        }
+    }
+
+    pub fn is_rsa(&self) -> bool {
+        match *self {
+            Algorithm::Rsa1024 => true,
+            Algorithm::Rsa2048 => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_ecc(&self) -> bool {
+        match *self {
+            Algorithm::Eccp256 => true,
+            Algorithm::Eccp384 => true,
+            _ => false,
+        }
+    }
+}
+
 /// This enumeration describes the identifiers for the various slots the Yubikey has for
 /// certificates.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]

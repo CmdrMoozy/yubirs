@@ -19,6 +19,7 @@ use libc::{c_char, c_int, c_uchar};
 use openssl;
 use pcsc_sys;
 use piv::DEFAULT_READER;
+use piv::id::Algorithm;
 use piv::nid::*;
 use piv::scarderr::SmartCardError;
 use rand::{self, Rng};
@@ -385,29 +386,25 @@ fn ykpiv_save_object(
 fn sign_decipher_impl(
     card: pcsc_sys::SCARDHANDLE,
     data: &[u8],
-    algorithm_id: c_uchar,
+    algorithm: Algorithm,
     key_id: c_uchar,
     decipher: bool,
 ) -> Result<Vec<u8>> {
-    if algorithm_id != YKPIV_ALGO_RSA1024 && algorithm_id != YKPIV_ALGO_RSA2048
-        && algorithm_id != YKPIV_ALGO_ECCP256 && algorithm_id != YKPIV_ALGO_ECCP384
-    {
-        bail!("Invalid cryptographic algorithm");
+    if !algorithm.is_rsa() && !algorithm.is_ecc() {
+        bail!("Data signing / deciphering only supports RSA or ECC algorithms");
     }
 
-    let key_len: usize = match algorithm_id {
-        YKPIV_ALGO_RSA1024 => 128,
-        YKPIV_ALGO_RSA2048 => 256,
-        YKPIV_ALGO_ECCP256 => 32,
-        YKPIV_ALGO_ECCP384 => 48,
+    let key_len: usize = match algorithm {
+        Algorithm::Rsa1024 => 128,
+        Algorithm::Rsa2048 => 256,
+        Algorithm::Eccp256 => 32,
+        Algorithm::Eccp384 => 48,
         _ => 0,
     };
 
-    if (algorithm_id == YKPIV_ALGO_RSA1024 || algorithm_id == YKPIV_ALGO_RSA2048)
-        && data.len() != key_len
-    {
+    if algorithm.is_rsa() && data.len() != key_len {
         bail!("Invalid input data; expected {} bytes", key_len);
-    } else if algorithm_id == YKPIV_ALGO_ECCP256 || algorithm_id == YKPIV_ALGO_ECCP384 {
+    } else if algorithm.is_ecc() {
         if !decipher && data.len() > key_len {
             bail!("Invalid input data; expected at most {} bytes", key_len);
         } else if decipher && data.len() != (key_len * 2) + 1 {
@@ -440,7 +437,7 @@ fn sign_decipher_impl(
     data_to_send.extend_from_slice(&[
         0x82,
         0x00,
-        if (algorithm_id == YKPIV_ALGO_ECCP256 || algorithm_id == YKPIV_ALGO_ECCP384) && decipher {
+        if algorithm.is_ecc() && decipher {
             0x85
         } else {
             0x81
@@ -461,7 +458,7 @@ fn sign_decipher_impl(
 
     let (sw, recv) = ykpiv_transfer_data(
         card,
-        &[0, YKPIV_INS_AUTHENTICATE, algorithm_id, key_id],
+        &[0, YKPIV_INS_AUTHENTICATE, algorithm.to_value(), key_id],
         data,
     )?;
     if sw == SW_ERR_SECURITY_STATUS {
@@ -510,19 +507,19 @@ fn sign_decipher_impl(
 pub fn ykpiv_sign_data(
     card: pcsc_sys::SCARDHANDLE,
     data: &[u8],
-    algorithm_id: c_uchar,
+    algorithm: Algorithm,
     key_id: c_uchar,
 ) -> Result<Vec<u8>> {
-    sign_decipher_impl(card, data, algorithm_id, key_id, false)
+    sign_decipher_impl(card, data, algorithm, key_id, false)
 }
 
 pub fn ykpiv_decipher_data(
     card: pcsc_sys::SCARDHANDLE,
     data: &[u8],
-    algorithm_id: c_uchar,
+    algorithm: Algorithm,
     key_id: c_uchar,
 ) -> Result<Vec<u8>> {
-    sign_decipher_impl(card, data, algorithm_id, key_id, true)
+    sign_decipher_impl(card, data, algorithm, key_id, true)
 }
 
 // TODO: This function should accept Rust-style enums instead of IDs. This would let us clean up
@@ -530,7 +527,7 @@ pub fn ykpiv_decipher_data(
 pub fn ykpiv_import_private_key(
     card: pcsc_sys::SCARDHANDLE,
     key_id: c_uchar,
-    algorithm_id: c_uchar,
+    algorithm: Algorithm,
     p: &[u8],
     q: &[u8],
     dp: &[u8],
@@ -560,34 +557,31 @@ pub fn ykpiv_import_private_key(
         bail!("Invalid touch policy");
     }
 
-    if algorithm_id != YKPIV_ALGO_RSA1024 && algorithm_id != YKPIV_ALGO_RSA2048
-        && algorithm_id != YKPIV_ALGO_ECCP256 && algorithm_id != YKPIV_ALGO_ECCP384
-    {
-        bail!("Invalid cryptographic algorithm");
+    if !algorithm.is_rsa() && !algorithm.is_ecc() {
+        bail!("Certificate functions only support RSA or ECC algorithms");
     }
 
-    let elem_len: usize = match algorithm_id {
-        YKPIV_ALGO_RSA1024 => 64,
-        YKPIV_ALGO_RSA2048 => 128,
-        YKPIV_ALGO_ECCP256 => 32,
-        YKPIV_ALGO_ECCP384 => 48,
+    let elem_len: usize = match algorithm {
+        Algorithm::Rsa1024 => 64,
+        Algorithm::Rsa2048 => 128,
+        Algorithm::Eccp256 => 32,
+        Algorithm::Eccp384 => 48,
         _ => 0,
     };
 
-    let params: Vec<&[u8]> =
-        if algorithm_id == YKPIV_ALGO_RSA1024 || algorithm_id == YKPIV_ALGO_RSA2048 {
-            vec![p, q, dp, dq, qinv]
-        } else if algorithm_id == YKPIV_ALGO_ECCP256 || algorithm_id == YKPIV_ALGO_ECCP384 {
-            vec![ec_data]
-        } else {
-            vec![]
-        };
+    let params: Vec<&[u8]> = if algorithm.is_rsa() {
+        vec![p, q, dp, dq, qinv]
+    } else if algorithm.is_ecc() {
+        vec![ec_data]
+    } else {
+        vec![]
+    };
 
-    let param_tag: u8 = match algorithm_id {
-        YKPIV_ALGO_RSA1024 => 0x01,
-        YKPIV_ALGO_RSA2048 => 0x01,
-        YKPIV_ALGO_ECCP256 => 0x06,
-        YKPIV_ALGO_ECCP384 => 0x06,
+    let param_tag: u8 = match algorithm {
+        Algorithm::Rsa1024 => 0x01,
+        Algorithm::Rsa2048 => 0x01,
+        Algorithm::Eccp256 => 0x06,
+        Algorithm::Eccp384 => 0x06,
         _ => 0,
     };
 
@@ -620,7 +614,7 @@ pub fn ykpiv_import_private_key(
 
     let (sw, _) = ykpiv_transfer_data(
         card,
-        &[0, YKPIV_INS_IMPORT_KEY, algorithm_id, key_id],
+        &[0, YKPIV_INS_IMPORT_KEY, algorithm.to_value(), key_id],
         key_data.as_slice(),
     )?;
     match sw {
@@ -798,7 +792,7 @@ impl ykpiv_state {
             st: StructuredApdu {
                 cla: 0,
                 ins: YKPIV_INS_AUTHENTICATE,
-                p1: YKPIV_ALGO_3DES,
+                p1: Algorithm::Des.to_value(),
                 p2: YKPIV_KEY_CARDMGM,
                 lc: 0x04,
                 data: data,
@@ -832,7 +826,7 @@ impl ykpiv_state {
             st: StructuredApdu {
                 cla: 0,
                 ins: YKPIV_INS_AUTHENTICATE,
-                p1: YKPIV_ALGO_3DES,
+                p1: Algorithm::Des.to_value(),
                 p2: YKPIV_KEY_CARDMGM,
                 lc: 21,
                 data: [0; 255],
@@ -1060,7 +1054,7 @@ impl ykpiv_state {
         }
 
         let mut data: [c_uchar; 255] = [0; 255];
-        data[0] = YKPIV_ALGO_3DES;
+        data[0] = Algorithm::Des.to_value();
         data[1] = YKPIV_KEY_CARDMGM;
         data[2] = MGM_KEY_BYTES as c_uchar; // Key length
         (&mut data[3..(3 + MGM_KEY_BYTES)]).copy_from_slice(new_mgm_key.as_slice());
