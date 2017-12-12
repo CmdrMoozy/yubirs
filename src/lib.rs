@@ -29,7 +29,6 @@ extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate openssl;
-extern crate pcsc;
 extern crate pcsc_sys;
 extern crate rand;
 extern crate regex;
