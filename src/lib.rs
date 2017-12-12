@@ -33,7 +33,6 @@ extern crate pcsc_sys;
 extern crate rand;
 extern crate regex;
 extern crate rpassword;
-extern crate sodiumoxide;
 
 pub mod cert;
 pub mod error;
@@ -46,10 +45,7 @@ mod tests;
 /// Initializes Yubirs and any other underlying libraries. It is recommended to call this function
 /// as soon as the program starts.
 pub fn init() -> error::Result<()> {
+    openssl::init();
     curl::init();
-    if !sodiumoxide::init() {
-        bail!("Initializing sodiumoxide library failed");
-    }
-
     Ok(())
 }

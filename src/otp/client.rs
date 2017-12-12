@@ -107,7 +107,7 @@ impl Client {
             timestamp,
             success_percentage,
             timeout,
-        );
+        )?;
 
         let mut headers = List::new();
         headers.append("User-Agent: github.com/CmdrMoozy/yubirs")?;

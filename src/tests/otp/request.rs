@@ -49,7 +49,7 @@ fn test_request_construction() {
         Otp::new("vvvvvvcucrlcietctckflvnncdgckubflugerlnr").unwrap(),
         true,
         Some(SuccessPercentage::Secure),
-        Some(8));
+        Some(8)).unwrap();
     assert!(VALID_NONCE_REGEX.is_match(request.nonce.as_str()));
     request.nonce = TEST_NONCE.to_owned();
     assert_eq!("DCzYoErmGciW6hQUR%2FTtfRq97no%3D", request.get_signature());
