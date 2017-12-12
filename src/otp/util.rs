@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::sha1::Sha1;
-use crypto::hmac::Hmac;
 use curl::easy::Easy;
 use data_encoding;
+use error::*;
+use openssl;
 
 /// URL-encode the given string. That is, replacing any characters which are not allowed to appear
 /// in URLs with their percent-encoded versions.
@@ -25,20 +25,20 @@ pub fn url_encode(s: &str) -> String {
 }
 
 /// Generate a HMAC-SHA1 signature as accepted by the Yubico API, using the given decoded API key.
-pub fn generate_signature(key: &[u8], data: String) -> Vec<u8> {
-    use crypto::mac::Mac;
-    let mut hmac = Hmac::new(Sha1::new(), key);
+pub fn generate_signature(key: &[u8], data: String) -> Result<Vec<u8>> {
+    let hmac = openssl::pkey::PKey::hmac(key)?;
+    let mut signer = openssl::sign::Signer::new(openssl::hash::MessageDigest::sha1(), &hmac)?;
     let data = data.into_bytes();
-    hmac.input(&data[..]);
-    hmac.result().code().to_vec()
+    signer.update(data.as_slice())?;
+    Ok(signer.sign_to_vec()?)
 }
 
 /// Generates a signature as per generate_signature(), and then encodes it in such a way that it
 /// will be accepted by Yubico's API (base64 + percent-encoded).
-pub fn generate_encoded_signature(key: &[u8], data: String) -> String {
-    url_encode(
+pub fn generate_encoded_signature(key: &[u8], data: String) -> Result<String> {
+    Ok(url_encode(
         data_encoding::BASE64
-            .encode(generate_signature(key, data).as_slice())
+            .encode(generate_signature(key, data)?.as_slice())
             .as_str(),
-    )
+    ))
 }

@@ -14,10 +14,6 @@
 
 extern crate bdrck;
 extern crate chrono;
-// NOTE: Strongly prefer sodiumoxide over crypto. Crypto is only used because it supports certain
-// legacy crypto algorithms which sodiumoxide omits.
-
-extern crate crypto;
 extern crate curl;
 extern crate data_encoding;
 #[macro_use]

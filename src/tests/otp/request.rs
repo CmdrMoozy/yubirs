@@ -52,7 +52,7 @@ fn test_request_construction() {
         Some(8)).unwrap();
     assert!(VALID_NONCE_REGEX.is_match(request.nonce.as_str()));
     request.nonce = TEST_NONCE.to_owned();
-    assert_eq!("DCzYoErmGciW6hQUR%2FTtfRq97no%3D", request.get_signature());
+    assert_eq!("DCzYoErmGciW6hQUR%2FTtfRq97no%3D", request.get_signature().unwrap());
     assert_eq!(
         request.to_string(),
         "h=DCzYoErmGciW6hQUR%2FTtfRq97no%3D&id=87&\

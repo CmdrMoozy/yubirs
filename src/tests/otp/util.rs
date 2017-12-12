@@ -67,8 +67,9 @@ lazy_static! {
 #[test]
 fn test_signature_generation() {
     for test_case in SIGNATURE_TEST_CASES.iter() {
-        let sig = generate_signature(test_case.key.as_slice(), test_case.data.to_owned());
-        let enc = generate_encoded_signature(test_case.key.as_slice(), test_case.data.to_owned());
+        let sig = generate_signature(test_case.key.as_slice(), test_case.data.to_owned()).unwrap();
+        let enc = generate_encoded_signature(
+            test_case.key.as_slice(), test_case.data.to_owned()).unwrap();
         assert_eq!(test_case.expected, sig);
         assert_eq!(test_case.expected_encoded, enc);
     }

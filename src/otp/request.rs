@@ -119,7 +119,7 @@ impl Request {
     }
 
     /// Returns, as a base64-/percent-encoded string, the signature for this request.
-    pub fn get_signature(&self) -> String {
+    pub fn get_signature(&self) -> Result<String> {
         util::generate_encoded_signature(
             self.api_key.as_slice(),
             self.to_string_without_signature(),
@@ -132,7 +132,9 @@ impl fmt::Display for Request {
         write!(
             f,
             "h={}&{}",
-            self.get_signature(),
+            self.get_signature()
+                .ok()
+                .unwrap_or("COMPUTING SIGNATURE FAILED".to_owned()),
             self.to_string_without_signature()
         )
     }

@@ -250,7 +250,7 @@ impl VerificationResult {
             }
         }
 
-        if util::generate_signature(api_key, result.signature_data.clone()) != result.signature {
+        if util::generate_signature(api_key, result.signature_data.clone())? != result.signature {
             bail!("Verifying response signature failed");
         }
 
