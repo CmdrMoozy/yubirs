@@ -14,6 +14,7 @@
 
 use libc::{c_int, c_uchar};
 
+pub const YKPIV_ALGO_TAG: c_uchar = 0x80;
 pub const YKPIV_ALGO_3DES: c_uchar = 0x03;
 pub const YKPIV_ALGO_RSA1024: c_uchar = 0x06;
 pub const YKPIV_ALGO_RSA2048: c_uchar = 0x07;
