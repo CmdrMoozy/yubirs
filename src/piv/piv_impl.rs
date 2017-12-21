@@ -509,15 +509,15 @@ impl fmt::Display for Version {
     }
 }
 
-pub struct ykpiv_state<T: PcscHal> {
+pub struct StateImpl<T: PcscHal> {
     hal: T,
     authenticated_pin: bool,
     authenticated_mgm: bool,
 }
 
-impl<T: PcscHal> ykpiv_state<T> {
+impl<T: PcscHal> StateImpl<T> {
     pub fn new() -> Result<Self> {
-        Ok(ykpiv_state {
+        Ok(StateImpl {
             hal: T::new()?,
             authenticated_pin: false,
             authenticated_mgm: false,
@@ -846,7 +846,7 @@ impl<T: PcscHal> ykpiv_state<T> {
     }
 }
 
-impl<T: PcscHal> Drop for ykpiv_state<T> {
+impl<T: PcscHal> Drop for StateImpl<T> {
     fn drop(&mut self) {
         self.disconnect();
     }

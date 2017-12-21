@@ -16,18 +16,16 @@ use crypto::{format_certificate, Format};
 use error::*;
 use piv::hal::PcscHardware;
 use piv::id::{Key, Object};
-// TODO: Rename.
-use piv::piv_impl as ykpiv;
-use piv::piv_impl::Version;
+use piv::piv_impl::{StateImpl, Version};
 
 pub struct State {
-    state: ykpiv::ykpiv_state<PcscHardware>,
+    state: StateImpl<PcscHardware>,
 }
 
 impl State {
     pub fn new() -> Result<State> {
         Ok(State {
-            state: ykpiv::ykpiv_state::new()?,
+            state: StateImpl::new()?,
         })
     }
 
