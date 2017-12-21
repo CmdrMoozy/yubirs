@@ -585,7 +585,7 @@ impl<T: PcscHal> ykpiv_state<T> {
                 cla: 0,
                 ins: YKPIV_INS_AUTHENTICATE,
                 p1: Algorithm::Des.to_value(),
-                p2: YKPIV_KEY_CARDMGM,
+                p2: Key::CardManagement.to_value(),
                 lc: 0x04,
                 data: data,
             },
@@ -620,7 +620,7 @@ impl<T: PcscHal> ykpiv_state<T> {
                 cla: 0,
                 ins: YKPIV_INS_AUTHENTICATE,
                 p1: Algorithm::Des.to_value(),
-                p2: YKPIV_KEY_CARDMGM,
+                p2: Key::CardManagement.to_value(),
                 lc: 21,
                 data: [0; 255],
             },
@@ -755,7 +755,7 @@ impl<T: PcscHal> ykpiv_state<T> {
 
         let mut data: [u8; 255] = [0; 255];
         data[0] = Algorithm::Des.to_value();
-        data[1] = YKPIV_KEY_CARDMGM;
+        data[1] = Key::CardManagement.to_value();
         data[2] = MGM_KEY_BYTES as u8; // Key length
         (&mut data[3..(3 + MGM_KEY_BYTES)]).copy_from_slice(new_mgm_key.as_slice());
         let apdu = Apdu {
@@ -795,7 +795,7 @@ impl<T: PcscHal> ykpiv_state<T> {
         let mut data: Vec<u8> = Vec::new();
         // TODO: Deduplicate this if statement? It appears in one other place.
         if id == Object::Discovery {
-            data.extend_from_slice(&[1, YKPIV_OBJ_DISCOVERY as u8]);
+            data.extend_from_slice(&[1, Object::Discovery.to_value() as u8]);
         } else if id.to_value() > 0xffff && id.to_value() <= 0xffffff {
             data.extend_from_slice(&[
                 3,
