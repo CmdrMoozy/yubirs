@@ -90,6 +90,85 @@ impl Algorithm {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Instruction {
+    Attest,
+    Authenticate,
+    ChangeReference,
+    GenerateAsymmetric,
+    GetData,
+    GetVersion,
+    ImportKey,
+    PutData,
+    Reset,
+    ResetRetry,
+    SetManagementKey,
+    SetPinRetries,
+    Verify,
+}
+
+lazy_static! {
+    static ref INSTRUCTION_STRINGS: HashMap<Instruction, &'static str> = {
+        let mut m = HashMap::new();
+        m.insert(Instruction::Attest, "Attest");
+        m.insert(Instruction::Authenticate, "Authenticate");
+        m.insert(Instruction::ChangeReference, "ChangeReference");
+        m.insert(Instruction::GenerateAsymmetric, "GenerateAsymmetric");
+        m.insert(Instruction::GetData, "GetData");
+        m.insert(Instruction::GetVersion, "GetVersion");
+        m.insert(Instruction::ImportKey, "ImportKey");
+        m.insert(Instruction::PutData, "PutData");
+        m.insert(Instruction::Reset, "Reset");
+        m.insert(Instruction::ResetRetry, "ResetRetry");
+        m.insert(Instruction::SetManagementKey, "SetManagementKey");
+        m.insert(Instruction::SetPinRetries, "SetPinRetries");
+        m.insert(Instruction::Verify, "Verify");
+        m
+    };
+
+    static ref STRING_INSTRUCTIONS: HashMap<String, Instruction> = {
+        INSTRUCTION_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
+    };
+}
+
+impl fmt::Display for Instruction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", INSTRUCTION_STRINGS.get(self).map_or("", |s| *s))
+    }
+}
+
+impl FromStr for Instruction {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let s = s.to_uppercase();
+        Ok(match STRING_INSTRUCTIONS.get(&s) {
+            None => bail!("Invalid instruction '{}'", s),
+            Some(i) => *i,
+        })
+    }
+}
+
+impl Instruction {
+    pub fn to_value(&self) -> u8 {
+        match *self {
+            Instruction::Attest => nid::YKPIV_INS_ATTEST,
+            Instruction::Authenticate => nid::YKPIV_INS_AUTHENTICATE,
+            Instruction::ChangeReference => nid::YKPIV_INS_CHANGE_REFERENCE,
+            Instruction::GenerateAsymmetric => nid::YKPIV_INS_GENERATE_ASYMMETRIC,
+            Instruction::GetData => nid::YKPIV_INS_GET_DATA,
+            Instruction::GetVersion => nid::YKPIV_INS_GET_VERSION,
+            Instruction::ImportKey => nid::YKPIV_INS_IMPORT_KEY,
+            Instruction::PutData => nid::YKPIV_INS_PUT_DATA,
+            Instruction::Reset => nid::YKPIV_INS_RESET,
+            Instruction::ResetRetry => nid::YKPIV_INS_RESET_RETRY,
+            Instruction::SetManagementKey => nid::YKPIV_INS_SET_MGMKEY,
+            Instruction::SetPinRetries => nid::YKPIV_INS_SET_PIN_RETRIES,
+            Instruction::Verify => nid::YKPIV_INS_VERIFY,
+        }
+    }
+}
+
 /// This enumeration describes the identifiers for the various slots the Yubikey has for
 /// certificates.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]

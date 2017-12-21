@@ -19,7 +19,7 @@ use libc::c_int;
 use openssl;
 use pcsc_sys;
 use piv::hal::{Apdu, PcscHal, StructuredApdu};
-use piv::id::{Algorithm, Key, Object, PinPolicy, TouchPolicy};
+use piv::id::*;
 use piv::nid::*;
 use piv::scarderr::SmartCardError;
 use rand::{self, Rng};
@@ -204,7 +204,10 @@ fn ykpiv_save_object<T: PcscHal>(hal: &T, id: Object, mut buffer: Vec<u8>) -> Re
     }
     data.append(&mut buffer);
 
-    let (sw, _) = hal.send_data(&[0, YKPIV_INS_PUT_DATA, 0x3f, 0xff], data.as_slice())?;
+    let (sw, _) = hal.send_data(
+        &[0, Instruction::PutData.to_value(), 0x3f, 0xff],
+        data.as_slice(),
+    )?;
     if sw != SW_SUCCESS {
         bail!("Failed to save data object");
     }
@@ -288,7 +291,7 @@ fn sign_decipher_impl<T: PcscHal>(
     let (sw, recv) = hal.send_data(
         &[
             0,
-            YKPIV_INS_AUTHENTICATE,
+            Instruction::Authenticate.to_value(),
             algorithm.to_value(),
             key.to_value(),
         ],
@@ -424,7 +427,12 @@ pub fn ykpiv_import_private_key<T: PcscHal>(
     }
 
     let (sw, _) = hal.send_data(
-        &[0, YKPIV_INS_IMPORT_KEY, algorithm.to_value(), id.to_value()],
+        &[
+            0,
+            Instruction::ImportKey.to_value(),
+            algorithm.to_value(),
+            id.to_value(),
+        ],
         key_data.as_slice(),
     )?;
     match sw {
@@ -468,9 +476,9 @@ fn change_impl<T: PcscHal>(
         );
     }
 
-    let mut templ: Vec<u8> = vec![0, YKPIV_INS_CHANGE_REFERENCE, 0, 0x80];
+    let mut templ: Vec<u8> = vec![0, Instruction::ChangeReference.to_value(), 0, 0x80];
     if action == ChangeAction::UnblockPin {
-        templ[1] = YKPIV_INS_RESET_RETRY;
+        templ[1] = Instruction::ResetRetry.to_value();
     }
     if action == ChangeAction::ChangePuk {
         templ[3] = 0x81;
@@ -547,7 +555,7 @@ impl<T: PcscHal> StateImpl<T> {
             let apdu = Apdu {
                 st: StructuredApdu {
                     cla: 0,
-                    ins: YKPIV_INS_VERIFY,
+                    ins: Instruction::Verify.to_value(),
                     p1: 0x00,
                     p2: 0x80,
                     lc: 0x80,
@@ -583,7 +591,7 @@ impl<T: PcscHal> StateImpl<T> {
         let apdu = Apdu {
             st: StructuredApdu {
                 cla: 0,
-                ins: YKPIV_INS_AUTHENTICATE,
+                ins: Instruction::Authenticate.to_value(),
                 p1: Algorithm::Des.to_value(),
                 p2: Key::CardManagement.to_value(),
                 lc: 0x04,
@@ -618,7 +626,7 @@ impl<T: PcscHal> StateImpl<T> {
         let apdu = Apdu {
             st: StructuredApdu {
                 cla: 0,
-                ins: YKPIV_INS_AUTHENTICATE,
+                ins: Instruction::Authenticate.to_value(),
                 p1: Algorithm::Des.to_value(),
                 p2: Key::CardManagement.to_value(),
                 lc: 21,
@@ -661,7 +669,7 @@ impl<T: PcscHal> StateImpl<T> {
         let apdu = Apdu {
             st: StructuredApdu {
                 cla: 0,
-                ins: YKPIV_INS_GET_VERSION,
+                ins: Instruction::GetVersion.to_value(),
                 p1: 0,
                 p2: 0,
                 lc: 0,
@@ -713,7 +721,8 @@ impl<T: PcscHal> StateImpl<T> {
     }
 
     pub fn reset(&mut self) -> Result<()> {
-        let (sw, _) = self.hal.send_data(&[0, YKPIV_INS_RESET, 0, 0], &[])?;
+        let (sw, _) = self.hal
+            .send_data(&[0, Instruction::Reset.to_value(), 0, 0], &[])?;
         if sw != SW_SUCCESS {
             bail!("Reset failed, probably because PIN or PUK retries are still available");
         }
@@ -730,7 +739,12 @@ impl<T: PcscHal> StateImpl<T> {
         self.authenticate_mgm(mgm_key)?;
         self.authenticate_pin(pin)?;
         let (sw, _) = self.hal.send_data(
-            &[0, YKPIV_INS_SET_PIN_RETRIES, pin_retries, puk_retries],
+            &[
+                0,
+                Instruction::SetPinRetries.to_value(),
+                pin_retries,
+                puk_retries,
+            ],
             &[],
         )?;
         if sw != SW_SUCCESS {
@@ -761,7 +775,7 @@ impl<T: PcscHal> StateImpl<T> {
         let apdu = Apdu {
             st: StructuredApdu {
                 cla: 0,
-                ins: YKPIV_INS_SET_MGMKEY,
+                ins: Instruction::SetManagementKey.to_value(),
                 p1: 0xff,
                 p2: if touch { 0xfe } else { 0xff },
                 lc: (MGM_KEY_BYTES as u8) + 3, // Key length + 3 extra bytes in data
@@ -805,8 +819,10 @@ impl<T: PcscHal> StateImpl<T> {
             ]);
         }
 
-        let (sw, mut recv) = self.hal
-            .send_data(&[0, YKPIV_INS_GET_DATA, 0x3f, 0xff], data.as_slice())?;
+        let (sw, mut recv) = self.hal.send_data(
+            &[0, Instruction::GetData.to_value(), 0x3f, 0xff],
+            data.as_slice(),
+        )?;
         if sw != SW_SUCCESS {
             bail!("Failed to read data object");
         }
