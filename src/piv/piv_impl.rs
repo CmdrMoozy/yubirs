@@ -15,11 +15,11 @@
 use crypto::{is_weak_mgm_key, MGM_KEY_BYTES};
 use data_encoding;
 use error::*;
-use libc::{c_int, c_uchar};
+use libc::c_int;
 use openssl;
 use pcsc_sys;
 use piv::hal::{Apdu, PcscHal, StructuredApdu};
-use piv::id::{Algorithm, PinPolicy, TouchPolicy};
+use piv::id::{Algorithm, Object, PinPolicy, TouchPolicy};
 use piv::nid::*;
 use piv::scarderr::SmartCardError;
 use rand::{self, Rng};
@@ -42,7 +42,7 @@ const NEW_MGM_KEY_PROMPT: &'static str = "New Management Key: ";
 /// parity. This can be run through
 /// https://github.com/Yubico/yubico-piv-tool/blob/master/tools/fasc.pl to get bytes.
 #[cfg_attr(rustfmt, rustfmt_skip)]
-const CHUID_TEMPLATE: &'static [c_uchar] = &[
+const CHUID_TEMPLATE: &'static [u8] = &[
     0x30, 0x19, 0xd4, 0xe7, 0x39, 0xda, 0x73, 0x9c, 0xed, 0x39, 0xce, 0x73, 0x9d, 0x83, 0x68,
     0x58, 0x21, 0x08, 0x42, 0x10, 0x84, 0x21, 0x38, 0x42, 0x10, 0xc3, 0xf5, 0x34, 0x10, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -52,7 +52,7 @@ const CHUID_RANDOM_OFFSET: usize = 29;
 const CHUID_RANDOM_BYTES: usize = 16;
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
-const CCC_TEMPLATE: &'static [c_uchar] = &[
+const CCC_TEMPLATE: &'static [u8] = &[
     0xf0, 0x15, 0xa0, 0x00, 0x00, 0x01, 0x16, 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf1, 0x01, 0x21, 0xf2, 0x01, 0x21, 0xf3,
     0x00, 0xf4, 0x01, 0x00, 0xf5, 0x01, 0x10, 0xf6, 0x00, 0xf7, 0x00, 0xfa, 0x00, 0xfb, 0x00,
@@ -166,44 +166,43 @@ enum ChangeAction {
 }
 
 fn build_data_object(
-    template: &'static [c_uchar],
+    template: &'static [u8],
     random_offset: usize,
     random_bytes_len: usize,
 ) -> Vec<u8> {
-    let mut object: Vec<c_uchar> = Vec::with_capacity(template.len());
+    let mut object: Vec<u8> = Vec::with_capacity(template.len());
     object.extend_from_slice(&template[..random_offset]);
-    let random_bytes: Vec<c_uchar> = rand::weak_rng().gen_iter().take(random_bytes_len).collect();
+    let random_bytes: Vec<u8> = rand::weak_rng().gen_iter().take(random_bytes_len).collect();
     object.extend(random_bytes.into_iter());
     object.extend_from_slice(&template[random_offset + random_bytes_len..]);
     object
 }
 
-// TODO: This should accept a Rust-style enum instead of an int.
-fn ykpiv_save_object<T: PcscHal>(hal: &T, object_id: c_int, mut object: Vec<u8>) -> Result<()> {
+fn ykpiv_save_object<T: PcscHal>(hal: &T, id: Object, mut buffer: Vec<u8>) -> Result<()> {
     let mut data: Vec<u8> = vec![0x5c];
-    if object_id == YKPIV_OBJ_DISCOVERY {
-        data.extend_from_slice(&[1, YKPIV_OBJ_DISCOVERY as u8]);
-    } else if object_id > 0xffff && object_id <= 0xffffff {
+    if id == Object::Discovery {
+        data.extend_from_slice(&[1, id.to_value() as u8]);
+    } else if id.to_value() > 0xffff && id.to_value() <= 0xffffff {
         data.extend_from_slice(&[
             3,
-            ((object_id >> 16) & 0xff) as u8,
-            ((object_id >> 8) & 0xff) as u8,
-            (object_id & 0xff) as u8,
+            ((id.to_value() >> 16) & 0xff) as u8,
+            ((id.to_value() >> 8) & 0xff) as u8,
+            (id.to_value() & 0xff) as u8,
         ]);
     }
     data.push(0x53);
-    if object.len() < 0x80 {
-        data.push(object.len() as u8);
-    } else if object.len() < 0xff {
-        data.extend_from_slice(&[0x81, object.len() as u8]);
+    if buffer.len() < 0x80 {
+        data.push(buffer.len() as u8);
+    } else if buffer.len() < 0xff {
+        data.extend_from_slice(&[0x81, buffer.len() as u8]);
     } else {
         data.extend_from_slice(&[
             0x82,
-            ((object.len() >> 8) & 0xff) as u8,
-            (object.len() & 0xff) as u8,
+            ((buffer.len() >> 8) & 0xff) as u8,
+            (buffer.len() & 0xff) as u8,
         ]);
     }
-    data.append(&mut object);
+    data.append(&mut buffer);
 
     let (sw, _) = hal.send_data(&[0, YKPIV_INS_PUT_DATA, 0x3f, 0xff], data.as_slice())?;
     if sw != SW_SUCCESS {
@@ -219,7 +218,7 @@ fn sign_decipher_impl<T: PcscHal>(
     hal: &T,
     data: &[u8],
     algorithm: Algorithm,
-    key_id: c_uchar,
+    key_id: u8,
     decipher: bool,
 ) -> Result<Vec<u8>> {
     if !algorithm.is_rsa() && !algorithm.is_ecc() {
@@ -339,7 +338,7 @@ pub fn ykpiv_sign_data<T: PcscHal>(
     hal: &T,
     data: &[u8],
     algorithm: Algorithm,
-    key_id: c_uchar,
+    key_id: u8,
 ) -> Result<Vec<u8>> {
     sign_decipher_impl(hal, data, algorithm, key_id, false)
 }
@@ -348,7 +347,7 @@ pub fn ykpiv_decipher_data<T: PcscHal>(
     hal: &T,
     data: &[u8],
     algorithm: Algorithm,
-    key_id: c_uchar,
+    key_id: u8,
 ) -> Result<Vec<u8>> {
     sign_decipher_impl(hal, data, algorithm, key_id, true)
 }
@@ -357,7 +356,7 @@ pub fn ykpiv_decipher_data<T: PcscHal>(
 // some assorted input validation code.
 pub fn ykpiv_import_private_key<T: PcscHal>(
     hal: &T,
-    key_id: c_uchar,
+    key_id: u8,
     algorithm: Algorithm,
     p: &[u8],
     q: &[u8],
@@ -475,7 +474,7 @@ fn change_impl<T: PcscHal>(
         );
     }
 
-    let mut templ: Vec<c_uchar> = vec![0, YKPIV_INS_CHANGE_REFERENCE, 0, 0x80];
+    let mut templ: Vec<u8> = vec![0, YKPIV_INS_CHANGE_REFERENCE, 0, 0x80];
     if action == ChangeAction::UnblockPin {
         templ[1] = YKPIV_INS_RESET_RETRY;
     }
@@ -483,7 +482,7 @@ fn change_impl<T: PcscHal>(
         templ[3] = 0x81;
     }
 
-    let mut in_data: Vec<c_uchar> = vec![0; 16];
+    let mut in_data: Vec<u8> = vec![0; 16];
     for (dst, src) in in_data.iter_mut().zip(existing.as_bytes()) {
         *dst = *src;
     }
@@ -543,7 +542,7 @@ impl<T: PcscHal> ykpiv_state<T> {
                 );
             }
 
-            let mut data: [c_uchar; 255] = [0; 255];
+            let mut data: [u8; 255] = [0; 255];
             for (dst, src) in data.iter_mut().zip(pin.as_bytes()) {
                 *dst = *src;
             }
@@ -583,7 +582,7 @@ impl<T: PcscHal> ykpiv_state<T> {
         debug_assert!(mgm_key.len() == MGM_KEY_BYTES);
 
         // Get a challenge from the card.
-        let mut data: [c_uchar; 255] = [0; 255];
+        let mut data: [u8; 255] = [0; 255];
         data[0] = 0x7c;
         data[1] = 0x02;
         data[2] = 0x80;
@@ -613,7 +612,7 @@ impl<T: PcscHal> ykpiv_state<T> {
             card_challenge.as_slice(),
         )?;
         debug_assert!(our_challenge.len() == 8);
-        let mut data: [c_uchar; 255] = [0; 255];
+        let mut data: [u8; 255] = [0; 255];
         data[0] = 0x7c;
         data[1] = 20; // 2 + 8 + 2 + 8
         data[2] = 0x80;
@@ -760,10 +759,10 @@ impl<T: PcscHal> ykpiv_state<T> {
             bail!("Refusing to set new management key because it contains weak DES keys");
         }
 
-        let mut data: [c_uchar; 255] = [0; 255];
+        let mut data: [u8; 255] = [0; 255];
         data[0] = Algorithm::Des.to_value();
         data[1] = YKPIV_KEY_CARDMGM;
-        data[2] = MGM_KEY_BYTES as c_uchar; // Key length
+        data[2] = MGM_KEY_BYTES as u8; // Key length
         (&mut data[3..(3 + MGM_KEY_BYTES)]).copy_from_slice(new_mgm_key.as_slice());
         let apdu = Apdu {
             st: StructuredApdu {
@@ -771,7 +770,7 @@ impl<T: PcscHal> ykpiv_state<T> {
                 ins: YKPIV_INS_SET_MGMKEY,
                 p1: 0xff,
                 p2: if touch { 0xfe } else { 0xff },
-                lc: (MGM_KEY_BYTES as c_uchar) + 3, // Key length + 3 extra bytes in data
+                lc: (MGM_KEY_BYTES as u8) + 3, // Key length + 3 extra bytes in data
                 data: data,
             },
         };
@@ -787,28 +786,28 @@ impl<T: PcscHal> ykpiv_state<T> {
     pub fn set_chuid(&mut self, mgm_key: Option<&str>) -> Result<()> {
         self.authenticate_mgm(mgm_key)?;
         let object = build_data_object(CHUID_TEMPLATE, CHUID_RANDOM_OFFSET, CHUID_RANDOM_BYTES);
-        ykpiv_save_object(&self.hal, YKPIV_OBJ_CHUID, object)?;
+        ykpiv_save_object(&self.hal, Object::Chuid, object)?;
         Ok(())
     }
 
     pub fn set_ccc(&mut self, mgm_key: Option<&str>) -> Result<()> {
         self.authenticate_mgm(mgm_key)?;
         let object = build_data_object(CCC_TEMPLATE, CCC_RANDOM_OFFSET, CCC_RANDOM_BYTES);
-        ykpiv_save_object(&self.hal, YKPIV_OBJ_CAPABILITY, object)?;
+        ykpiv_save_object(&self.hal, Object::Capability, object)?;
         Ok(())
     }
 
-    pub fn read_object(&self, object_id: c_int) -> Result<Vec<u8>> {
+    pub fn read_object(&self, id: Object) -> Result<Vec<u8>> {
         let mut data: Vec<u8> = Vec::new();
         // TODO: Deduplicate this if statement? It appears in one other place.
-        if object_id == YKPIV_OBJ_DISCOVERY {
+        if id == Object::Discovery {
             data.extend_from_slice(&[1, YKPIV_OBJ_DISCOVERY as u8]);
-        } else if object_id > 0xffff && object_id <= 0xffffff {
+        } else if id.to_value() > 0xffff && id.to_value() <= 0xffffff {
             data.extend_from_slice(&[
                 3,
-                ((object_id >> 16) & 0xff) as u8,
-                ((object_id >> 8) & 0xff) as u8,
-                (object_id & 0xff) as u8,
+                ((id.to_value() >> 16) & 0xff) as u8,
+                ((id.to_value() >> 8) & 0xff) as u8,
+                (id.to_value() & 0xff) as u8,
             ]);
         }
 
@@ -844,11 +843,11 @@ impl<T: PcscHal> ykpiv_state<T> {
     pub fn write_object(
         &mut self,
         mgm_key: Option<&str>,
-        object_id: c_int,
+        id: Object,
         buffer: Vec<u8>,
     ) -> Result<()> {
         self.authenticate_mgm(mgm_key)?;
-        ykpiv_save_object(&self.hal, object_id, buffer)?;
+        ykpiv_save_object(&self.hal, id, buffer)?;
         Ok(())
     }
 }

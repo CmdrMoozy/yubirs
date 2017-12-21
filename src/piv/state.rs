@@ -149,7 +149,7 @@ impl State {
 
     /// Read a data object from the Yubikey, returning the byte contents.
     pub fn read_object(&self, id: Object) -> Result<Vec<u8>> {
-        Ok(self.state.read_object(id.to_value())?)
+        Ok(self.state.read_object(id)?)
     }
 
     /// Write a data object to the Yubikey. This function takes ownership of the data, because
@@ -160,7 +160,7 @@ impl State {
         id: Object,
         buffer: Vec<u8>,
     ) -> Result<()> {
-        Ok(self.state.write_object(mgm_key, id.to_value(), buffer)?)
+        Ok(self.state.write_object(mgm_key, id, buffer)?)
     }
 
     /// This is a convenience function to read a certificate's data object from the Yubikey, and
