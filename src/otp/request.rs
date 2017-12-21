@@ -19,7 +19,6 @@ use otp::Otp;
 use otp::util;
 use std::fmt;
 
-
 /// Generate a 40 character long string with random unique data. Note that the Yubico API will only
 /// accept nonces which contain the characters [a-zA-Z0-9]. If the nonce contains other characters,
 /// the misleading error code MISSING_PARAMETER will be returned.

@@ -14,13 +14,14 @@
 
 use crypto::{format_certificate, Format};
 use error::*;
+use piv::hal::PcscHardware;
 use piv::id::{Key, Object};
 // TODO: Rename.
 use piv::piv_impl as ykpiv;
 use piv::piv_impl::Version;
 
 pub struct State {
-    state: ykpiv::ykpiv_state,
+    state: ykpiv::ykpiv_state<PcscHardware>,
 }
 
 impl State {
@@ -112,12 +113,8 @@ impl State {
         pin_retries: u8,
         puk_retries: u8,
     ) -> Result<()> {
-        Ok(self.state.set_retries(
-            mgm_key,
-            pin,
-            pin_retries,
-            puk_retries,
-        )?)
+        Ok(self.state
+            .set_retries(mgm_key, pin, pin_retries, puk_retries)?)
     }
 
     /// This function changes the management key stored on the device. This is the key used to
@@ -128,11 +125,8 @@ impl State {
         new_mgm_key: Option<&str>,
         touch: bool,
     ) -> Result<()> {
-        Ok(self.state.set_management_key(
-            old_mgm_key,
-            new_mgm_key,
-            touch,
-        )?)
+        Ok(self.state
+            .set_management_key(old_mgm_key, new_mgm_key, touch)?)
     }
 
     /// This function writes a new, randomly-generated Card Holder Unique Identifier (CHUID) to the

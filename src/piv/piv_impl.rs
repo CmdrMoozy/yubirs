@@ -15,17 +15,15 @@
 use crypto::{is_weak_mgm_key, MGM_KEY_BYTES};
 use data_encoding;
 use error::*;
-use libc::{c_char, c_int, c_uchar};
+use libc::{c_int, c_uchar};
 use openssl;
 use pcsc_sys;
-use piv::DEFAULT_READER;
+use piv::hal::{Apdu, PcscHal, StructuredApdu};
 use piv::id::{Algorithm, PinPolicy, TouchPolicy};
 use piv::nid::*;
 use piv::scarderr::SmartCardError;
 use rand::{self, Rng};
-use std::ffi::CString;
 use std::fmt;
-use std::ptr;
 use util::MaybePromptedString;
 
 const PIN_NAME: &'static str = "PIN";
@@ -62,91 +60,6 @@ const CCC_TEMPLATE: &'static [c_uchar] = &[
 ];
 const CCC_RANDOM_OFFSET: usize = 9;
 const CCC_RANDOM_BYTES: usize = 14;
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct StructuredApdu {
-    /// Instruction class - indicates the type of command, e.g. interindustry or
-    /// proprietary.
-    pub cla: c_uchar,
-    /// Instruction code - indicates the specific command, e.g. "write data".
-    pub ins: c_uchar,
-    /// First instruction parameter for the command, e.g. offset into file at
-    /// which to write the data.
-    pub p1: c_uchar,
-    /// Second instruction parameter for the command, e.g. offset into file at
-    /// which to write the data.
-    pub p2: c_uchar,
-    /// Encodes the number (N_c) of bytes of command data to follow. The
-    /// official specification says that this field can be variable length, but
-    /// upstream specifies it statically at 1 byte.
-    pub lc: c_uchar,
-    /// The command data. The official specification says this can be up to
-    /// 65535 bytes long, but upstream defines it as a static 255 bytes.
-    pub data: [c_uchar; 255],
-}
-
-/// APDU stands for "smart card Application Protocol Data Unit". This union
-/// definition is used by upstream's library to alternate between treating APDU
-/// data in a structured or unstructured way.
-#[repr(C)]
-#[derive(Clone, Copy)]
-union Apdu {
-    st: StructuredApdu,
-    raw: [c_uchar; 230],
-}
-
-/// The Application ID to send in an APDU when connecting to a Yubikey.
-const APDU_AID: [c_uchar; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
-
-// TODO: Remove this function, leaving only send_data.
-fn send_data_impl(
-    card: pcsc_sys::SCARDHANDLE,
-    apdu: *const Apdu,
-    recv_buffer: &mut Vec<u8>,
-) -> Result<c_int> {
-    let send_len: pcsc_sys::DWORD = unsafe { (*apdu).st.lc as pcsc_sys::DWORD + 5 };
-    debug!(
-        "> {}",
-        (unsafe { &(*apdu).raw[0..(send_len as usize)] })
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect::<String>()
-    );
-    let mut recv_length = recv_buffer.len() as pcsc_sys::DWORD;
-    SmartCardError::new(unsafe {
-        pcsc_sys::SCardTransmit(
-            card,
-            &pcsc_sys::g_rgSCardT1Pci,
-            (*apdu).raw.as_ptr(),
-            send_len,
-            ptr::null_mut(),
-            recv_buffer.as_mut_ptr(),
-            &mut recv_length,
-        )
-    })?;
-    debug!(
-        "< {}",
-        recv_buffer
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect::<String>()
-    );
-    recv_buffer.truncate(recv_length as usize);
-    Ok(if recv_buffer.len() >= 2 {
-        ((recv_buffer[recv_length as usize - 2] as c_int) << 8)
-            | (recv_buffer[recv_length as usize - 1] as c_int)
-    } else {
-        0
-    })
-}
-
-fn send_data(card: pcsc_sys::SCARDHANDLE, apdu: &Apdu) -> Result<(c_int, Vec<u8>)> {
-    // Upstream uses a 261-byte buffer in all cases, even though this number seems mostly made up.
-    // It seems like a sane default for now.
-    let mut recv: Vec<u8> = vec![0; 261];
-    Ok((send_data_impl(card, apdu, &mut recv)?, recv))
-}
 
 enum VerificationResult {
     /// The verification was successful.
@@ -252,83 +165,6 @@ enum ChangeAction {
     ChangePuk,
 }
 
-fn ykpiv_transfer_data(
-    card: pcsc_sys::SCARDHANDLE,
-    templ: &[c_uchar],
-    in_data: &[c_uchar],
-) -> Result<(c_int, Vec<c_uchar>)> {
-    SmartCardError::new(unsafe { pcsc_sys::SCardBeginTransaction(card) })?;
-
-    let mut out_data: Vec<c_uchar> = Vec::new();
-    let mut sw: c_int = SW_SUCCESS;
-
-    for chunk in in_data.chunks(255) {
-        let mut data: [c_uchar; 255] = [0; 255];
-        for (dst, src) in data.iter_mut().zip(chunk.iter()) {
-            *dst = *src;
-        }
-        let apdu = Apdu {
-            st: StructuredApdu {
-                cla: if chunk.len() == 255 {
-                    0x10
-                } else {
-                    *templ.get(0).unwrap_or(&0)
-                },
-                ins: *templ.get(1).unwrap_or(&0),
-                p1: *templ.get(2).unwrap_or(&0),
-                p2: *templ.get(3).unwrap_or(&0),
-                lc: chunk.len() as u8,
-                data: data,
-            },
-        };
-
-        debug!(
-            "Sending chunk of {} out of {} total bytes",
-            chunk.len(),
-            in_data.len()
-        );
-        let (sw_new, mut recv) = send_data(card, &apdu)?;
-        sw = sw_new;
-        if sw != SW_SUCCESS && sw >> 8 != 0x61 {
-            return Ok((sw, out_data));
-        }
-        let recv_len = recv.len() - 2;
-        recv.truncate(recv_len);
-        out_data.append(&mut recv);
-    }
-
-    while sw >> 8 == 0x61 {
-        let apdu = Apdu {
-            st: StructuredApdu {
-                cla: 0,
-                ins: 0xc0,
-                p1: 0,
-                p2: 0,
-                lc: 0,
-                data: [0; 255],
-            },
-        };
-
-        debug!(
-            "The card indicates there are {} more bytes of data to read",
-            sw & 0xff
-        );
-        let (sw_new, mut recv) = send_data(card, &apdu)?;
-        sw = sw_new;
-        if sw != SW_SUCCESS && sw >> 8 != 0x61 {
-            return Ok((sw, out_data));
-        }
-        let recv_len = recv.len() - 2;
-        recv.truncate(recv_len);
-        out_data.append(&mut recv);
-    }
-
-    SmartCardError::new(unsafe {
-        pcsc_sys::SCardEndTransaction(card, pcsc_sys::SCARD_LEAVE_CARD)
-    })?;
-    Ok((sw, out_data))
-}
-
 fn build_data_object(
     template: &'static [c_uchar],
     random_offset: usize,
@@ -343,11 +179,7 @@ fn build_data_object(
 }
 
 // TODO: This should accept a Rust-style enum instead of an int.
-fn ykpiv_save_object(
-    card: pcsc_sys::SCARDHANDLE,
-    object_id: c_int,
-    mut object: Vec<u8>,
-) -> Result<()> {
+fn ykpiv_save_object<T: PcscHal>(hal: &T, object_id: c_int, mut object: Vec<u8>) -> Result<()> {
     let mut data: Vec<u8> = vec![0x5c];
     if object_id == YKPIV_OBJ_DISCOVERY {
         data.extend_from_slice(&[1, YKPIV_OBJ_DISCOVERY as u8]);
@@ -373,7 +205,7 @@ fn ykpiv_save_object(
     }
     data.append(&mut object);
 
-    let (sw, _) = ykpiv_transfer_data(card, &[0, YKPIV_INS_PUT_DATA, 0x3f, 0xff], data.as_slice())?;
+    let (sw, _) = hal.send_data(&[0, YKPIV_INS_PUT_DATA, 0x3f, 0xff], data.as_slice())?;
     if sw != SW_SUCCESS {
         bail!("Failed to save data object");
     }
@@ -383,8 +215,8 @@ fn ykpiv_save_object(
 // TODO: This function can be cleaned up / code can be reused.
 // TODO: This function should accept Rust-style enums instead of IDs. This would let us clean up
 // some assorted input validation code.
-fn sign_decipher_impl(
-    card: pcsc_sys::SCARDHANDLE,
+fn sign_decipher_impl<T: PcscHal>(
+    hal: &T,
     data: &[u8],
     algorithm: Algorithm,
     key_id: c_uchar,
@@ -456,8 +288,7 @@ fn sign_decipher_impl(
     }
     data_to_send.extend_from_slice(data);
 
-    let (sw, recv) = ykpiv_transfer_data(
-        card,
+    let (sw, recv) = hal.send_data(
         &[0, YKPIV_INS_AUTHENTICATE, algorithm.to_value(), key_id],
         data,
     )?;
@@ -504,28 +335,28 @@ fn sign_decipher_impl(
     Ok(recv_slice.into())
 }
 
-pub fn ykpiv_sign_data(
-    card: pcsc_sys::SCARDHANDLE,
+pub fn ykpiv_sign_data<T: PcscHal>(
+    hal: &T,
     data: &[u8],
     algorithm: Algorithm,
     key_id: c_uchar,
 ) -> Result<Vec<u8>> {
-    sign_decipher_impl(card, data, algorithm, key_id, false)
+    sign_decipher_impl(hal, data, algorithm, key_id, false)
 }
 
-pub fn ykpiv_decipher_data(
-    card: pcsc_sys::SCARDHANDLE,
+pub fn ykpiv_decipher_data<T: PcscHal>(
+    hal: &T,
     data: &[u8],
     algorithm: Algorithm,
     key_id: c_uchar,
 ) -> Result<Vec<u8>> {
-    sign_decipher_impl(card, data, algorithm, key_id, true)
+    sign_decipher_impl(hal, data, algorithm, key_id, true)
 }
 
 // TODO: This function should accept Rust-style enums instead of IDs. This would let us clean up
 // some assorted input validation code.
-pub fn ykpiv_import_private_key(
-    card: pcsc_sys::SCARDHANDLE,
+pub fn ykpiv_import_private_key<T: PcscHal>(
+    hal: &T,
     key_id: c_uchar,
     algorithm: Algorithm,
     p: &[u8],
@@ -599,8 +430,7 @@ pub fn ykpiv_import_private_key(
         key_data.extend_from_slice(&[YKPIV_TOUCHPOLICY_TAG, 0x01, touch_policy.to_value()]);
     }
 
-    let (sw, _) = ykpiv_transfer_data(
-        card,
+    let (sw, _) = hal.send_data(
         &[0, YKPIV_INS_IMPORT_KEY, algorithm.to_value(), key_id],
         key_data.as_slice(),
     )?;
@@ -614,8 +444,8 @@ pub fn ykpiv_import_private_key(
 /// This function provides the common implementation for all of the various ways we can change the
 /// PIN or PUK on a Yubikey. The way we do this using low-level PC/SC functions is identical,
 /// except we send a different action value depending on the requested change type.
-fn change_impl(
-    card: pcsc_sys::SCARDHANDLE,
+fn change_impl<T: PcscHal>(
+    hal: &T,
     action: ChangeAction,
     existing: &MaybePromptedString,
     new: &MaybePromptedString,
@@ -671,11 +501,10 @@ fn change_impl(
         *b = 0xff;
     }
 
-    let (sw, _) = match ykpiv_transfer_data(card, templ.as_slice(), in_data.as_slice()) {
-        Err(e) => return VerificationResult::OtherFailure(e),
-        Ok(tuple) => tuple,
-    };
-    VerificationResult::from_status(sw)
+    match hal.send_data(templ.as_slice(), in_data.as_slice()) {
+        Err(e) => VerificationResult::OtherFailure(e),
+        Ok((sw, _)) => VerificationResult::from_status(sw),
+    }
 }
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -687,28 +516,16 @@ impl fmt::Display for Version {
     }
 }
 
-#[repr(C)]
-pub struct ykpiv_state {
-    pub context: pcsc_sys::SCARDCONTEXT,
-    pub card: pcsc_sys::SCARDHANDLE,
+pub struct ykpiv_state<T: PcscHal> {
+    hal: T,
     authenticated_pin: bool,
     authenticated_mgm: bool,
 }
 
-impl ykpiv_state {
+impl<T: PcscHal> ykpiv_state<T> {
     pub fn new() -> Result<Self> {
-        let mut context: pcsc_sys::SCARDCONTEXT = pcsc_sys::SCARD_E_INVALID_HANDLE;
-        SmartCardError::new(unsafe {
-            pcsc_sys::SCardEstablishContext(
-                pcsc_sys::SCARD_SCOPE_SYSTEM,
-                ptr::null(),
-                ptr::null(),
-                &mut context,
-            )
-        })?;
         Ok(ykpiv_state {
-            context: context,
-            card: 0,
+            hal: T::new()?,
             authenticated_pin: false,
             authenticated_mgm: false,
         })
@@ -745,11 +562,12 @@ impl ykpiv_state {
                 },
             };
 
-            let mut buffer: Vec<c_uchar> = vec![0; 261];
-            VerificationResult::from_status(match send_data_impl(self.card, &apdu, &mut buffer) {
-                Err(e) => return VerificationResult::OtherFailure(e),
-                Ok(sw) => sw,
-            })
+            match self.hal
+                .send_data_impl(unsafe { &apdu.raw })
+            {
+                Err(e) => VerificationResult::OtherFailure(e),
+                Ok((sw, _)) => VerificationResult::from_status(sw),
+            }
         })?;
         Ok(())
     }
@@ -779,7 +597,8 @@ impl ykpiv_state {
                 data: data,
             },
         };
-        let (sw, response) = send_data(self.card, &apdu)?;
+        let (sw, response) =
+            self.hal.send_data_impl(unsafe { &apdu.raw })?;
         if sw != SW_SUCCESS {
             bail!("Failed to get management key challenge from card");
         }
@@ -813,7 +632,8 @@ impl ykpiv_state {
                 data: [0; 255],
             },
         };
-        let (sw, response) = send_data(self.card, &apdu)?;
+        let (sw, response) =
+            self.hal.send_data_impl(unsafe { &apdu.raw })?;
         if sw != SW_SUCCESS {
             bail!("Failed to send management key challenge back to card");
         }
@@ -833,106 +653,15 @@ impl ykpiv_state {
     }
 
     pub fn list_readers(&self) -> Result<Vec<String>> {
-        let mut readers_len: pcsc_sys::DWORD = 0;
-        SmartCardError::new(unsafe {
-            pcsc_sys::SCardListReaders(self.context, ptr::null(), ptr::null_mut(), &mut readers_len)
-        })?;
-
-        let mut buffer: Vec<u8> = vec![0_u8; readers_len as usize];
-        SmartCardError::new(unsafe {
-            pcsc_sys::SCardListReaders(
-                self.context,
-                ptr::null(),
-                buffer.as_mut_ptr() as *mut c_char,
-                &mut readers_len,
-            )
-        })?;
-        if readers_len as usize != buffer.len() {
-            bail!("Failed to retrieve full reader list due to buffer size race.");
-        }
-
-        let ret: ::std::result::Result<Vec<String>, ::std::str::Utf8Error> = buffer
-            .split(|b| *b == 0)
-            .filter_map(|slice| match slice.len() {
-                0 => None,
-                _ => Some(::std::str::from_utf8(slice).map(|s| s.to_owned())),
-            })
-            .collect();
-
-        Ok(ret?)
+        self.hal.list_readers()
     }
 
     pub fn connect(&mut self, reader: Option<&str>) -> Result<()> {
-        let reader = reader.unwrap_or(DEFAULT_READER);
-        let readers = self.list_readers()?;
-        for potential_reader in readers {
-            if !potential_reader.contains(reader) {
-                info!(
-                    "Skipping reader '{}' since it doesn't match '{}'",
-                    potential_reader,
-                    reader
-                );
-                continue;
-            }
-
-            info!("Attempting to connect to reader '{}'", potential_reader);
-            let potential_reader = CString::new(potential_reader)?;
-            let mut active_protocol: pcsc_sys::DWORD = pcsc_sys::SCARD_PROTOCOL_UNDEFINED;
-            SmartCardError::new(unsafe {
-                pcsc_sys::SCardConnect(
-                    self.context,
-                    potential_reader.as_ptr(),
-                    pcsc_sys::SCARD_SHARE_SHARED,
-                    pcsc_sys::SCARD_PROTOCOL_T1,
-                    &mut self.card,
-                    &mut active_protocol,
-                )
-            })?;
-
-            let mut data: [c_uchar; 255] = [0; 255];
-            for (dst, src) in data.iter_mut().zip(APDU_AID.iter()) {
-                *dst = *src;
-            }
-            let apdu = Apdu {
-                st: StructuredApdu {
-                    cla: 0,
-                    ins: 0xa4,
-                    p1: 0x04,
-                    p2: 0,
-                    lc: APDU_AID.len() as c_uchar,
-                    data: data,
-                },
-            };
-
-            let mut recv_buffer: Vec<u8> = vec![0; 255];
-            let sw = send_data_impl(self.card, &apdu, &mut recv_buffer)?;
-            if sw != SW_SUCCESS {
-                bail!("Failed selecting application: {:x}", sw);
-            }
-
-            return Ok(());
-        }
-
-        Err(
-            SmartCardError::new(pcsc_sys::SCARD_E_UNKNOWN_READER)
-                .err()
-                .unwrap()
-                .into(),
-        )
+        self.hal.connect(reader)
     }
 
     pub fn disconnect(&mut self) {
-        if self.card != 0 {
-            unsafe {
-                pcsc_sys::SCardDisconnect(self.card, pcsc_sys::SCARD_RESET_CARD);
-            }
-            self.card = 0;
-        }
-
-        if unsafe { pcsc_sys::SCardIsValidContext(self.context) } == pcsc_sys::SCARD_S_SUCCESS {
-            unsafe { pcsc_sys::SCardReleaseContext(self.context) };
-            self.context = pcsc_sys::SCARD_E_INVALID_HANDLE;
-        }
+        self.hal.disconnect()
     }
 
     pub fn get_version(&self) -> Result<Version> {
@@ -946,13 +675,11 @@ impl ykpiv_state {
                 data: [0; 255],
             },
         };
-        let mut buffer: Vec<u8> = vec![0; 261];
-
-        let sw = send_data_impl(self.card, &apdu, &mut buffer)?;
+        let (sw, buffer) =
+            self.hal.send_data_impl(unsafe { &apdu.raw })?;
         if sw != SW_SUCCESS {
             bail!("Get version instruction returned error: {:x}", sw);
         }
-
         Ok(Version(buffer[0], buffer[1], buffer[2]))
     }
 
@@ -964,7 +691,7 @@ impl ykpiv_state {
             new_pin,
             PIN_PROMPT,
             NEW_PIN_PROMPT,
-            |existing, new| change_impl(self.card, ChangeAction::ChangePin, existing, new),
+            |existing, new| change_impl(&self.hal, ChangeAction::ChangePin, existing, new),
         )
     }
 
@@ -976,7 +703,7 @@ impl ykpiv_state {
             new_pin,
             PUK_PROMPT,
             NEW_PIN_PROMPT,
-            |existing, new| change_impl(self.card, ChangeAction::UnblockPin, existing, new),
+            |existing, new| change_impl(&self.hal, ChangeAction::UnblockPin, existing, new),
         )
     }
 
@@ -988,12 +715,12 @@ impl ykpiv_state {
             new_puk,
             PUK_PROMPT,
             NEW_PUK_PROMPT,
-            |existing, new| change_impl(self.card, ChangeAction::ChangePuk, existing, new),
+            |existing, new| change_impl(&self.hal, ChangeAction::ChangePuk, existing, new),
         )
     }
 
     pub fn reset(&mut self) -> Result<()> {
-        let (sw, _) = ykpiv_transfer_data(self.card, &[0, YKPIV_INS_RESET, 0, 0], &[])?;
+        let (sw, _) = self.hal.send_data(&[0, YKPIV_INS_RESET, 0, 0], &[])?;
         if sw != SW_SUCCESS {
             bail!("Reset failed, probably because PIN or PUK retries are still available");
         }
@@ -1009,8 +736,7 @@ impl ykpiv_state {
     ) -> Result<()> {
         self.authenticate_mgm(mgm_key)?;
         self.authenticate_pin(pin)?;
-        let (sw, _) = ykpiv_transfer_data(
-            self.card,
+        let (sw, _) = self.hal.send_data(
             &[0, YKPIV_INS_SET_PIN_RETRIES, pin_retries, puk_retries],
             &[],
         )?;
@@ -1050,7 +776,8 @@ impl ykpiv_state {
             },
         };
 
-        let (sw, _) = send_data(self.card, &apdu)?;
+        let (sw, _) =
+            self.hal.send_data_impl(unsafe { &apdu.raw })?;
         if sw != SW_SUCCESS {
             bail!("Failed to set new card management key");
         }
@@ -1060,14 +787,14 @@ impl ykpiv_state {
     pub fn set_chuid(&mut self, mgm_key: Option<&str>) -> Result<()> {
         self.authenticate_mgm(mgm_key)?;
         let object = build_data_object(CHUID_TEMPLATE, CHUID_RANDOM_OFFSET, CHUID_RANDOM_BYTES);
-        ykpiv_save_object(self.card, YKPIV_OBJ_CHUID, object)?;
+        ykpiv_save_object(&self.hal, YKPIV_OBJ_CHUID, object)?;
         Ok(())
     }
 
     pub fn set_ccc(&mut self, mgm_key: Option<&str>) -> Result<()> {
         self.authenticate_mgm(mgm_key)?;
         let object = build_data_object(CCC_TEMPLATE, CCC_RANDOM_OFFSET, CCC_RANDOM_BYTES);
-        ykpiv_save_object(self.card, YKPIV_OBJ_CAPABILITY, object)?;
+        ykpiv_save_object(&self.hal, YKPIV_OBJ_CAPABILITY, object)?;
         Ok(())
     }
 
@@ -1085,11 +812,8 @@ impl ykpiv_state {
             ]);
         }
 
-        let (sw, mut recv) = ykpiv_transfer_data(
-            self.card,
-            &[0, YKPIV_INS_GET_DATA, 0x3f, 0xff],
-            data.as_slice(),
-        )?;
+        let (sw, mut recv) = self.hal
+            .send_data(&[0, YKPIV_INS_GET_DATA, 0x3f, 0xff], data.as_slice())?;
         if sw != SW_SUCCESS {
             bail!("Failed to read data object");
         }
@@ -1124,12 +848,12 @@ impl ykpiv_state {
         buffer: Vec<u8>,
     ) -> Result<()> {
         self.authenticate_mgm(mgm_key)?;
-        ykpiv_save_object(self.card, object_id, buffer)?;
+        ykpiv_save_object(&self.hal, object_id, buffer)?;
         Ok(())
     }
 }
 
-impl Drop for ykpiv_state {
+impl<T: PcscHal> Drop for ykpiv_state<T> {
     fn drop(&mut self) {
         self.disconnect();
     }
