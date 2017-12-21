@@ -534,6 +534,55 @@ impl PinPolicy {
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Tag {
+    Algorithm,
+    PinPolicy,
+    TouchPolicy,
+}
+
+lazy_static! {
+    static ref TAG_STRINGS: HashMap<Tag, &'static str> = {
+        let mut m = HashMap::new();
+        m.insert(Tag::Algorithm, "Algorithm");
+        m.insert(Tag::PinPolicy, "PinPolicy");
+        m.insert(Tag::TouchPolicy, "TouchPolicy");
+        m
+    };
+
+    static ref STRING_TAGS: HashMap<String, Tag> = {
+        TAG_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
+    };
+}
+
+impl fmt::Display for Tag {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", TAG_STRINGS.get(self).map_or("", |s| *s))
+    }
+}
+
+impl FromStr for Tag {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let s = s.to_uppercase();
+        Ok(match STRING_TAGS.get(&s) {
+            None => bail!("Invalid tag '{}'", s),
+            Some(t) => *t,
+        })
+    }
+}
+
+impl Tag {
+    pub fn to_value(&self) -> u8 {
+        match *self {
+            Tag::Algorithm => nid::YKPIV_ALGO_TAG,
+            Tag::PinPolicy => nid::YKPIV_PINPOLICY_TAG,
+            Tag::TouchPolicy => nid::YKPIV_TOUCHPOLICY_TAG,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TouchPolicy {
     Default,
     Never,

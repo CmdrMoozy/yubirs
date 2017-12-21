@@ -419,11 +419,11 @@ pub fn ykpiv_import_private_key<T: PcscHal>(
     }
 
     if pin_policy != PinPolicy::Default {
-        key_data.extend_from_slice(&[YKPIV_PINPOLICY_TAG, 0x01, pin_policy.to_value()]);
+        key_data.extend_from_slice(&[Tag::PinPolicy.to_value(), 0x01, pin_policy.to_value()]);
     }
 
     if touch_policy != TouchPolicy::Default {
-        key_data.extend_from_slice(&[YKPIV_TOUCHPOLICY_TAG, 0x01, touch_policy.to_value()]);
+        key_data.extend_from_slice(&[Tag::TouchPolicy.to_value(), 0x01, touch_policy.to_value()]);
     }
 
     let (sw, _) = hal.send_data(
