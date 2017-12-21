@@ -19,7 +19,7 @@ use libc::c_int;
 use openssl;
 use pcsc_sys;
 use piv::hal::{Apdu, PcscHal, StructuredApdu};
-use piv::id::{Algorithm, Object, PinPolicy, TouchPolicy};
+use piv::id::{Algorithm, Key, Object, PinPolicy, TouchPolicy};
 use piv::nid::*;
 use piv::scarderr::SmartCardError;
 use rand::{self, Rng};
@@ -212,13 +212,11 @@ fn ykpiv_save_object<T: PcscHal>(hal: &T, id: Object, mut buffer: Vec<u8>) -> Re
 }
 
 // TODO: This function can be cleaned up / code can be reused.
-// TODO: This function should accept Rust-style enums instead of IDs. This would let us clean up
-// some assorted input validation code.
 fn sign_decipher_impl<T: PcscHal>(
     hal: &T,
     data: &[u8],
     algorithm: Algorithm,
-    key_id: u8,
+    key: Key,
     decipher: bool,
 ) -> Result<Vec<u8>> {
     if !algorithm.is_rsa() && !algorithm.is_ecc() {
@@ -288,7 +286,12 @@ fn sign_decipher_impl<T: PcscHal>(
     data_to_send.extend_from_slice(data);
 
     let (sw, recv) = hal.send_data(
-        &[0, YKPIV_INS_AUTHENTICATE, algorithm.to_value(), key_id],
+        &[
+            0,
+            YKPIV_INS_AUTHENTICATE,
+            algorithm.to_value(),
+            key.to_value(),
+        ],
         data,
     )?;
     if sw == SW_ERR_SECURITY_STATUS {
@@ -338,25 +341,23 @@ pub fn ykpiv_sign_data<T: PcscHal>(
     hal: &T,
     data: &[u8],
     algorithm: Algorithm,
-    key_id: u8,
+    key: Key,
 ) -> Result<Vec<u8>> {
-    sign_decipher_impl(hal, data, algorithm, key_id, false)
+    sign_decipher_impl(hal, data, algorithm, key, false)
 }
 
 pub fn ykpiv_decipher_data<T: PcscHal>(
     hal: &T,
     data: &[u8],
     algorithm: Algorithm,
-    key_id: u8,
+    key: Key,
 ) -> Result<Vec<u8>> {
-    sign_decipher_impl(hal, data, algorithm, key_id, true)
+    sign_decipher_impl(hal, data, algorithm, key, true)
 }
 
-// TODO: This function should accept Rust-style enums instead of IDs. This would let us clean up
-// some assorted input validation code.
 pub fn ykpiv_import_private_key<T: PcscHal>(
     hal: &T,
-    key_id: u8,
+    id: Key,
     algorithm: Algorithm,
     p: &[u8],
     q: &[u8],
@@ -367,13 +368,6 @@ pub fn ykpiv_import_private_key<T: PcscHal>(
     pin_policy: PinPolicy,
     touch_policy: TouchPolicy,
 ) -> Result<()> {
-    if key_id == YKPIV_KEY_CARDMGM || key_id < YKPIV_KEY_RETIRED1
-        || (key_id > YKPIV_KEY_RETIRED20 && key_id < YKPIV_KEY_AUTHENTICATION)
-        || (key_id > YKPIV_KEY_CARDAUTH && key_id != YKPIV_KEY_ATTESTATION)
-    {
-        bail!("The specified key type is not supported by this function");
-    }
-
     if !algorithm.is_rsa() && !algorithm.is_ecc() {
         bail!("Certificate functions only support RSA or ECC algorithms");
     }
@@ -430,7 +424,7 @@ pub fn ykpiv_import_private_key<T: PcscHal>(
     }
 
     let (sw, _) = hal.send_data(
-        &[0, YKPIV_INS_IMPORT_KEY, algorithm.to_value(), key_id],
+        &[0, YKPIV_INS_IMPORT_KEY, algorithm.to_value(), id.to_value()],
         key_data.as_slice(),
     )?;
     match sw {
