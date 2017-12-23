@@ -15,13 +15,10 @@
 use crypto::{is_weak_mgm_key, MGM_KEY_BYTES};
 use data_encoding;
 use error::*;
-use libc::c_int;
 use openssl;
-use pcsc_sys;
 use piv::hal::{Apdu, PcscHal, StructuredApdu};
 use piv::id::*;
-use piv::nid::*;
-use piv::scarderr::SmartCardError;
+use piv::sw::StatusWord;
 use rand::{self, Rng};
 use std::fmt;
 use util::MaybePromptedString;
@@ -74,31 +71,19 @@ enum VerificationResult {
 }
 
 impl VerificationResult {
-    pub fn from_status(sw: c_int) -> VerificationResult {
-        if sw == SW_SUCCESS {
-            VerificationResult::Success
-        } else if (sw >> 8) == 0x63 {
-            VerificationResult::Failure(
-                (sw & 0xf) as usize,
-                SmartCardError::new(pcsc_sys::SCARD_E_INVALID_CHV)
-                    .err()
-                    .unwrap()
-                    .into(),
-            )
-        } else if sw == SW_ERR_AUTH_BLOCKED {
-            VerificationResult::PermanentFailure(
-                SmartCardError::new(pcsc_sys::SCARD_W_CHV_BLOCKED)
-                    .err()
-                    .unwrap()
-                    .into(),
-            )
+    pub fn from_status(sw: StatusWord) -> VerificationResult {
+        if let Err(e) = sw.error {
+            if let Some(counter) = sw.counter {
+                if counter == 0 {
+                    VerificationResult::PermanentFailure(e)
+                } else {
+                    VerificationResult::Failure(counter, e)
+                }
+            } else {
+                VerificationResult::OtherFailure(e)
+            }
         } else {
-            VerificationResult::OtherFailure(
-                SmartCardError::new(pcsc_sys::SCARD_E_UNKNOWN_RES_MNG)
-                    .err()
-                    .unwrap()
-                    .into(),
-            )
+            VerificationResult::Success
         }
     }
 }
@@ -208,9 +193,7 @@ fn ykpiv_save_object<T: PcscHal>(hal: &T, id: Object, mut buffer: Vec<u8>) -> Re
         &[0, Instruction::PutData.to_value(), 0x3f, 0xff],
         data.as_slice(),
     )?;
-    if sw != SW_SUCCESS {
-        bail!("Failed to save data object");
-    }
+    sw.error?;
     Ok(())
 }
 
@@ -297,11 +280,7 @@ fn sign_decipher_impl<T: PcscHal>(
         ],
         data,
     )?;
-    if sw == SW_ERR_SECURITY_STATUS {
-        bail!("Authenticating for sign / decipher failed");
-    } else if sw != SW_SUCCESS {
-        bail!("Authenticating for sign / decipher failed due to an unknown error");
-    }
+    sw.error?;
 
     // Skip the first 7c tag.
     if recv[0] != 0x7c {
@@ -435,11 +414,7 @@ pub fn ykpiv_import_private_key<T: PcscHal>(
         ],
         key_data.as_slice(),
     )?;
-    match sw {
-        SW_ERR_SECURITY_STATUS => bail!("Failed to import private key due to authentication error"),
-        SW_SUCCESS => Ok(()),
-        _ => bail!("Failed to import private key due to unknown error"),
-    }
+    sw.error
 }
 
 /// This function provides the common implementation for all of the various ways we can change the
@@ -600,9 +575,7 @@ impl<T: PcscHal> StateImpl<T> {
         };
         let (sw, response) =
             self.hal.send_data_impl(unsafe { &apdu.raw })?;
-        if sw != SW_SUCCESS {
-            bail!("Failed to get management key challenge from card");
-        }
+        sw.error?;
         let card_challenge: Vec<u8> = (&response[4..13]).into();
         debug_assert!(card_challenge.len() == 8);
 
@@ -635,9 +608,7 @@ impl<T: PcscHal> StateImpl<T> {
         };
         let (sw, response) =
             self.hal.send_data_impl(unsafe { &apdu.raw })?;
-        if sw != SW_SUCCESS {
-            bail!("Failed to send management key challenge back to card");
-        }
+        sw.error?;
 
         // Compare the response from the card with our expected response.
         let expected_card_reply = openssl::symm::encrypt(
@@ -678,9 +649,7 @@ impl<T: PcscHal> StateImpl<T> {
         };
         let (sw, buffer) =
             self.hal.send_data_impl(unsafe { &apdu.raw })?;
-        if sw != SW_SUCCESS {
-            bail!("Get version instruction returned error: {:x}", sw);
-        }
+        sw.error?;
         Ok(Version(buffer[0], buffer[1], buffer[2]))
     }
 
@@ -723,9 +692,7 @@ impl<T: PcscHal> StateImpl<T> {
     pub fn reset(&mut self) -> Result<()> {
         let (sw, _) = self.hal
             .send_data(&[0, Instruction::Reset.to_value(), 0, 0], &[])?;
-        if sw != SW_SUCCESS {
-            bail!("Reset failed, probably because PIN or PUK retries are still available");
-        }
+        sw.error?;
         Ok(())
     }
 
@@ -747,9 +714,7 @@ impl<T: PcscHal> StateImpl<T> {
             ],
             &[],
         )?;
-        if sw != SW_SUCCESS {
-            bail!("Setting PIN and PUK retries failed");
-        }
+        sw.error?;
         Ok(())
     }
 
@@ -785,9 +750,7 @@ impl<T: PcscHal> StateImpl<T> {
 
         let (sw, _) =
             self.hal.send_data_impl(unsafe { &apdu.raw })?;
-        if sw != SW_SUCCESS {
-            bail!("Failed to set new card management key");
-        }
+        sw.error?;
         Ok(())
     }
 
@@ -823,9 +786,7 @@ impl<T: PcscHal> StateImpl<T> {
             &[0, Instruction::GetData.to_value(), 0x3f, 0xff],
             data.as_slice(),
         )?;
-        if sw != SW_SUCCESS {
-            bail!("Failed to read data object");
-        }
+        sw.error?;
 
         recv.remove(0); // The first byte is not part of the object or length?
         if recv[0] < 0x81 {

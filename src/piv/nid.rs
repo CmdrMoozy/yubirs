@@ -91,12 +91,6 @@ pub const YKPIV_INS_AUTHENTICATE: u8 = 0x87;
 pub const YKPIV_INS_GET_DATA: u8 = 0xcb;
 pub const YKPIV_INS_PUT_DATA: u8 = 0xdb;
 
-pub const SW_SUCCESS: c_int = 0x9000;
-pub const SW_ERR_SECURITY_STATUS: c_int = 0x6982;
-pub const SW_ERR_AUTH_BLOCKED: c_int = 0x6983;
-pub const SW_ERR_INCORRECT_PARAM: c_int = 0x6a80;
-pub const SW_ERR_INCORRECT_SLOT: c_int = 0x6b00;
-
 pub const YKPIV_INS_SET_MGMKEY: u8 = 0xff;
 pub const YKPIV_INS_IMPORT_KEY: u8 = 0xfe;
 pub const YKPIV_INS_GET_VERSION: u8 = 0xfd;

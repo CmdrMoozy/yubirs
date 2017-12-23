@@ -18,6 +18,7 @@ mod nid;
 mod piv_impl;
 pub mod scarderr;
 pub mod state;
+mod sw;
 
 /// The default reader string to use. The first reader (as returned by list_readers) which contains
 /// this string as a substring is the one which will be used. So, this default will result in us

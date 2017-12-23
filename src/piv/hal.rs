@@ -13,11 +13,11 @@
 // limitations under the License.
 
 use error::*;
-use libc::{c_char, c_int};
+use libc::c_char;
 use pcsc_sys;
 use piv::DEFAULT_READER;
-use piv::nid::*;
 use piv::scarderr::SmartCardError;
+use piv::sw::StatusWord;
 use std::ffi::CString;
 use std::ptr;
 
@@ -70,17 +70,17 @@ pub trait PcscHal {
     /// Send data to the underlying hardware. The given byte slice must be formatted as a smart
     /// card APDU (https://en.wikipedia.org/wiki/Smart_card_application_protocol_data_unit). This
     /// function should return a status word, as well as any bytes returned by the hardware.
-    fn send_data_impl(&self, apdu: &[u8]) -> Result<(c_int, Vec<u8>)>;
+    fn send_data_impl(&self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)>;
 
     fn begin_transaction(&self) -> Result<()>;
     fn end_transaction(&self) -> Result<()>;
 
     /// A provided, higher-level interface for sending data to the underlying hardware.
-    fn send_data(&self, templ: &[u8], data: &[u8]) -> Result<(c_int, Vec<u8>)> {
+    fn send_data(&self, templ: &[u8], data: &[u8]) -> Result<(StatusWord, Vec<u8>)> {
         self.begin_transaction()?;
 
         let mut out_data: Vec<u8> = Vec::new();
-        let mut sw: c_int = SW_SUCCESS;
+        let mut sw: StatusWord = StatusWord::success();
 
         for chunk in data.chunks(255) {
             let mut data: [u8; 255] = [0; 255];
@@ -110,7 +110,7 @@ pub trait PcscHal {
             let (sw_new, mut recv) =
                 self.send_data_impl(unsafe { &apdu.raw })?;
             sw = sw_new;
-            if sw != SW_SUCCESS && sw >> 8 != 0x61 {
+            if sw.error.is_err() {
                 return Ok((sw, out_data));
             }
             let recv_len = recv.len() - 2;
@@ -118,7 +118,7 @@ pub trait PcscHal {
             out_data.append(&mut recv);
         }
 
-        while sw >> 8 == 0x61 {
+        while let Some(bytes_remaining) = sw.bytes_remaining {
             let apdu = Apdu {
                 st: StructuredApdu {
                     cla: 0,
@@ -132,12 +132,12 @@ pub trait PcscHal {
 
             debug!(
                 "The card indicates there are {} more bytes of data to read",
-                sw & 0xff
+                bytes_remaining
             );
             let (sw_new, mut recv) =
                 self.send_data_impl(unsafe { &apdu.raw })?;
             sw = sw_new;
-            if sw != SW_SUCCESS && sw >> 8 != 0x61 {
+            if sw.error.is_err() {
                 return Ok((sw, out_data));
             }
             let recv_len = recv.len() - 2;
@@ -247,9 +247,7 @@ impl PcscHal for PcscHardware {
 
             let (sw, _) =
                 self.send_data_impl(unsafe { &apdu.raw })?;
-            if sw != SW_SUCCESS {
-                bail!("Failed selecting application: {:x}", sw);
-            }
+            sw.error?;
 
             return Ok(());
         }
@@ -274,7 +272,7 @@ impl PcscHal for PcscHardware {
         }
     }
 
-    fn send_data_impl(&self, apdu: &[u8]) -> Result<(c_int, Vec<u8>)> {
+    fn send_data_impl(&self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)> {
         let send_len: pcsc_sys::DWORD = apdu[4] as pcsc_sys::DWORD + 5;
         debug!(
             "> {}",
@@ -309,13 +307,10 @@ impl PcscHal for PcscHardware {
                 .collect::<String>()
         );
 
-        let sw: c_int = if recv_buffer.len() >= 2 {
-            ((recv_buffer[recv_length as usize - 2] as c_int) << 8)
-                | (recv_buffer[recv_length as usize - 1] as c_int)
-        } else {
-            0
-        };
-        Ok((sw, recv_buffer))
+        Ok((
+            StatusWord::new(recv_buffer.as_slice(), recv_length as usize),
+            recv_buffer,
+        ))
     }
 
     fn begin_transaction(&self) -> Result<()> {
