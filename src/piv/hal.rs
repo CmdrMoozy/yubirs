@@ -81,8 +81,14 @@ pub trait PcscHal {
 
         let mut out_data: Vec<u8> = Vec::new();
         let mut sw: StatusWord = StatusWord::success();
+        // If the given data slice is empty, we still want to execute the first loop at least once,
+        // sending the template by itself with no real data.
+        let chunks: Vec<&[u8]> = match data.is_empty() {
+            false => data.chunks(255).collect(),
+            true => vec![&[]],
+        };
 
-        for chunk in data.chunks(255) {
+        for chunk in chunks {
             let mut data: [u8; 255] = [0; 255];
             for (dst, src) in data.iter_mut().zip(chunk.iter()) {
                 *dst = *src;
@@ -107,8 +113,7 @@ pub trait PcscHal {
                 chunk.len(),
                 data.len()
             );
-            let (sw_new, mut recv) =
-                self.send_data_impl(unsafe { &apdu.raw })?;
+            let (sw_new, mut recv) = self.send_data_impl(unsafe { &apdu.raw })?;
             sw = sw_new;
             if sw.error.is_err() {
                 return Ok((sw, out_data));
@@ -134,8 +139,7 @@ pub trait PcscHal {
                 "The card indicates there are {} more bytes of data to read",
                 bytes_remaining
             );
-            let (sw_new, mut recv) =
-                self.send_data_impl(unsafe { &apdu.raw })?;
+            let (sw_new, mut recv) = self.send_data_impl(unsafe { &apdu.raw })?;
             sw = sw_new;
             if sw.error.is_err() {
                 return Ok((sw, out_data));
@@ -245,8 +249,7 @@ impl PcscHal for PcscHardware {
                 },
             };
 
-            let (sw, _) =
-                self.send_data_impl(unsafe { &apdu.raw })?;
+            let (sw, _) = self.send_data_impl(unsafe { &apdu.raw })?;
             sw.error?;
 
             return Ok(());

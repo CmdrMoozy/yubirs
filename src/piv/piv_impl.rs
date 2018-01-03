@@ -486,6 +486,15 @@ fn change_impl<T: PcscHal>(
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Version(u8, u8, u8);
 
+impl Version {
+    pub fn new(data: &[u8]) -> Result<Version> {
+        if data.len() < 3 {
+            bail!("Version data must be three bytes long.");
+        }
+        Ok(Version(data[0], data[1], data[2]))
+    }
+}
+
 impl fmt::Display for Version {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}.{}.{}", self.0, self.1, self.2)
@@ -519,7 +528,7 @@ impl<T: PcscHal> StateImpl<T> {
                 );
             }
 
-            let mut data: [u8; 255] = [0; 255];
+            let mut data: [u8; 128] = [0; 128];
             for (dst, src) in data.iter_mut().zip(pin.as_bytes()) {
                 *dst = *src;
             }
@@ -527,19 +536,8 @@ impl<T: PcscHal> StateImpl<T> {
                 *b = 0xff;
             }
 
-            let apdu = Apdu {
-                st: StructuredApdu {
-                    cla: 0,
-                    ins: Instruction::Verify.to_value(),
-                    p1: 0x00,
-                    p2: 0x80,
-                    lc: 0x80,
-                    data: data,
-                },
-            };
-
             match self.hal
-                .send_data_impl(unsafe { &apdu.raw })
+                .send_data(&[0, Instruction::Verify.to_value(), 0x00, 0x80], &data)
             {
                 Err(e) => VerificationResult::OtherFailure(e),
                 Ok((sw, _)) => VerificationResult::from_status(sw),
@@ -573,8 +571,7 @@ impl<T: PcscHal> StateImpl<T> {
                 data: data,
             },
         };
-        let (sw, response) =
-            self.hal.send_data_impl(unsafe { &apdu.raw })?;
+        let (sw, response) = self.hal.send_data_impl(unsafe { &apdu.raw })?;
         sw.error?;
         let card_challenge: Vec<u8> = (&response[4..13]).into();
         debug_assert!(card_challenge.len() == 8);
@@ -606,8 +603,7 @@ impl<T: PcscHal> StateImpl<T> {
                 data: [0; 255],
             },
         };
-        let (sw, response) =
-            self.hal.send_data_impl(unsafe { &apdu.raw })?;
+        let (sw, response) = self.hal.send_data_impl(unsafe { &apdu.raw })?;
         sw.error?;
 
         // Compare the response from the card with our expected response.
@@ -637,20 +633,10 @@ impl<T: PcscHal> StateImpl<T> {
     }
 
     pub fn get_version(&self) -> Result<Version> {
-        let apdu = Apdu {
-            st: StructuredApdu {
-                cla: 0,
-                ins: Instruction::GetVersion.to_value(),
-                p1: 0,
-                p2: 0,
-                lc: 0,
-                data: [0; 255],
-            },
-        };
-        let (sw, buffer) =
-            self.hal.send_data_impl(unsafe { &apdu.raw })?;
+        let (sw, buffer) = self.hal
+            .send_data(&[0, Instruction::GetVersion.to_value(), 0, 0, 0], &[])?;
         sw.error?;
-        Ok(Version(buffer[0], buffer[1], buffer[2]))
+        Ok(Version::new(buffer.as_slice())?)
     }
 
     pub fn change_pin(&mut self, old_pin: Option<&str>, new_pin: Option<&str>) -> Result<()> {
@@ -748,8 +734,7 @@ impl<T: PcscHal> StateImpl<T> {
             },
         };
 
-        let (sw, _) =
-            self.hal.send_data_impl(unsafe { &apdu.raw })?;
+        let (sw, _) = self.hal.send_data_impl(unsafe { &apdu.raw })?;
         sw.error?;
         Ok(())
     }
