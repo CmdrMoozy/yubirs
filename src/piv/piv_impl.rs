@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{is_weak_mgm_key, MGM_KEY_BYTES};
+use crypto::{decrypt_des_challenge, encrypt_des_challenge, is_weak_mgm_key, MGM_KEY_BYTES};
 use data_encoding;
 use error::*;
 use openssl;
@@ -577,13 +577,7 @@ impl<T: PcscHal> StateImpl<T> {
         debug_assert!(card_challenge.len() == 8);
 
         // Send a response to the card's challenge, and a challenge of our own.
-        let our_challenge = openssl::symm::encrypt(
-            openssl::symm::Cipher::des_ecb(),
-            mgm_key.as_slice(),
-            None,
-            card_challenge.as_slice(),
-        )?;
-        debug_assert!(our_challenge.len() == 8);
+        let our_challenge = decrypt_des_challenge(mgm_key.as_slice(), card_challenge.as_slice())?;
         let mut data: [u8; 255] = [0; 255];
         data[0] = 0x7c;
         data[1] = 20; // 2 + 8 + 2 + 8
@@ -607,12 +601,8 @@ impl<T: PcscHal> StateImpl<T> {
         sw.error?;
 
         // Compare the response from the card with our expected response.
-        let expected_card_reply = openssl::symm::encrypt(
-            openssl::symm::Cipher::des_ecb(),
-            mgm_key.as_slice(),
-            None,
-            expected_card_reply.as_slice(),
-        )?;
+        let expected_card_reply =
+            encrypt_des_challenge(mgm_key.as_slice(), expected_card_reply.as_slice())?;
         if expected_card_reply.as_slice() != &response[4..13] {
             bail!("Management key authentication failed");
         }

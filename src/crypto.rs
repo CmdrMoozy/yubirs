@@ -106,7 +106,7 @@ pub fn decrypt_des_challenge(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>> {
     }
     let plaintext =
         openssl::symm::decrypt(openssl::symm::Cipher::des_ecb(), key, None, ciphertext)?;
-    assert_eq!(DES_CHALLENGE_BYTES, plaintext.len());
+    debug_assert_eq!(DES_CHALLENGE_BYTES, plaintext.len());
     Ok(plaintext)
 }
 
@@ -125,7 +125,7 @@ pub fn encrypt_des_challenge(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
     }
     let ciphertext =
         openssl::symm::encrypt(openssl::symm::Cipher::des_ecb(), key, None, plaintext)?;
-    assert_eq!(DES_CHALLENGE_BYTES, ciphertext.len());
+    debug_assert_eq!(DES_CHALLENGE_BYTES, ciphertext.len());
     Ok(ciphertext)
 }
 
