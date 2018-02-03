@@ -13,4 +13,6 @@
 // limitations under the License.
 
 #[cfg(test)]
+mod crypto;
+#[cfg(test)]
 mod otp;

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use error::*;
+use openssl;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::str::FromStr;
@@ -20,6 +21,9 @@ use std::str::FromStr;
 /// The number of bytes a binary management key must contain (3DES keys are 8 bytes each, so
 /// 8 * 3 = 24 bytes total).
 pub const MGM_KEY_BYTES: usize = 24;
+
+/// The number of bytes in a PIV management key challenge.
+pub const DES_CHALLENGE_BYTES: usize = 8;
 
 lazy_static! {
     // Weak DES keys, from: https://en.wikipedia.org/wiki/Weak_key#Weak_keys_in_DES.
@@ -85,6 +89,44 @@ pub fn is_weak_mgm_key(mgm_key: &[u8]) -> Result<bool> {
         }
     }
     Ok(false)
+}
+
+pub fn decrypt_des_challenge(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>> {
+    if key.len() != MGM_KEY_BYTES {
+        bail!(
+            "Invalid management key; must be {} bytes long",
+            MGM_KEY_BYTES
+        );
+    }
+    if ciphertext.len() != DES_CHALLENGE_BYTES {
+        bail!(
+            "Invalid challenge; must be {} bytes long",
+            DES_CHALLENGE_BYTES
+        );
+    }
+    let plaintext =
+        openssl::symm::decrypt(openssl::symm::Cipher::des_ecb(), key, None, ciphertext)?;
+    assert_eq!(DES_CHALLENGE_BYTES, plaintext.len());
+    Ok(plaintext)
+}
+
+pub fn encrypt_des_challenge(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
+    if key.len() != MGM_KEY_BYTES {
+        bail!(
+            "Invalid management key; must be {} bytes long",
+            MGM_KEY_BYTES
+        );
+    }
+    if plaintext.len() != DES_CHALLENGE_BYTES {
+        bail!(
+            "Invalid challenge; must be {} bytes long",
+            DES_CHALLENGE_BYTES
+        );
+    }
+    let ciphertext =
+        openssl::symm::encrypt(openssl::symm::Cipher::des_ecb(), key, None, plaintext)?;
+    assert_eq!(DES_CHALLENGE_BYTES, ciphertext.len());
+    Ok(ciphertext)
 }
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
