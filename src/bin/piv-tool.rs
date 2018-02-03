@@ -147,7 +147,7 @@ fn read_certificate(values: Values) -> Result<()> {
 }
 
 fn main() {
-    bdrck::logging::init(None);
+    bdrck::logging::init(None, None, false);
     yubirs::init().unwrap();
 
     main_impl_multiple_commands(vec![
