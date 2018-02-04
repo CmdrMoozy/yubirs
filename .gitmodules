@@ -1,0 +1,6 @@
+[submodule "deps/openssl"]
+	path = deps/openssl
+	url = https://github.com/CmdrMoozy/rust-openssl.git
+[submodule "deps/curl"]
+	path = deps/curl
+	url = https://github.com/CmdrMoozy/curl-rust.git
