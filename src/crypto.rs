@@ -104,9 +104,23 @@ pub fn decrypt_des_challenge(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>> {
             DES_CHALLENGE_BYTES
         );
     }
-    let plaintext =
-        openssl::symm::decrypt(openssl::symm::Cipher::des_ecb(), key, None, ciphertext)?;
-    debug_assert_eq!(DES_CHALLENGE_BYTES, plaintext.len());
+
+    let mut crypter = openssl::symm::Crypter::new(
+        openssl::symm::Cipher::des_ede3(),
+        openssl::symm::Mode::Decrypt,
+        key,
+        None,
+    )?;
+    // Upstream doesn't use any padding.
+    crypter.pad(false);
+    // OpenSSL requires we allocate twice as much memory, even though DES_CHALLENGE_BYTES is only
+    // one DES block in length.
+    let mut plaintext = vec![0; DES_CHALLENGE_BYTES * 2];
+    let count = crypter.update(ciphertext, &mut plaintext)?;
+    let rest = crypter.finalize(&mut plaintext[count..])?;
+    debug_assert_eq!(DES_CHALLENGE_BYTES, count + rest);
+    plaintext.truncate(count + rest);
+
     Ok(plaintext)
 }
 
@@ -123,9 +137,23 @@ pub fn encrypt_des_challenge(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
             DES_CHALLENGE_BYTES
         );
     }
-    let ciphertext =
-        openssl::symm::encrypt(openssl::symm::Cipher::des_ecb(), key, None, plaintext)?;
-    debug_assert_eq!(DES_CHALLENGE_BYTES, ciphertext.len());
+
+    let mut crypter = openssl::symm::Crypter::new(
+        openssl::symm::Cipher::des_ede3(),
+        openssl::symm::Mode::Encrypt,
+        key,
+        None,
+    )?;
+    // Upstream doesn't use any padding.
+    crypter.pad(false);
+    // OpenSSL requires we allocate twice as much memory, even though DES_CHALLENGE_BYTES is only
+    // one DES block in length.
+    let mut ciphertext = vec![0; DES_CHALLENGE_BYTES * 2];
+    let count = crypter.update(plaintext, &mut ciphertext)?;
+    let rest = crypter.finalize(&mut ciphertext[count..])?;
+    debug_assert_eq!(DES_CHALLENGE_BYTES, count + rest);
+    ciphertext.truncate(count + rest);
+
     Ok(ciphertext)
 }
 
