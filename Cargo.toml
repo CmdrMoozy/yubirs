@@ -10,16 +10,14 @@ license = "Apache-2.0"
 [dependencies]
 bdrck = "0.5"
 chrono = "0.4"
-# We need a custom version of curl to use our custom openssl patches.
-curl = { version = "0.4.11", path = "deps/curl" }
+curl = "0.4"
 data-encoding = "2.1"
 error-chain = "0.11"
 isatty = "0.1"
 lazy_static = "1.0"
 libc = "0.2"
 log = "0.4"
-# Use custom openssl version since we depend on extra patches vs. upstream.
-openssl = { version = "0.10.2", path = "deps/openssl/openssl" }
+openssl = "~0.10.4"
 pcsc-sys = "1.0"
 rand = "0.4"
 regex = "0.2"
