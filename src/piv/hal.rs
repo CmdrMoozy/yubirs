@@ -57,6 +57,19 @@ pub union Apdu {
     pub raw: [u8; 230],
 }
 
+impl Apdu {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != 230 {
+            bail!("Invalid APDU data; expected 230 bytes, got {}", bytes.len());
+        }
+        let apdu = Apdu { raw: [0; 230] };
+        for (dst, src) in unsafe { apdu.raw }.iter_mut().zip(bytes.iter()) {
+            *dst = *src;
+        }
+        Ok(apdu)
+    }
+}
+
 pub trait PcscHal {
     fn new() -> Result<Self>
     where

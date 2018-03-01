@@ -13,8 +13,4 @@
 // limitations under the License.
 
 #[cfg(test)]
-mod crypto;
-#[cfg(test)]
-mod otp;
-#[cfg(test)]
-mod piv;
+mod hal;

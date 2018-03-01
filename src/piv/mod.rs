@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod hal;
-mod handle;
+pub mod hal;
+pub mod handle;
 pub mod id;
 mod nid;
 pub mod scarderr;
-mod sw;
+pub mod sw;
 
 /// The default reader string to use. The first reader (as returned by list_readers) which contains
 /// this string as a substring is the one which will be used. So, this default will result in us
