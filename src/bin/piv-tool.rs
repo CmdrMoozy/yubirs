@@ -21,8 +21,7 @@ use bdrck::flags::*;
 use std::fs::File;
 use std::io::Read;
 use yubirs::error::*;
-use yubirs::piv::DEFAULT_READER;
-use yubirs::piv::state::State;
+use yubirs::piv::*;
 
 fn print_data(data: &[u8]) -> Result<()> {
     if isatty::stdout_isatty() {
@@ -48,8 +47,8 @@ fn read_data(path: &str, is_base64: bool) -> Result<Vec<u8>> {
 }
 
 fn list_readers(_: Values) -> Result<()> {
-    let state = State::new()?;
-    let readers: Vec<String> = state.list_readers()?;
+    let handle: Handle<PcscHardware> = Handle::new()?;
+    let readers: Vec<String> = handle.list_readers()?;
     for reader in readers {
         println!("{}", reader);
     }
@@ -57,88 +56,88 @@ fn list_readers(_: Values) -> Result<()> {
 }
 
 fn get_version(values: Values) -> Result<()> {
-    let mut state = State::new()?;
-    state.connect(Some(values.get_required("reader")))?;
-    println!("{}", state.get_version()?);
+    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    handle.connect(Some(values.get_required("reader")))?;
+    println!("{}", handle.get_version()?);
     Ok(())
 }
 
 fn change_pin(values: Values) -> Result<()> {
-    let mut state = State::new()?;
-    state.connect(Some(values.get_required("reader")))?;
-    state.change_pin(None, None)
+    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    handle.connect(Some(values.get_required("reader")))?;
+    handle.change_pin(None, None)
 }
 
 fn unblock_pin(values: Values) -> Result<()> {
-    let mut state = State::new()?;
-    state.connect(Some(values.get_required("reader")))?;
-    state.unblock_pin(None, None)
+    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    handle.connect(Some(values.get_required("reader")))?;
+    handle.unblock_pin(None, None)
 }
 
 fn change_puk(values: Values) -> Result<()> {
-    let mut state = State::new()?;
-    state.connect(Some(values.get_required("reader")))?;
-    state.change_puk(None, None)
+    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    handle.connect(Some(values.get_required("reader")))?;
+    handle.change_puk(None, None)
 }
 
 fn reset(values: Values) -> Result<()> {
-    let mut state = State::new()?;
-    state.connect(Some(values.get_required("reader")))?;
-    state.reset()
+    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    handle.connect(Some(values.get_required("reader")))?;
+    handle.reset()
 }
 
 fn set_retries(values: Values) -> Result<()> {
     let pin_retries: u8 = values.get_required_parsed("pin_retries")?;
     let puk_retries: u8 = values.get_required_parsed("puk_retries")?;
-    let mut state = State::new()?;
-    state.connect(Some(values.get_required("reader")))?;
-    state.set_retries(None, None, pin_retries, puk_retries)?;
+    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    handle.connect(Some(values.get_required("reader")))?;
+    handle.set_retries(None, None, pin_retries, puk_retries)?;
     Ok(())
 }
 
 fn change_mgm_key(values: Values) -> Result<()> {
-    let mut state = State::new()?;
-    state.connect(Some(values.get_required("reader")))?;
-    state.set_management_key(None, None, false)?;
+    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    handle.connect(Some(values.get_required("reader")))?;
+    handle.set_management_key(None, None, false)?;
     Ok(())
 }
 
 fn set_chuid(values: Values) -> Result<()> {
-    let mut state = State::new()?;
-    state.connect(Some(values.get_required("reader")))?;
-    state.set_chuid(None)?;
+    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    handle.connect(Some(values.get_required("reader")))?;
+    handle.set_chuid(None)?;
     Ok(())
 }
 
 fn set_ccc(values: Values) -> Result<()> {
-    let mut state = State::new()?;
-    state.connect(Some(values.get_required("reader")))?;
-    state.set_ccc(None)?;
+    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    handle.connect(Some(values.get_required("reader")))?;
+    handle.set_ccc(None)?;
     Ok(())
 }
 
 fn read_object(values: Values) -> Result<()> {
-    let mut state = State::new()?;
-    state.connect(Some(values.get_required("reader")))?;
-    let data = state.read_object(values.get_required_parsed("object_id")?)?;
+    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    handle.connect(Some(values.get_required("reader")))?;
+    let data = handle.read_object(values.get_required_parsed("object_id")?)?;
     print_data(data.as_slice())?;
     Ok(())
 }
 
 fn write_object(values: Values) -> Result<()> {
     let data = read_data(values.get_required("input"), values.get_boolean("base64"))?;
-    let mut state = State::new()?;
-    state.connect(Some(values.get_required("reader")))?;
-    state.write_object(None, values.get_required_parsed("object_id")?, data)?;
+    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    handle.connect(Some(values.get_required("reader")))?;
+    handle.write_object(None, values.get_required_parsed("object_id")?, data)?;
     Ok(())
 }
 
 fn read_certificate(values: Values) -> Result<()> {
-    let mut state = State::new()?;
-    state.connect(Some(values.get_required("reader")))?;
+    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    handle.connect(Some(values.get_required("reader")))?;
     println!(
         "{}",
-        state.read_certificate(
+        handle.read_certificate(
             values.get_required_parsed("certificate_id")?,
             values.get_required_parsed("format")?
         )?

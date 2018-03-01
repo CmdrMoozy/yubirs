@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{decrypt_des_challenge, encrypt_des_challenge, is_weak_mgm_key, MGM_KEY_BYTES};
+use crypto::*;
 use data_encoding;
 use error::*;
 use openssl;
@@ -319,7 +319,7 @@ fn sign_decipher_impl<T: PcscHal>(
     Ok(recv_slice.into())
 }
 
-pub fn ykpiv_sign_data<T: PcscHal>(
+fn ykpiv_sign_data<T: PcscHal>(
     hal: &T,
     data: &[u8],
     algorithm: Algorithm,
@@ -328,7 +328,7 @@ pub fn ykpiv_sign_data<T: PcscHal>(
     sign_decipher_impl(hal, data, algorithm, key, false)
 }
 
-pub fn ykpiv_decipher_data<T: PcscHal>(
+fn ykpiv_decipher_data<T: PcscHal>(
     hal: &T,
     data: &[u8],
     algorithm: Algorithm,
@@ -337,7 +337,7 @@ pub fn ykpiv_decipher_data<T: PcscHal>(
     sign_decipher_impl(hal, data, algorithm, key, true)
 }
 
-pub fn ykpiv_import_private_key<T: PcscHal>(
+fn ykpiv_import_private_key<T: PcscHal>(
     hal: &T,
     id: Key,
     algorithm: Algorithm,
@@ -501,15 +501,15 @@ impl fmt::Display for Version {
     }
 }
 
-pub struct StateImpl<T: PcscHal> {
+pub struct Handle<T: PcscHal> {
     hal: T,
     authenticated_pin: bool,
     authenticated_mgm: bool,
 }
 
-impl<T: PcscHal> StateImpl<T> {
+impl<T: PcscHal> Handle<T> {
     pub fn new() -> Result<Self> {
-        Ok(StateImpl {
+        Ok(Handle {
             hal: T::new()?,
             authenticated_pin: false,
             authenticated_mgm: false,
@@ -610,18 +610,29 @@ impl<T: PcscHal> StateImpl<T> {
         Ok(())
     }
 
+    /// This function returns the list of valid reader strings which can be
+    /// passed to State::new.
     pub fn list_readers(&self) -> Result<Vec<String>> {
         self.hal.list_readers()
     }
 
+    /// Connect to the PC/SC reader which matches the given reader string (or
+    /// DEFAULT_READER, if one was not provided). The first reader which
+    /// includes the given string as a substring will be used.
     pub fn connect(&mut self, reader: Option<&str>) -> Result<()> {
         self.hal.connect(reader)
     }
 
+    /// Disconnect from the currently connected PC/SC reader. This is only
+    /// necessary if you want to re-use this State to interact with a different
+    /// reader.
     pub fn disconnect(&mut self) {
         self.hal.disconnect()
     }
 
+    /// This function returns the version number the connected reader reports.
+    /// Note that connect() must be called before this function, or an error
+    /// will be returned.
     pub fn get_version(&self) -> Result<Version> {
         let (sw, buffer) = self.hal
             .send_data(&[0, Instruction::GetVersion.to_value(), 0, 0, 0], &[])?;
@@ -629,6 +640,14 @@ impl<T: PcscHal> StateImpl<T> {
         Ok(Version::new(buffer.as_slice())?)
     }
 
+    /// This function allows the user to change the Yubikey's PIN, given that
+    /// the user knows the existing PIN. The old and new PINs can be provided
+    /// as function arguments. If they are not provided, this function will
+    /// prompt for them on stdin.
+    ///
+    /// When prompting for a PIN, this function will automatically retry if PIN
+    /// verification fails, until there are no more available retries. At that
+    /// point, the PIN can be unblocked using the PUK.
     pub fn change_pin(&mut self, old_pin: Option<&str>, new_pin: Option<&str>) -> Result<()> {
         verification_change_loop(
             PIN_NAME,
@@ -641,6 +660,15 @@ impl<T: PcscHal> StateImpl<T> {
         )
     }
 
+    /// This function allows the user to reset the Yubikey's PIN using the PUK,
+    /// after the user has exhausted their allotted tries to enter the PIN
+    /// correctly. The PUK and new PIN can be provided as function arguments. If
+    /// they are not provided, this function will prompt for them on stdin.
+    ///
+    /// When prompting for a PUK, this function will automatically retry if PUK
+    /// verification fails, until there are no more available retries. At that
+    /// point, the Yubiey can be reset to factory defaults using the reset
+    /// function.
     pub fn unblock_pin(&mut self, puk: Option<&str>, new_pin: Option<&str>) -> Result<()> {
         verification_change_loop(
             PUK_NAME,
@@ -653,6 +681,14 @@ impl<T: PcscHal> StateImpl<T> {
         )
     }
 
+    /// This function allows the user to change the Yubikey's PUK, given that
+    /// the user knows the existing PUK. The old and new PUKs can be provided
+    /// as function arguments. If they are not provided, this function will
+    /// prompt for them on stdin.
+    ///
+    /// When prompting for a PUK, this function will automatically retry if PUK
+    /// verification fails, until there are no more available retries. At that
+    /// point, the PIN and PUK can both be unblocked using the reset function.
     pub fn change_puk(&mut self, old_puk: Option<&str>, new_puk: Option<&str>) -> Result<()> {
         verification_change_loop(
             PUK_NAME,
@@ -665,6 +701,15 @@ impl<T: PcscHal> StateImpl<T> {
         )
     }
 
+    /// This function resets the PIN, PUK, and management key to their factory
+    /// default values, as well as delete any stored certificates and keys. The
+    /// default values for the PIN and PUK are 123456 and 12345678,
+    /// respectively.
+    ///
+    /// Note that this function will return an error unless the tries to verify
+    /// the PIN and PUK have both been fully exhausted (e.g., the Yubikey is now
+    /// unusable). Otherwise, the change_pin, unblock_pin, and change_puk
+    /// functions should be used instead of this function.
     pub fn reset(&mut self) -> Result<()> {
         let (sw, _) = self.hal
             .send_data(&[0, Instruction::Reset.to_value(), 0, 0], &[])?;
@@ -672,6 +717,12 @@ impl<T: PcscHal> StateImpl<T> {
         Ok(())
     }
 
+    /// This function sets the number of retries available for PIN or PUK
+    /// verification. This also resets the PIN and PUK back to their factory
+    /// default values, 123456 and 12345678, respectively.
+    ///
+    /// Note that this function is slightly strange compared to the rest of the
+    /// API, in that both the management key *and* the current PIN are required.
     pub fn set_retries(
         &mut self,
         mgm_key: Option<&str>,
@@ -694,6 +745,8 @@ impl<T: PcscHal> StateImpl<T> {
         Ok(())
     }
 
+    /// This function changes the management key stored on the device. This is
+    /// the key used to authenticate() for administrative / management access.
     pub fn set_management_key(
         &mut self,
         old_mgm_key: Option<&str>,
@@ -729,6 +782,14 @@ impl<T: PcscHal> StateImpl<T> {
         Ok(())
     }
 
+    /// This function writes a new, randomly-generated Card Holder Unique
+    /// Identifier (CHUID) to the device. Some systems (Windows) require a CHUID
+    /// to be present before they will recognize the Yubikey. This data object
+    /// is not present on Yubikeys by default (from the factory).
+    ///
+    /// Also note that, according to the Yubikey docs, the card contents are
+    /// aggressively cached on Windows. In order to invalidate the cached data,
+    /// e.g. after changing stored certificates, the CHUID must also be changed.
     pub fn set_chuid(&mut self, mgm_key: Option<&str>) -> Result<()> {
         self.authenticate_mgm(mgm_key)?;
         let object = build_data_object(CHUID_TEMPLATE, CHUID_RANDOM_OFFSET, CHUID_RANDOM_BYTES);
@@ -736,6 +797,10 @@ impl<T: PcscHal> StateImpl<T> {
         Ok(())
     }
 
+    /// This function writes a new, randomly-generated Card Capability Container
+    /// (CCC) to the device. Some systems (MacOS) require a CCC to be present
+    /// before they will recognize the Yubikey. This data object is not present
+    /// on Yubikeys by default (from the factory).
     pub fn set_ccc(&mut self, mgm_key: Option<&str>) -> Result<()> {
         self.authenticate_mgm(mgm_key)?;
         let object = build_data_object(CCC_TEMPLATE, CCC_RANDOM_OFFSET, CCC_RANDOM_BYTES);
@@ -743,6 +808,7 @@ impl<T: PcscHal> StateImpl<T> {
         Ok(())
     }
 
+    /// Read a data object from the Yubikey, returning the byte contents.
     pub fn read_object(&self, id: Object) -> Result<Vec<u8>> {
         let mut data: Vec<u8> = Vec::new();
         // TODO: Deduplicate this if statement? It appears in one other place.
@@ -786,6 +852,8 @@ impl<T: PcscHal> StateImpl<T> {
         Ok(recv)
     }
 
+    /// Write a data object to the Yubikey. This function takes ownership of the
+    /// data, because upstream's API requires a mutable data buffer.
     pub fn write_object(
         &mut self,
         mgm_key: Option<&str>,
@@ -796,9 +864,16 @@ impl<T: PcscHal> StateImpl<T> {
         ykpiv_save_object(&self.hal, id, buffer)?;
         Ok(())
     }
+
+    /// This is a convenience function to read a certificate's data object from
+    /// the Yubikey, and then return it formatted in a specified way.
+    pub fn read_certificate(&mut self, id: Key, format: Format) -> Result<String> {
+        let data = self.read_object(id.to_object()?)?;
+        format_certificate(data.as_slice(), format)
+    }
 }
 
-impl<T: PcscHal> Drop for StateImpl<T> {
+impl<T: PcscHal> Drop for Handle<T> {
     fn drop(&mut self) {
         self.disconnect();
     }
