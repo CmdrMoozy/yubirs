@@ -15,6 +15,7 @@
 use error::*;
 use piv::scarderr::SmartCardError;
 
+#[derive(Debug)]
 pub struct StatusWord {
     pub value: u16,
     pub error: Result<()>,

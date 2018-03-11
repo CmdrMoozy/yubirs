@@ -20,8 +20,9 @@ use std::collections::VecDeque;
 use std::sync::Mutex;
 
 pub struct PcscTestStub {
+    connected: bool,
     readers: Vec<String>,
-    send_data_callbacks: Mutex<VecDeque<Box<Fn(StructuredApdu) -> Result<(StatusWord, Vec<u8>)>>>>,
+    send_data_callbacks: Mutex<VecDeque<Box<Fn(Apdu) -> Result<(StatusWord, Vec<u8>)>>>>,
 }
 
 impl PcscTestStub {
@@ -32,7 +33,7 @@ impl PcscTestStub {
             .collect();
     }
 
-    pub fn push_mock_send_data<F: 'static + Fn(StructuredApdu) -> Result<(StatusWord, Vec<u8>)>>(
+    pub fn push_mock_send_data<F: 'static + Fn(Apdu) -> Result<(StatusWord, Vec<u8>)>>(
         &self,
         callback: F,
     ) {
@@ -46,6 +47,7 @@ impl PcscTestStub {
 impl PcscHal for PcscTestStub {
     fn new() -> Result<Self> {
         Ok(PcscTestStub {
+            connected: false,
             readers: vec![DEFAULT_READER.to_owned()],
             send_data_callbacks: Mutex::new(VecDeque::new()),
         })
@@ -59,30 +61,42 @@ impl PcscHal for PcscTestStub {
         let reader: &str = reader.unwrap_or(DEFAULT_READER);
         for r in self.readers.iter() {
             if r.contains(reader) {
+                self.connected = true;
                 return Ok(());
             }
         }
         bail!("No reading matching '{}' found", reader);
     }
 
-    fn disconnect(&mut self) {}
+    fn disconnect(&mut self) {
+        self.connected = false;
+    }
 
     fn send_data_impl(&self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)> {
+        if !self.connected {
+            bail!("Can't send data without first being connected.");
+        }
         let apdu = Apdu::from_bytes(apdu)?;
         let mut callbacks = self.send_data_callbacks.lock().unwrap();
         match callbacks.pop_front() {
             None => {
                 bail!("Unexpected call to send_data_impl (no mock callbacks to handle this data)")
             }
-            Some(callback) => callback(unsafe { apdu.st }),
+            Some(callback) => callback(apdu),
         }
     }
 
     fn begin_transaction(&self) -> Result<()> {
+        if !self.connected {
+            bail!("Can't begin transaction without first being connected.");
+        }
         Ok(())
     }
 
     fn end_transaction(&self) -> Result<()> {
+        if !self.connected {
+            bail!("Can't end transaction without first being connected.");
+        }
         Ok(())
     }
 }

@@ -24,36 +24,11 @@ use std::ptr;
 /// The Application ID to send in an APDU when connecting to a Yubikey.
 const APDU_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct StructuredApdu {
-    /// Instruction class - indicates the type of command, e.g. interindustry or
-    /// proprietary.
-    pub cla: u8,
-    /// Instruction code - indicates the specific command, e.g. "write data".
-    pub ins: u8,
-    /// First instruction parameter for the command, e.g. offset into file at
-    /// which to write the data.
-    pub p1: u8,
-    /// Second instruction parameter for the command, e.g. offset into file at
-    /// which to write the data.
-    pub p2: u8,
-    /// Encodes the number (N_c) of bytes of command data to follow. The
-    /// official specification says that this field can be variable length, but
-    /// upstream specifies it statically at 1 byte.
-    pub lc: u8,
-    /// The command data. The official specification says this can be up to
-    /// 65535 bytes long, but upstream defines it as a static 255 bytes.
-    pub data: [u8; 255],
-}
-
 /// APDU stands for "smart card Application Protocol Data Unit". This union
 /// definition is used by upstream's library to alternate between treating APDU
 /// data in a structured or unstructured way.
-#[repr(C)]
 #[derive(Clone, Copy)]
-pub union Apdu {
-    pub st: StructuredApdu,
+pub struct Apdu {
     pub raw: [u8; 230],
 }
 
@@ -62,11 +37,63 @@ impl Apdu {
         if bytes.len() != 230 {
             bail!("Invalid APDU data; expected 230 bytes, got {}", bytes.len());
         }
-        let apdu = Apdu { raw: [0; 230] };
-        for (dst, src) in unsafe { apdu.raw }.iter_mut().zip(bytes.iter()) {
+        let mut apdu = Apdu { raw: [0; 230] };
+        for (dst, src) in apdu.raw.iter_mut().zip(bytes.iter()) {
             *dst = *src;
         }
         Ok(apdu)
+    }
+
+    pub fn from_pieces(cla: u8, ins: u8, p1: u8, p2: u8, lc: u8, data: &[u8]) -> Result<Self> {
+        if data.len() != 255 {
+            bail!("Invalid APDU data; expected 255 bytes, got {}", data.len());
+        }
+        let mut apdu = Apdu { raw: [0; 230] };
+        apdu.raw[0] = cla;
+        apdu.raw[1] = ins;
+        apdu.raw[2] = p1;
+        apdu.raw[3] = p2;
+        apdu.raw[4] = lc;
+        for (dst, src) in apdu.raw[5..].iter_mut().zip(data.iter()) {
+            *dst = *src;
+        }
+        Ok(apdu)
+    }
+
+    /// Instruction class - indicates the type of command, e.g. interindustry or
+    /// proprietary.
+    pub fn cla(&self) -> u8 {
+        self.raw[0]
+    }
+
+    /// Instruction code - indicates the specific command, e.g. "write data".
+    pub fn ins(&self) -> u8 {
+        self.raw[1]
+    }
+
+    /// First instruction parameter for the command, e.g. offset into file at
+    /// which to write the data.
+    pub fn p1(&self) -> u8 {
+        self.raw[2]
+    }
+
+    /// Second instruction parameter for the command, e.g. offset into file at
+    /// which to write the data.
+    pub fn p2(&self) -> u8 {
+        self.raw[3]
+    }
+
+    /// Encodes the number (N_c) of bytes of command data to follow. The
+    /// official specification says that this field can be variable length, but
+    /// upstream specifies it statically at 1 byte.
+    pub fn lc(&self) -> u8 {
+        self.raw[4]
+    }
+
+    /// The command data. The official specification says this can be up to
+    /// 65535 bytes long, but upstream defines it as a static 255 bytes.
+    pub fn data(&self) -> &[u8] {
+        &self.raw[5..]
     }
 }
 
@@ -106,27 +133,25 @@ pub trait PcscHal {
             for (dst, src) in data.iter_mut().zip(chunk.iter()) {
                 *dst = *src;
             }
-            let apdu = Apdu {
-                st: StructuredApdu {
-                    cla: if chunk.len() == 255 {
-                        0x10
-                    } else {
-                        *templ.get(0).unwrap_or(&0)
-                    },
-                    ins: *templ.get(1).unwrap_or(&0),
-                    p1: *templ.get(2).unwrap_or(&0),
-                    p2: *templ.get(3).unwrap_or(&0),
-                    lc: chunk.len() as u8,
-                    data: data,
+            let apdu = Apdu::from_pieces(
+                if chunk.len() == 255 {
+                    0x10
+                } else {
+                    *templ.get(0).unwrap_or(&0)
                 },
-            };
+                *templ.get(1).unwrap_or(&0),
+                *templ.get(2).unwrap_or(&0),
+                *templ.get(3).unwrap_or(&0),
+                chunk.len() as u8,
+                &data,
+            )?;
 
             debug!(
                 "Sending chunk of {} out of {} total bytes",
                 chunk.len(),
                 data.len()
             );
-            let (sw_new, mut recv) = self.send_data_impl(unsafe { &apdu.raw })?;
+            let (sw_new, mut recv) = self.send_data_impl(&apdu.raw)?;
             sw = sw_new;
             if sw.error.is_err() {
                 return Ok((sw, out_data));
@@ -137,22 +162,13 @@ pub trait PcscHal {
         }
 
         while let Some(bytes_remaining) = sw.bytes_remaining {
-            let apdu = Apdu {
-                st: StructuredApdu {
-                    cla: 0,
-                    ins: 0xc0,
-                    p1: 0,
-                    p2: 0,
-                    lc: 0,
-                    data: [0; 255],
-                },
-            };
+            let apdu = Apdu::from_pieces(0, 0xc0, 0, 0, 0, &[0; 255])?;
 
             debug!(
                 "The card indicates there are {} more bytes of data to read",
                 bytes_remaining
             );
-            let (sw_new, mut recv) = self.send_data_impl(unsafe { &apdu.raw })?;
+            let (sw_new, mut recv) = self.send_data_impl(&apdu.raw)?;
             sw = sw_new;
             if sw.error.is_err() {
                 return Ok((sw, out_data));
@@ -251,18 +267,9 @@ impl PcscHal for PcscHardware {
             for (dst, src) in data.iter_mut().zip(APDU_AID.iter()) {
                 *dst = *src;
             }
-            let apdu = Apdu {
-                st: StructuredApdu {
-                    cla: 0,
-                    ins: 0xa4,
-                    p1: 0x04,
-                    p2: 0,
-                    lc: APDU_AID.len() as u8,
-                    data: data,
-                },
-            };
+            let apdu = Apdu::from_pieces(0, 0xa4, 0x04, 0, APDU_AID.len() as u8, &data)?;
 
-            let (sw, _) = self.send_data_impl(unsafe { &apdu.raw })?;
+            let (sw, _) = self.send_data_impl(&apdu.raw)?;
             sw.error?;
 
             return Ok(());

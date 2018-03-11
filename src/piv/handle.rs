@@ -16,7 +16,7 @@ use crypto::*;
 use data_encoding;
 use error::*;
 use openssl;
-use piv::hal::{Apdu, PcscHal, StructuredApdu};
+use piv::hal::{Apdu, PcscHal};
 use piv::id::*;
 use piv::sw::StatusWord;
 use rand::{self, Rng};
@@ -516,6 +516,14 @@ impl<T: PcscHal> Handle<T> {
         })
     }
 
+    pub fn get_hal(&self) -> &T {
+        &self.hal
+    }
+
+    pub fn get_hal_mut(&mut self) -> &mut T {
+        &mut self.hal
+    }
+
     fn authenticate_pin(&mut self, pin: Option<&str>) -> Result<()> {
         if self.authenticated_pin {
             return Ok(());
@@ -561,17 +569,15 @@ impl<T: PcscHal> Handle<T> {
         data[0] = 0x7c;
         data[1] = 0x02;
         data[2] = 0x80;
-        let apdu = Apdu {
-            st: StructuredApdu {
-                cla: 0,
-                ins: Instruction::Authenticate.to_value(),
-                p1: Algorithm::Des.to_value(),
-                p2: Key::CardManagement.to_value(),
-                lc: 0x04,
-                data: data,
-            },
-        };
-        let (sw, response) = self.hal.send_data_impl(unsafe { &apdu.raw })?;
+        let apdu = Apdu::from_pieces(
+            0,
+            Instruction::Authenticate.to_value(),
+            Algorithm::Des.to_value(),
+            Key::CardManagement.to_value(),
+            0x04,
+            &data,
+        )?;
+        let (sw, response) = self.hal.send_data_impl(&apdu.raw)?;
         sw.error?;
         let card_challenge: Vec<u8> = (&response[4..13]).into();
         debug_assert!(card_challenge.len() == 8);
@@ -587,17 +593,15 @@ impl<T: PcscHal> Handle<T> {
         data[12] = 0x81;
         openssl::rand::rand_bytes(&mut data[13..21])?;
         let expected_card_reply: Vec<u8> = (&data[13..21]).into();
-        let apdu = Apdu {
-            st: StructuredApdu {
-                cla: 0,
-                ins: Instruction::Authenticate.to_value(),
-                p1: Algorithm::Des.to_value(),
-                p2: Key::CardManagement.to_value(),
-                lc: 21,
-                data: [0; 255],
-            },
-        };
-        let (sw, response) = self.hal.send_data_impl(unsafe { &apdu.raw })?;
+        let apdu = Apdu::from_pieces(
+            0,
+            Instruction::Authenticate.to_value(),
+            Algorithm::Des.to_value(),
+            Key::CardManagement.to_value(),
+            21,
+            &[0; 255],
+        )?;
+        let (sw, response) = self.hal.send_data_impl(&apdu.raw)?;
         sw.error?;
 
         // Compare the response from the card with our expected response.
@@ -766,18 +770,17 @@ impl<T: PcscHal> Handle<T> {
         data[1] = Key::CardManagement.to_value();
         data[2] = MGM_KEY_BYTES as u8; // Key length
         (&mut data[3..(3 + MGM_KEY_BYTES)]).copy_from_slice(new_mgm_key.as_slice());
-        let apdu = Apdu {
-            st: StructuredApdu {
-                cla: 0,
-                ins: Instruction::SetManagementKey.to_value(),
-                p1: 0xff,
-                p2: if touch { 0xfe } else { 0xff },
-                lc: (MGM_KEY_BYTES as u8) + 3, // Key length + 3 extra bytes in data
-                data: data,
-            },
-        };
+        // "lc" value is key length + 3 extra bytes in data.
+        let apdu = Apdu::from_pieces(
+            0,
+            Instruction::SetManagementKey.to_value(),
+            0xff,
+            if touch { 0xfe } else { 0xff },
+            (MGM_KEY_BYTES as u8) + 3,
+            &data,
+        )?;
 
-        let (sw, _) = self.hal.send_data_impl(unsafe { &apdu.raw })?;
+        let (sw, _) = self.hal.send_data_impl(&apdu.raw)?;
         sw.error?;
         Ok(())
     }
