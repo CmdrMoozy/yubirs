@@ -3,8 +3,6 @@ language: rust
 
 addons:
   apt:
-    sources:
-      - kalakris-cmake
     packages:
       - pcsc-lite
       # Required for coveralls.
