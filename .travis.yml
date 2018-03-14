@@ -6,6 +6,7 @@ addons:
     sources:
       - kalakris-cmake
     packages:
+      - pcsc-lite
       # Required for coveralls.
       - libcurl4-openssl-dev
       - libelf-dev
