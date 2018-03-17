@@ -24,5 +24,12 @@ pub mod sw;
 /// using the first connected Yubikey we find.
 pub const DEFAULT_READER: &'static str = "Yubikey";
 
+/// The default PIN code configured on YubiKeys from the factory.
+pub const DEFAULT_PIN: &'static str = "123456";
+/// The default PUK code configured on YubiKeys from the factory.
+pub const DEFAULT_PUK: &'static str = "12345678";
+/// The default 3DES management key (slot 9B) configured on YubiKeys from the factory.
+pub const DEFAULT_MGM_KEY: &'static str = "010203040506070801020304050607080102030405060708";
+
 pub use self::hal::{PcscHal, PcscHardware};
 pub use self::handle::{Handle, Version};

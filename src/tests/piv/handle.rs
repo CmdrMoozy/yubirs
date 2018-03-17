@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use error::*;
-use piv::DEFAULT_READER;
+use piv::{DEFAULT_PIN, DEFAULT_READER};
 use piv::hal::Apdu;
 use piv::handle::{Handle, Version};
 use piv::id::Instruction;
@@ -66,8 +66,6 @@ fn test_get_version() {
     assert_eq!(expected_version, handle.get_version().unwrap());
 }
 
-const MOCK_INITIAL_PIN: &'static str = "123456";
-
 fn mock_change_pin_send_data(apdu: Apdu) -> Result<(StatusWord, Vec<u8>)> {
     if apdu.cla() == 0 && apdu.ins() == Instruction::ChangeReference.to_value() && apdu.p1() == 0
         && apdu.p2() == 0x80 && apdu.lc() == 16
@@ -75,7 +73,7 @@ fn mock_change_pin_send_data(apdu: Apdu) -> Result<(StatusWord, Vec<u8>)> {
         let existing: Vec<u8> = apdu.data()[0..8].to_owned();
         let existing: Vec<u8> = existing.into_iter().take_while(|b| *b != 0xff).collect();
         let existing = String::from_utf8(existing).unwrap();
-        if existing != MOCK_INITIAL_PIN {
+        if existing != DEFAULT_PIN {
             // Return "authentication failed" status word.
             return Ok((StatusWord::new(&[0x63, 0x00], 2), vec![]));
         }
@@ -109,10 +107,7 @@ fn test_change_pin() {
 
     handle.connect(None).unwrap();
     // Changing with the right initial PIN should succeed.
-    let res = handle.change_pin(Some(MOCK_INITIAL_PIN), Some("111111"));
-    println!("{:?}", res);
-    assert!(res.is_ok());
-    // assert!(handle.change_pin(Some(MOCK_INITIAL_PIN), Some("111111")).is_ok());
+    assert!(handle.change_pin(Some(DEFAULT_PIN), Some("111111")).is_ok());
     // Changing with the wrong initial PIN should fail.
     assert_eq!(
         "The supplied PIN is incorrect.",
