@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use error::*;
-use piv::{DEFAULT_PIN, DEFAULT_READER};
+use piv::{DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
 use piv::hal::Apdu;
 use piv::handle::{Handle, Version};
 use piv::id::Instruction;
@@ -110,7 +110,7 @@ fn test_change_pin() {
     assert!(handle.change_pin(Some(DEFAULT_PIN), Some("111111")).is_ok());
     // Changing with the wrong initial PIN should fail.
     assert_eq!(
-        "The supplied PIN is incorrect.",
+        "The supplied PIN/PUK is incorrect.",
         handle
             .change_pin(Some("WRONG"), Some("111111"))
             .err()
@@ -139,6 +139,86 @@ fn test_change_pin_invalid_parameters() {
         "Invalid new PIN; it exceeds 8 characters".to_owned(),
         handle
             .change_pin(Some("123456"), Some("123456789"))
+            .err()
+            .unwrap()
+            .to_string()
+    );
+}
+
+// TODO: Combine this with the mock implementation for change pin?
+fn mock_change_puk_send_data(apdu: Apdu) -> Result<(StatusWord, Vec<u8>)> {
+    if apdu.cla() == 0 && apdu.ins() == Instruction::ChangeReference.to_value() && apdu.p1() == 0
+        && apdu.p2() == 0x81 && apdu.lc() == 16
+    {
+        let existing: Vec<u8> = apdu.data()[0..8].to_owned();
+        let existing: Vec<u8> = existing.into_iter().take_while(|b| *b != 0xff).collect();
+        let existing = String::from_utf8(existing).unwrap();
+        if existing != DEFAULT_PUK {
+            // Return "authentication failed" status word.
+            return Ok((StatusWord::new(&[0x63, 0x00], 2), vec![]));
+        }
+
+        let new: Vec<u8> = apdu.data()[8..16].to_owned();
+        let new: Vec<u8> = new.into_iter().take_while(|b| *b != 0xff).collect();
+        let new = String::from_utf8(new).unwrap();
+        if new.is_empty() {
+            // Return "invalid data parameters" status word.
+            return Ok((StatusWord::new(&[0x6a, 0x80], 2), vec![]));
+        }
+
+        // TODO: The empty two-byte response is weird here too; see other TODOs in this file.
+        // Return "success" status word.
+        return Ok((StatusWord::new(&[0x90, 0x00], 2), vec![0x00, 0x00]));
+    } else {
+        // Return "invalid instruction byte" status word.
+        return Ok((StatusWord::new(&[0x6d, 0x00], 2), vec![]));
+    }
+}
+
+#[test]
+fn test_change_puk() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_mock_send_data(mock_change_puk_send_data);
+    handle
+        .get_hal()
+        .push_mock_send_data(mock_change_puk_send_data);
+
+    handle.connect(None).unwrap();
+    // Changing with the right initial PUK should succeed.
+    assert!(handle.change_puk(Some(DEFAULT_PUK), Some("1111")).is_ok());
+    // Changing with the wrong initial PUK should fail.
+    assert_eq!(
+        "The supplied PIN/PUK is incorrect.",
+        handle
+            .change_puk(Some("WRONG"), Some("1111"))
+            .err()
+            .unwrap()
+            .to_string()
+    );
+
+    handle.connect(None).unwrap();
+}
+
+#[test]
+fn test_change_puk_invalid_parameters() {
+    let mut handle = new_test_handle();
+    // No need to add mock data, validation happens first.
+
+    handle.connect(None).unwrap();
+    assert_eq!(
+        "Invalid existing PUK; it exceeds 8 characters".to_owned(),
+        handle
+            .change_puk(Some("123456789"), Some("123456"))
+            .err()
+            .unwrap()
+            .to_string()
+    );
+    assert_eq!(
+        "Invalid new PUK; it exceeds 8 characters".to_owned(),
+        handle
+            .change_puk(Some("123456"), Some("123456789"))
             .err()
             .unwrap()
             .to_string()

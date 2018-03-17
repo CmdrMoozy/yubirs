@@ -241,7 +241,7 @@ impl ::std::error::Error for SmartCardError {
             SmartCardError::InvalidAtr => {
                 "An ATR string obtained from the registry is not a valid ATR string."
             }
-            SmartCardError::InvalidChv => "The supplied PIN is incorrect.",
+            SmartCardError::InvalidChv => "The supplied PIN/PUK is incorrect.",
             SmartCardError::InvalidHandle => "The supplied handle was not valid.",
             SmartCardError::InvalidParameter => {
                 "One or more of the supplied parameters could not be properly interpreted."
