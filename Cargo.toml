@@ -8,7 +8,7 @@ repository = "https://github.com/CmdrMoozy/yubirs"
 license = "Apache-2.0"
 
 [dependencies]
-bdrck = "0.5"
+bdrck = "0.6"
 chrono = "0.4"
 curl = "0.4"
 data-encoding = "2.1"
