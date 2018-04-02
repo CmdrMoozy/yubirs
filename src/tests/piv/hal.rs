@@ -22,7 +22,7 @@ use std::sync::Mutex;
 pub struct PcscTestStub {
     connected: bool,
     readers: Vec<String>,
-    send_data_callbacks: Mutex<VecDeque<Box<Fn(Apdu) -> Result<(StatusWord, Vec<u8>)>>>>,
+    send_data_callbacks: Mutex<VecDeque<Box<FnMut(Apdu) -> Result<(StatusWord, Vec<u8>)>>>>,
 }
 
 impl PcscTestStub {
@@ -33,7 +33,7 @@ impl PcscTestStub {
             .collect();
     }
 
-    pub fn push_mock_send_data<F: 'static + Fn(Apdu) -> Result<(StatusWord, Vec<u8>)>>(
+    pub fn push_mock_send_data<F: 'static + FnMut(Apdu) -> Result<(StatusWord, Vec<u8>)>>(
         &self,
         callback: F,
     ) {
@@ -82,7 +82,7 @@ impl PcscHal for PcscTestStub {
             None => {
                 bail!("Unexpected call to send_data_impl (no mock callbacks to handle this data)")
             }
-            Some(callback) => callback(apdu),
+            Some(mut callback) => callback(apdu),
         }
     }
 
