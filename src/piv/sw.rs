@@ -24,13 +24,7 @@ pub struct StatusWord {
 }
 
 impl StatusWord {
-    pub fn new(buffer: &[u8], length: usize) -> StatusWord {
-        let value: u16 = if length >= 2 {
-            ((buffer[length - 2] as u16) << 8) | (buffer[length - 1] as u16)
-        } else {
-            0
-        };
-
+    pub fn new_from_value(value: u16) -> StatusWord {
         // This page contains a partial listing of status word values:
         // https://web.archive.org/web/20090623030155/http://cheef.ru/docs/HowTo/SW1SW2.info. It is
         // likely incomplete, but at least covers all of the cases upstream's library takes
@@ -119,6 +113,15 @@ impl StatusWord {
             bytes_remaining: bytes_remaining,
             counter: counter,
         }
+    }
+
+    pub fn new(buffer: &[u8], length: usize) -> StatusWord {
+        let value: u16 = if length >= 2 {
+            ((buffer[length - 2] as u16) << 8) | (buffer[length - 1] as u16)
+        } else {
+            0
+        };
+        StatusWord::new_from_value(value)
     }
 
     pub fn success() -> StatusWord {

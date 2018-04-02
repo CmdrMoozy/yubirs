@@ -48,10 +48,10 @@ fn test_get_version() {
             if apdu.cla() == 0 && apdu.ins() == Instruction::GetVersion.to_value() && apdu.p1() == 0
                 && apdu.p2() == 0 && apdu.lc() == 0
             {
-                return Ok((StatusWord::new(&[0x90, 0x00], 2), vec![0x01, 0x02, 0x03]));
+                return Ok((StatusWord::new_from_value(0x9000), vec![0x01, 0x02, 0x03]));
             } else {
                 // Return "invalid instruction byte" status word.
-                return Ok((StatusWord::new(&[0x6d, 0x00], 2), vec![]));
+                return Ok((StatusWord::new_from_value(0x6d00), vec![]));
             }
         });
 
@@ -70,7 +70,7 @@ fn mock_change_pin_send_data(apdu: Apdu) -> Result<(StatusWord, Vec<u8>)> {
         let existing = String::from_utf8(existing).unwrap();
         if existing != DEFAULT_PIN {
             // Return "authentication failed" status word.
-            return Ok((StatusWord::new(&[0x63, 0x00], 2), vec![]));
+            return Ok((StatusWord::new_from_value(0x6300), vec![]));
         }
 
         let new: Vec<u8> = apdu.data()[8..16].to_owned();
@@ -78,14 +78,14 @@ fn mock_change_pin_send_data(apdu: Apdu) -> Result<(StatusWord, Vec<u8>)> {
         let new = String::from_utf8(new).unwrap();
         if new.is_empty() {
             // Return "invalid data parameters" status word.
-            return Ok((StatusWord::new(&[0x6a, 0x80], 2), vec![]));
+            return Ok((StatusWord::new_from_value(0x6a80), vec![]));
         }
 
         // Return "success" status word.
-        return Ok((StatusWord::new(&[0x90, 0x00], 2), vec![]));
+        return Ok((StatusWord::new_from_value(0x9000), vec![]));
     } else {
         // Return "invalid instruction byte" status word.
-        return Ok((StatusWord::new(&[0x6d, 0x00], 2), vec![]));
+        return Ok((StatusWord::new_from_value(0x6d00), vec![]));
     }
 }
 
@@ -149,7 +149,7 @@ fn mock_change_puk_send_data(apdu: Apdu) -> Result<(StatusWord, Vec<u8>)> {
         let existing = String::from_utf8(existing).unwrap();
         if existing != DEFAULT_PUK {
             // Return "authentication failed" status word.
-            return Ok((StatusWord::new(&[0x63, 0x00], 2), vec![]));
+            return Ok((StatusWord::new_from_value(0x6300), vec![]));
         }
 
         let new: Vec<u8> = apdu.data()[8..16].to_owned();
@@ -157,14 +157,14 @@ fn mock_change_puk_send_data(apdu: Apdu) -> Result<(StatusWord, Vec<u8>)> {
         let new = String::from_utf8(new).unwrap();
         if new.is_empty() {
             // Return "invalid data parameters" status word.
-            return Ok((StatusWord::new(&[0x6a, 0x80], 2), vec![]));
+            return Ok((StatusWord::new_from_value(0x6a80), vec![]));
         }
 
         // Return "success" status word.
-        return Ok((StatusWord::new(&[0x90, 0x00], 2), vec![]));
+        return Ok((StatusWord::new_from_value(0x9000), vec![]));
     } else {
         // Return "invalid instruction byte" status word.
-        return Ok((StatusWord::new(&[0x6d, 0x00], 2), vec![]));
+        return Ok((StatusWord::new_from_value(0x6d00), vec![]));
     }
 }
 
