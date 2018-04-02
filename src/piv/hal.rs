@@ -156,8 +156,6 @@ pub trait PcscHal {
             if sw.error.is_err() {
                 return Ok((sw, out_data));
             }
-            let recv_len = recv.len() - 2;
-            recv.truncate(recv_len);
             out_data.append(&mut recv);
         }
 
@@ -330,10 +328,9 @@ impl PcscHal for PcscHardware {
                 .collect::<String>()
         );
 
-        Ok((
-            StatusWord::new(recv_buffer.as_slice(), recv_length as usize),
-            recv_buffer,
-        ))
+        let sw = StatusWord::new(recv_buffer.as_slice(), recv_length as usize);
+        recv_buffer.truncate(recv_length as usize - 2);
+        Ok((sw, recv_buffer))
     }
 
     fn begin_transaction(&self) -> Result<()> {

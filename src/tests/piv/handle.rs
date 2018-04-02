@@ -48,12 +48,7 @@ fn test_get_version() {
             if apdu.cla() == 0 && apdu.ins() == Instruction::GetVersion.to_value() && apdu.p1() == 0
                 && apdu.p2() == 0 && apdu.lc() == 0
             {
-                // TODO: Get rid of the trailing two bytes, or at least make it more clear why they
-                // exist. See src/piv/hal.rs "let recv_len = recv.len() - 2;".
-                return Ok((
-                    StatusWord::new(&[0x90, 0x00], 2),
-                    vec![0x01, 0x02, 0x03, 0x00, 0x00],
-                ));
+                return Ok((StatusWord::new(&[0x90, 0x00], 2), vec![0x01, 0x02, 0x03]));
             } else {
                 // Return "invalid instruction byte" status word.
                 return Ok((StatusWord::new(&[0x6d, 0x00], 2), vec![]));
@@ -86,9 +81,8 @@ fn mock_change_pin_send_data(apdu: Apdu) -> Result<(StatusWord, Vec<u8>)> {
             return Ok((StatusWord::new(&[0x6a, 0x80], 2), vec![]));
         }
 
-        // TODO: The empty two-byte response is weird here too; see other TODOs in this file.
         // Return "success" status word.
-        return Ok((StatusWord::new(&[0x90, 0x00], 2), vec![0x00, 0x00]));
+        return Ok((StatusWord::new(&[0x90, 0x00], 2), vec![]));
     } else {
         // Return "invalid instruction byte" status word.
         return Ok((StatusWord::new(&[0x6d, 0x00], 2), vec![]));
@@ -166,9 +160,8 @@ fn mock_change_puk_send_data(apdu: Apdu) -> Result<(StatusWord, Vec<u8>)> {
             return Ok((StatusWord::new(&[0x6a, 0x80], 2), vec![]));
         }
 
-        // TODO: The empty two-byte response is weird here too; see other TODOs in this file.
         // Return "success" status word.
-        return Ok((StatusWord::new(&[0x90, 0x00], 2), vec![0x00, 0x00]));
+        return Ok((StatusWord::new(&[0x90, 0x00], 2), vec![]));
     } else {
         // Return "invalid instruction byte" status word.
         return Ok((StatusWord::new(&[0x6d, 0x00], 2), vec![]));
