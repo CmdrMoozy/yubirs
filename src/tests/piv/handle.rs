@@ -44,7 +44,7 @@ fn test_get_version() {
     let mut handle = new_test_handle();
     handle
         .get_hal()
-        .push_mock_send_data(|apdu: Apdu| -> Result<(StatusWord, Vec<u8>)> {
+        .push_mock_send_data(1, |apdu: Apdu| -> Result<(StatusWord, Vec<u8>)> {
             if apdu.cla() == 0 && apdu.ins() == Instruction::GetVersion.to_value() && apdu.p1() == 0
                 && apdu.p2() == 0 && apdu.lc() == 0
             {
@@ -94,10 +94,10 @@ fn test_change_pin() {
     let mut handle = new_test_handle();
     handle
         .get_hal()
-        .push_mock_send_data(mock_change_pin_send_data);
+        .push_mock_send_data(1, mock_change_pin_send_data);
     handle
         .get_hal()
-        .push_mock_send_data(mock_change_pin_send_data);
+        .push_mock_send_data(1, mock_change_pin_send_data);
 
     handle.connect(None).unwrap();
     // Changing with the right initial PIN should succeed.
@@ -173,10 +173,10 @@ fn test_change_puk() {
     let mut handle = new_test_handle();
     handle
         .get_hal()
-        .push_mock_send_data(mock_change_puk_send_data);
+        .push_mock_send_data(1, mock_change_puk_send_data);
     handle
         .get_hal()
-        .push_mock_send_data(mock_change_puk_send_data);
+        .push_mock_send_data(1, mock_change_puk_send_data);
 
     handle.connect(None).unwrap();
     // Changing with the right initial PUK should succeed.

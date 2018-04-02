@@ -19,10 +19,41 @@ use piv::sw::StatusWord;
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
+struct MockSendData {
+    remaining: usize,
+    callback: Box<FnMut(Apdu) -> Result<(StatusWord, Vec<u8>)>>,
+}
+
+impl MockSendData {
+    /// Construct a new MockSendData which is intended to be called `calls`
+    /// times, using the given actual callback function.
+    pub fn new<F: 'static + FnMut(Apdu) -> Result<(StatusWord, Vec<u8>)>>(
+        calls: usize,
+        callback: F,
+    ) -> Self {
+        MockSendData {
+            remaining: calls,
+            callback: Box::new(callback),
+        }
+    }
+
+    /// Call this MockSendData function with the given argument. This function
+    /// returns the result from the mock implementation, along with a bool. If
+    /// the bool is true, it means this mock should be left in place for future
+    /// calls. If false, then the caller should pop this mock off, and not call
+    /// it again.
+    pub fn call(&mut self, apdu: Apdu) -> (Result<(StatusWord, Vec<u8>)>, bool) {
+        debug_assert!(self.remaining > 0);
+        let ret = (self.callback)(apdu);
+        self.remaining -= 1;
+        (ret, self.remaining > 0)
+    }
+}
+
 pub struct PcscTestStub {
     connected: bool,
     readers: Vec<String>,
-    send_data_callbacks: Mutex<VecDeque<Box<FnMut(Apdu) -> Result<(StatusWord, Vec<u8>)>>>>,
+    send_data_callbacks: Mutex<VecDeque<MockSendData>>,
 }
 
 impl PcscTestStub {
@@ -35,12 +66,13 @@ impl PcscTestStub {
 
     pub fn push_mock_send_data<F: 'static + FnMut(Apdu) -> Result<(StatusWord, Vec<u8>)>>(
         &self,
+        calls: usize,
         callback: F,
     ) {
         self.send_data_callbacks
             .lock()
             .unwrap()
-            .push_back(Box::new(callback));
+            .push_back(MockSendData::new(calls, callback))
     }
 }
 
@@ -78,12 +110,16 @@ impl PcscHal for PcscTestStub {
         }
         let apdu = Apdu::from_bytes(apdu)?;
         let mut callbacks = self.send_data_callbacks.lock().unwrap();
-        match callbacks.pop_front() {
+        let (ret, should_keep) = match callbacks.front_mut() {
             None => {
                 bail!("Unexpected call to send_data_impl (no mock callbacks to handle this data)")
             }
-            Some(mut callback) => callback(apdu),
+            Some(mut callback) => callback.call(apdu),
+        };
+        if !should_keep {
+            callbacks.pop_front();
         }
+        ret
     }
 
     fn begin_transaction(&self) -> Result<()> {
