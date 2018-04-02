@@ -15,6 +15,8 @@
 use error::*;
 use piv::DEFAULT_READER;
 use piv::hal::*;
+use piv::handle::Version;
+use piv::id::Instruction;
 use piv::sw::StatusWord;
 use std::collections::VecDeque;
 use std::sync::Mutex;
@@ -73,6 +75,22 @@ impl PcscTestStub {
             .lock()
             .unwrap()
             .push_back(MockSendData::new(calls, callback))
+    }
+
+    pub fn push_mock_get_version(&self, calls: usize, mock_version: Version) {
+        self.push_mock_send_data(calls, move |apdu: Apdu| -> Result<(StatusWord, Vec<u8>)> {
+            if apdu.cla() == 0 && apdu.ins() == Instruction::GetVersion.to_value() && apdu.p1() == 0
+                && apdu.p2() == 0 && apdu.lc() == 0
+            {
+                Ok((
+                    StatusWord::new_from_value(0x9000),
+                    vec![mock_version.0, mock_version.1, mock_version.2],
+                ))
+            } else {
+                // Return "invalid instruction byte" status word.
+                Ok((StatusWord::new_from_value(0x6d00), vec![]))
+            }
+        })
     }
 }
 

@@ -483,8 +483,8 @@ fn change_impl<T: PcscHal>(
     }
 }
 
-#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct Version(u8, u8, u8);
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Version(pub u8, pub u8, pub u8);
 
 impl Version {
     pub fn new(data: &[u8]) -> Result<Version> {

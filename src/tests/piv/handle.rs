@@ -42,23 +42,11 @@ fn test_list_readers() {
 #[test]
 fn test_get_version() {
     let mut handle = new_test_handle();
-    handle
-        .get_hal()
-        .push_mock_send_data(1, |apdu: Apdu| -> Result<(StatusWord, Vec<u8>)> {
-            if apdu.cla() == 0 && apdu.ins() == Instruction::GetVersion.to_value() && apdu.p1() == 0
-                && apdu.p2() == 0 && apdu.lc() == 0
-            {
-                return Ok((StatusWord::new_from_value(0x9000), vec![0x01, 0x02, 0x03]));
-            } else {
-                // Return "invalid instruction byte" status word.
-                return Ok((StatusWord::new_from_value(0x6d00), vec![]));
-            }
-        });
-
-    let expected_version = Version::new(&[1, 2, 3]).unwrap();
+    let expected = Version::new(&[1, 2, 3]).unwrap();
+    handle.get_hal().push_mock_get_version(1, expected);
     handle.connect(None).unwrap();
-    assert_eq!("1.2.3", expected_version.to_string().as_str());
-    assert_eq!(expected_version, handle.get_version().unwrap());
+    assert_eq!("1.2.3", expected.to_string().as_str());
+    assert_eq!(expected, handle.get_version().unwrap());
 }
 
 fn mock_change_pin_send_data(apdu: Apdu) -> Result<(StatusWord, Vec<u8>)> {
