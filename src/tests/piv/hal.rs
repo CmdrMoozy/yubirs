@@ -13,12 +13,12 @@
 // limitations under the License.
 
 use error::*;
-use piv::DEFAULT_READER;
+use piv::{DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
 use piv::hal::*;
 use piv::handle::Version;
 use piv::id::Instruction;
 use piv::sw::StatusWord;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 
 struct MockSendData {
@@ -70,14 +70,15 @@ impl PcscTestStub {
         &self,
         calls: usize,
         callback: F,
-    ) {
+    ) -> &Self {
         self.send_data_callbacks
             .lock()
             .unwrap()
-            .push_back(MockSendData::new(calls, callback))
+            .push_back(MockSendData::new(calls, callback));
+        self
     }
 
-    pub fn push_mock_get_version(&self, calls: usize, mock_version: Version) {
+    pub fn push_mock_get_version(&self, calls: usize, mock_version: Version) -> &Self {
         self.push_mock_send_data(calls, move |apdu: Apdu| -> Result<(StatusWord, Vec<u8>)> {
             if apdu.cla() == 0 && apdu.ins() == Instruction::GetVersion.to_value() && apdu.p1() == 0
                 && apdu.p2() == 0 && apdu.lc() == 0
@@ -89,6 +90,58 @@ impl PcscTestStub {
             } else {
                 // Return "invalid instruction byte" status word.
                 Ok((StatusWord::new_from_value(0x6d00), vec![]))
+            }
+        })
+    }
+
+    pub fn push_mock_change(&self, instructions: &[(Instruction, u8)]) -> &Self {
+        let mut instructions: VecDeque<(Instruction, u8)> = instructions.to_vec().into();
+
+        let mut retry_counters: HashMap<(Instruction, u8), usize> = HashMap::new();
+        retry_counters.insert((Instruction::ChangeReference, 0x80), 3);
+        retry_counters.insert((Instruction::ChangeReference, 0x81), 3);
+
+        let mut secrets: HashMap<(Instruction, u8), String> = HashMap::new();
+        secrets.insert((Instruction::ChangeReference, 0x80), DEFAULT_PIN.to_owned());
+        secrets.insert((Instruction::ChangeReference, 0x81), DEFAULT_PUK.to_owned());
+
+        let calls = instructions.len();
+
+        self.push_mock_send_data(calls, move |apdu: Apdu| -> Result<(StatusWord, Vec<u8>)> {
+            let instruction = instructions.pop_front().unwrap();
+
+            let retry_counter: &mut usize = retry_counters.get_mut(&instruction).unwrap();
+            if *retry_counter == 0 {
+                // Return "too many attempts".
+                return Ok((StatusWord::new_from_value(0x6983), vec![]));
+            }
+
+            if apdu.cla() == 0 && apdu.ins() == instruction.0.to_value() && apdu.p1() == 0
+                && apdu.p2() == instruction.1 && apdu.lc() == 16
+            {
+                let existing: Vec<u8> = apdu.data()[0..8].to_owned();
+                let existing: Vec<u8> = existing.into_iter().take_while(|b| *b != 0xff).collect();
+                let existing = String::from_utf8(existing).unwrap();
+                if &existing != secrets.get(&instruction).unwrap() {
+                    // Return "authentication failed" status word.
+                    *retry_counter -= 1;
+                    return Ok((StatusWord::new_from_value(0x6300), vec![]));
+                }
+
+                let new: Vec<u8> = apdu.data()[8..16].to_owned();
+                let new: Vec<u8> = new.into_iter().take_while(|b| *b != 0xff).collect();
+                let new = String::from_utf8(new).unwrap();
+                if new.is_empty() {
+                    // Return "invalid data parameters" status word.
+                    return Ok((StatusWord::new_from_value(0x6a80), vec![]));
+                }
+
+                // Return "success" status word.
+                secrets.insert(instruction, new);
+                return Ok((StatusWord::new_from_value(0x9000), vec![]));
+            } else {
+                // Return "invalid instruction byte" status word.
+                return Ok((StatusWord::new_from_value(0x6d00), vec![]));
             }
         })
     }

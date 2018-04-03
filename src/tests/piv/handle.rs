@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use error::*;
 use piv::{DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
-use piv::hal::Apdu;
 use piv::handle::{Handle, Version};
 use piv::id::Instruction;
-use piv::sw::StatusWord;
 use tests::piv::hal::PcscTestStub;
 
 fn new_test_handle() -> Handle<PcscTestStub> {
@@ -49,43 +46,13 @@ fn test_get_version() {
     assert_eq!(expected, handle.get_version().unwrap());
 }
 
-fn mock_change_pin_send_data(apdu: Apdu) -> Result<(StatusWord, Vec<u8>)> {
-    if apdu.cla() == 0 && apdu.ins() == Instruction::ChangeReference.to_value() && apdu.p1() == 0
-        && apdu.p2() == 0x80 && apdu.lc() == 16
-    {
-        let existing: Vec<u8> = apdu.data()[0..8].to_owned();
-        let existing: Vec<u8> = existing.into_iter().take_while(|b| *b != 0xff).collect();
-        let existing = String::from_utf8(existing).unwrap();
-        if existing != DEFAULT_PIN {
-            // Return "authentication failed" status word.
-            return Ok((StatusWord::new_from_value(0x6300), vec![]));
-        }
-
-        let new: Vec<u8> = apdu.data()[8..16].to_owned();
-        let new: Vec<u8> = new.into_iter().take_while(|b| *b != 0xff).collect();
-        let new = String::from_utf8(new).unwrap();
-        if new.is_empty() {
-            // Return "invalid data parameters" status word.
-            return Ok((StatusWord::new_from_value(0x6a80), vec![]));
-        }
-
-        // Return "success" status word.
-        return Ok((StatusWord::new_from_value(0x9000), vec![]));
-    } else {
-        // Return "invalid instruction byte" status word.
-        return Ok((StatusWord::new_from_value(0x6d00), vec![]));
-    }
-}
-
 #[test]
 fn test_change_pin() {
     let mut handle = new_test_handle();
-    handle
-        .get_hal()
-        .push_mock_send_data(1, mock_change_pin_send_data);
-    handle
-        .get_hal()
-        .push_mock_send_data(1, mock_change_pin_send_data);
+    handle.get_hal().push_mock_change(&[
+        (Instruction::ChangeReference, 0x80),
+        (Instruction::ChangeReference, 0x80),
+    ]);
 
     handle.connect(None).unwrap();
     // Changing with the right initial PIN should succeed.
@@ -94,7 +61,7 @@ fn test_change_pin() {
     assert_eq!(
         "The supplied PIN/PUK is incorrect.",
         handle
-            .change_pin(Some("WRONG"), Some("111111"))
+            .change_pin(Some("WRONG"), Some("222222"))
             .err()
             .unwrap()
             .to_string()
@@ -127,44 +94,13 @@ fn test_change_pin_invalid_parameters() {
     );
 }
 
-// TODO: Combine this with the mock implementation for change pin?
-fn mock_change_puk_send_data(apdu: Apdu) -> Result<(StatusWord, Vec<u8>)> {
-    if apdu.cla() == 0 && apdu.ins() == Instruction::ChangeReference.to_value() && apdu.p1() == 0
-        && apdu.p2() == 0x81 && apdu.lc() == 16
-    {
-        let existing: Vec<u8> = apdu.data()[0..8].to_owned();
-        let existing: Vec<u8> = existing.into_iter().take_while(|b| *b != 0xff).collect();
-        let existing = String::from_utf8(existing).unwrap();
-        if existing != DEFAULT_PUK {
-            // Return "authentication failed" status word.
-            return Ok((StatusWord::new_from_value(0x6300), vec![]));
-        }
-
-        let new: Vec<u8> = apdu.data()[8..16].to_owned();
-        let new: Vec<u8> = new.into_iter().take_while(|b| *b != 0xff).collect();
-        let new = String::from_utf8(new).unwrap();
-        if new.is_empty() {
-            // Return "invalid data parameters" status word.
-            return Ok((StatusWord::new_from_value(0x6a80), vec![]));
-        }
-
-        // Return "success" status word.
-        return Ok((StatusWord::new_from_value(0x9000), vec![]));
-    } else {
-        // Return "invalid instruction byte" status word.
-        return Ok((StatusWord::new_from_value(0x6d00), vec![]));
-    }
-}
-
 #[test]
 fn test_change_puk() {
     let mut handle = new_test_handle();
-    handle
-        .get_hal()
-        .push_mock_send_data(1, mock_change_puk_send_data);
-    handle
-        .get_hal()
-        .push_mock_send_data(1, mock_change_puk_send_data);
+    handle.get_hal().push_mock_change(&[
+        (Instruction::ChangeReference, 0x81),
+        (Instruction::ChangeReference, 0x81),
+    ]);
 
     handle.connect(None).unwrap();
     // Changing with the right initial PUK should succeed.
@@ -173,7 +109,7 @@ fn test_change_puk() {
     assert_eq!(
         "The supplied PIN/PUK is incorrect.",
         handle
-            .change_puk(Some("WRONG"), Some("1111"))
+            .change_puk(Some("WRONG"), Some("2222"))
             .err()
             .unwrap()
             .to_string()
