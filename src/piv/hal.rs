@@ -16,10 +16,12 @@ use error::*;
 use libc::c_char;
 use pcsc_sys;
 use piv::DEFAULT_READER;
+use piv::recording::Recording;
 use piv::scarderr::SmartCardError;
 use piv::sw::StatusWord;
 use std::ffi::CString;
 use std::ptr;
+use std::sync::Mutex;
 
 /// The Application ID to send in an APDU when connecting to a Yubikey.
 const APDU_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
@@ -185,10 +187,11 @@ pub trait PcscHal {
 pub struct PcscHardware {
     context: pcsc_sys::SCARDCONTEXT,
     card: pcsc_sys::SCARDHANDLE,
+    recording: Option<Mutex<Recording>>,
 }
 
-impl PcscHal for PcscHardware {
-    fn new() -> Result<Self> {
+impl PcscHardware {
+    fn new_impl(recording: Option<Mutex<Recording>>) -> Result<Self> {
         let mut context: pcsc_sys::SCARDCONTEXT = pcsc_sys::SCARD_E_INVALID_HANDLE;
         SmartCardError::new(unsafe {
             pcsc_sys::SCardEstablishContext(
@@ -202,7 +205,58 @@ impl PcscHal for PcscHardware {
         Ok(PcscHardware {
             context: context,
             card: 0,
+            recording: recording,
         })
+    }
+
+    pub fn new_with_recording() -> Result<Self> {
+        Self::new_impl(Some(Mutex::new(Recording::default())))
+    }
+
+    fn send_data_impl_impl(&self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)> {
+        let send_len: pcsc_sys::DWORD = apdu[4] as pcsc_sys::DWORD + 5;
+        debug!(
+            "> {}",
+            (&apdu[0..(send_len as usize)])
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>()
+        );
+
+        // Upstream uses a 261-byte buffer in all cases, even though this number seems mostly made
+        // up. It seems like a sane default for now.
+        let mut recv_buffer: Vec<u8> = vec![0; 261];
+        let mut recv_length = recv_buffer.len() as pcsc_sys::DWORD;
+        SmartCardError::new(unsafe {
+            pcsc_sys::SCardTransmit(
+                self.card,
+                &pcsc_sys::g_rgSCardT1Pci,
+                apdu.as_ptr(),
+                send_len,
+                ptr::null_mut(),
+                recv_buffer.as_mut_ptr(),
+                &mut recv_length,
+            )
+        })?;
+
+        recv_buffer.truncate(recv_length as usize);
+        debug!(
+            "< {}",
+            recv_buffer
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>()
+        );
+
+        let sw = StatusWord::new(recv_buffer.as_slice(), recv_length as usize);
+        recv_buffer.truncate(recv_length as usize - 2);
+        Ok((sw, recv_buffer))
+    }
+}
+
+impl PcscHal for PcscHardware {
+    fn new() -> Result<Self> {
+        Self::new_impl(None)
     }
 
     fn list_readers(&self) -> Result<Vec<String>> {
@@ -294,43 +348,14 @@ impl PcscHal for PcscHardware {
     }
 
     fn send_data_impl(&self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)> {
-        let send_len: pcsc_sys::DWORD = apdu[4] as pcsc_sys::DWORD + 5;
-        debug!(
-            "> {}",
-            (&apdu[0..(send_len as usize)])
-                .iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<String>()
-        );
-
-        // Upstream uses a 261-byte buffer in all cases, even though this number seems mostly made
-        // up. It seems like a sane default for now.
-        let mut recv_buffer: Vec<u8> = vec![0; 261];
-        let mut recv_length = recv_buffer.len() as pcsc_sys::DWORD;
-        SmartCardError::new(unsafe {
-            pcsc_sys::SCardTransmit(
-                self.card,
-                &pcsc_sys::g_rgSCardT1Pci,
-                apdu.as_ptr(),
-                send_len,
-                ptr::null_mut(),
-                recv_buffer.as_mut_ptr(),
-                &mut recv_length,
-            )
-        })?;
-
-        recv_buffer.truncate(recv_length as usize);
-        debug!(
-            "< {}",
-            recv_buffer
-                .iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<String>()
-        );
-
-        let sw = StatusWord::new(recv_buffer.as_slice(), recv_length as usize);
-        recv_buffer.truncate(recv_length as usize - 2);
-        Ok((sw, recv_buffer))
+        if let Some(recording) = self.recording.as_ref() {
+            let mut lock = recording.lock().unwrap();
+            let ret = self.send_data_impl_impl(apdu);
+            lock.record(apdu, &ret);
+            ret
+        } else {
+            self.send_data_impl_impl(apdu)
+        }
     }
 
     fn begin_transaction(&self) -> Result<()> {
