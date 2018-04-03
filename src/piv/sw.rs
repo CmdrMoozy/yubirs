@@ -14,6 +14,9 @@
 
 use error::*;
 use piv::scarderr::SmartCardError;
+use serde::de::{Deserialize, Deserializer, Visitor};
+use serde::ser::{Serialize, Serializer};
+use std::fmt;
 
 #[derive(Debug)]
 pub struct StatusWord {
@@ -137,5 +140,37 @@ impl StatusWord {
 impl Clone for StatusWord {
     fn clone(&self) -> Self {
         StatusWord::new_from_value(self.value)
+    }
+}
+
+struct StatusWordVisitor;
+
+impl<'de> Visitor<'de> for StatusWordVisitor {
+    type Value = StatusWord;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a two-byte status word")
+    }
+
+    fn visit_u16<E: ::serde::de::Error>(self, v: u16) -> ::std::result::Result<Self::Value, E> {
+        Ok(StatusWord::new_from_value(v))
+    }
+}
+
+impl Default for StatusWordVisitor {
+    fn default() -> Self {
+        StatusWordVisitor {}
+    }
+}
+
+impl Serialize for StatusWord {
+    fn serialize<S: Serializer>(&self, serializer: S) -> ::std::result::Result<S::Ok, S::Error> {
+        serializer.serialize_u16(self.value)
+    }
+}
+
+impl<'de> Deserialize<'de> for StatusWord {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> ::std::result::Result<Self, D::Error> {
+        deserializer.deserialize_u16(StatusWordVisitor::default())
     }
 }

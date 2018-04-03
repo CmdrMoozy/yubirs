@@ -14,6 +14,7 @@
 
 error_chain! {
     foreign_links {
+        Bincode(::bincode::Error);
         Curl(::curl::Error);
         Decode(::data_encoding::DecodeError);
         Io(::std::io::Error);
