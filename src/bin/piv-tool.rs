@@ -23,6 +23,15 @@ use std::io::Read;
 use yubirs::error::*;
 use yubirs::piv::*;
 
+fn new_handle(values: &Values) -> Result<Handle<PcscHardware>> {
+    match values.get_single("output_recording") {
+        None => Handle::new(),
+        Some(output_recording) => Ok(Handle::new_with_hal(PcscHardware::new_with_recording(
+            output_recording,
+        )?)),
+    }
+}
+
 fn print_data(data: &[u8]) -> Result<()> {
     if isatty::stdout_isatty() {
         println!("{}", data_encoding::BASE64.encode(data));
@@ -46,8 +55,8 @@ fn read_data(path: &str, is_base64: bool) -> Result<Vec<u8>> {
     })
 }
 
-fn list_readers(_: Values) -> Result<()> {
-    let handle: Handle<PcscHardware> = Handle::new()?;
+fn list_readers(values: Values) -> Result<()> {
+    let handle = new_handle(&values)?;
     let readers: Vec<String> = handle.list_readers()?;
     for reader in readers {
         println!("{}", reader);
@@ -56,32 +65,32 @@ fn list_readers(_: Values) -> Result<()> {
 }
 
 fn get_version(values: Values) -> Result<()> {
-    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     println!("{}", handle.get_version()?);
     Ok(())
 }
 
 fn change_pin(values: Values) -> Result<()> {
-    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     handle.change_pin(None, None)
 }
 
 fn unblock_pin(values: Values) -> Result<()> {
-    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     handle.unblock_pin(None, None)
 }
 
 fn change_puk(values: Values) -> Result<()> {
-    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     handle.change_puk(None, None)
 }
 
 fn reset(values: Values) -> Result<()> {
-    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     handle.reset()
 }
@@ -89,35 +98,35 @@ fn reset(values: Values) -> Result<()> {
 fn set_retries(values: Values) -> Result<()> {
     let pin_retries: u8 = values.get_required_parsed("pin_retries")?;
     let puk_retries: u8 = values.get_required_parsed("puk_retries")?;
-    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     handle.set_retries(None, None, pin_retries, puk_retries)?;
     Ok(())
 }
 
 fn change_mgm_key(values: Values) -> Result<()> {
-    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     handle.set_management_key(None, None, false)?;
     Ok(())
 }
 
 fn set_chuid(values: Values) -> Result<()> {
-    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     handle.set_chuid(None)?;
     Ok(())
 }
 
 fn set_ccc(values: Values) -> Result<()> {
-    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     handle.set_ccc(None)?;
     Ok(())
 }
 
 fn read_object(values: Values) -> Result<()> {
-    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     let data = handle.read_object(values.get_required_parsed("object_id")?)?;
     print_data(data.as_slice())?;
@@ -126,14 +135,14 @@ fn read_object(values: Values) -> Result<()> {
 
 fn write_object(values: Values) -> Result<()> {
     let data = read_data(values.get_required("input"), values.get_boolean("base64"))?;
-    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     handle.write_object(None, values.get_required_parsed("object_id")?, data)?;
     Ok(())
 }
 
 fn read_certificate(values: Values) -> Result<()> {
-    let mut handle: Handle<PcscHardware> = Handle::new()?;
+    let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     println!(
         "{}",
@@ -153,7 +162,13 @@ fn main() {
         Command::new(
             "list_readers",
             "List the available PC/SC readers",
-            Specs::new(vec![]).unwrap(),
+            Specs::new(vec![
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
+                ),
+            ]).unwrap(),
             Box::new(list_readers),
         ),
         Command::new(
@@ -168,6 +183,11 @@ fn main() {
                     ),
                     Some('r'),
                     Some(DEFAULT_READER),
+                ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
                 ),
             ]).unwrap(),
             Box::new(get_version),
@@ -184,6 +204,11 @@ fn main() {
                     ),
                     Some('r'),
                     Some(DEFAULT_READER),
+                ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
                 ),
             ]).unwrap(),
             Box::new(change_pin),
@@ -204,6 +229,11 @@ fn main() {
                     Some('r'),
                     Some(DEFAULT_READER),
                 ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
+                ),
             ]).unwrap(),
             Box::new(unblock_pin),
         ),
@@ -219,6 +249,11 @@ fn main() {
                     ),
                     Some('r'),
                     Some(DEFAULT_READER),
+                ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
                 ),
             ]).unwrap(),
             Box::new(change_puk),
@@ -239,6 +274,11 @@ fn main() {
                     Some('r'),
                     Some(DEFAULT_READER),
                 ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
+                ),
             ]).unwrap(),
             Box::new(reset),
         ),
@@ -254,6 +294,11 @@ fn main() {
                     ),
                     Some('r'),
                     Some(DEFAULT_READER),
+                ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
                 ),
                 Spec::required(
                     "pin_retries",
@@ -283,6 +328,11 @@ fn main() {
                     Some('r'),
                     Some(DEFAULT_READER),
                 ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
+                ),
             ]).unwrap(),
             Box::new(change_mgm_key),
         ),
@@ -298,6 +348,11 @@ fn main() {
                     ),
                     Some('r'),
                     Some(DEFAULT_READER),
+                ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
                 ),
             ]).unwrap(),
             Box::new(set_chuid),
@@ -315,6 +370,11 @@ fn main() {
                     Some('r'),
                     Some(DEFAULT_READER),
                 ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
+                ),
             ]).unwrap(),
             Box::new(set_ccc),
         ),
@@ -330,6 +390,11 @@ fn main() {
                     ),
                     Some('r'),
                     Some(DEFAULT_READER),
+                ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
                 ),
                 Spec::required(
                     "object_id",
@@ -352,6 +417,11 @@ fn main() {
                     ),
                     Some('r'),
                     Some(DEFAULT_READER),
+                ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
                 ),
                 Spec::required(
                     "object_id",
@@ -385,6 +455,11 @@ fn main() {
                     ),
                     Some('r'),
                     Some(DEFAULT_READER),
+                ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
                 ),
                 Spec::required(
                     "certificate_id",

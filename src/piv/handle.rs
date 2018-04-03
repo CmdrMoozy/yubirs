@@ -516,6 +516,14 @@ impl<T: PcscHal> Handle<T> {
         })
     }
 
+    pub fn new_with_hal(hal: T) -> Self {
+        Handle {
+            hal: hal,
+            authenticated_pin: false,
+            authenticated_mgm: false,
+        }
+    }
+
     pub fn get_hal(&self) -> &T {
         &self.hal
     }
