@@ -20,6 +20,7 @@ use piv::recording::Recording;
 use piv::scarderr::SmartCardError;
 use piv::sw::StatusWord;
 use std::ffi::CString;
+use std::path::{Path, PathBuf};
 use std::ptr;
 use std::sync::Mutex;
 
@@ -188,10 +189,14 @@ pub struct PcscHardware {
     context: pcsc_sys::SCARDCONTEXT,
     card: pcsc_sys::SCARDHANDLE,
     recording: Option<Mutex<Recording>>,
+    output_recording: Option<PathBuf>,
 }
 
 impl PcscHardware {
-    fn new_impl(recording: Option<Mutex<Recording>>) -> Result<Self> {
+    fn new_impl(
+        recording: Option<Mutex<Recording>>,
+        output_recording: Option<PathBuf>,
+    ) -> Result<Self> {
         let mut context: pcsc_sys::SCARDCONTEXT = pcsc_sys::SCARD_E_INVALID_HANDLE;
         SmartCardError::new(unsafe {
             pcsc_sys::SCardEstablishContext(
@@ -206,11 +211,15 @@ impl PcscHardware {
             context: context,
             card: 0,
             recording: recording,
+            output_recording: output_recording,
         })
     }
 
-    pub fn new_with_recording() -> Result<Self> {
-        Self::new_impl(Some(Mutex::new(Recording::default())))
+    pub fn new_with_recording<P: AsRef<Path>>(output: P) -> Result<Self> {
+        Self::new_impl(
+            Some(Mutex::new(Recording::default())),
+            Some(output.as_ref().to_path_buf()),
+        )
     }
 
     fn send_data_impl_impl(&self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)> {
@@ -256,7 +265,7 @@ impl PcscHardware {
 
 impl PcscHal for PcscHardware {
     fn new() -> Result<Self> {
-        Self::new_impl(None)
+        Self::new_impl(None, None)
     }
 
     fn list_readers(&self) -> Result<Vec<String>> {
@@ -368,5 +377,22 @@ impl PcscHal for PcscHardware {
             pcsc_sys::SCardEndTransaction(self.card, pcsc_sys::SCARD_LEAVE_CARD)
         })?;
         Ok(())
+    }
+}
+
+impl Drop for PcscHardware {
+    fn drop(&mut self) {
+        if let Some(output_recording) = self.output_recording.as_ref() {
+            // We want to write the recording to the given file. Note that we're
+            // happy to panic if things go awry here, because this is purely a
+            // debugging / testing feature anyway.
+            self.recording
+                .as_ref()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .flush(output_recording)
+                .unwrap();
+        }
     }
 }

@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use error::*;
 use piv::sw::StatusWord;
+use std::path::Path;
 
 pub type RecordedResult<T> = ::std::result::Result<T, String>;
 
@@ -32,6 +34,10 @@ impl Recording {
                 &Ok(ref tuple) => Ok(tuple.clone()),
             },
         })
+    }
+
+    pub fn flush<P: AsRef<Path>>(&self, output: P) -> Result<()> {
+        Ok(())
     }
 }
 
