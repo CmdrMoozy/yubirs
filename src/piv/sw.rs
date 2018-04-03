@@ -133,3 +133,9 @@ impl StatusWord {
         }
     }
 }
+
+impl Clone for StatusWord {
+    fn clone(&self) -> Self {
+        StatusWord::new_from_value(self.value)
+    }
+}
