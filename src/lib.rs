@@ -13,6 +13,7 @@
 // limitations under the License.
 
 extern crate bdrck;
+extern crate bincode;
 extern crate chrono;
 extern crate curl;
 extern crate data_encoding;
@@ -29,6 +30,9 @@ extern crate pcsc_sys;
 extern crate rand;
 extern crate regex;
 extern crate rpassword;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 
 pub mod crypto;
 pub mod error;

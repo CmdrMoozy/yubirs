@@ -9,6 +9,7 @@ license = "Apache-2.0"
 
 [dependencies]
 bdrck = "0.6"
+bincode = "1.0"
 chrono = "0.4"
 curl = "0.4"
 data-encoding = "2.1"
@@ -22,3 +23,5 @@ pcsc-sys = "1.0"
 rand = "0.4"
 regex = "0.2"
 rpassword = "2.0"
+serde = "1.0"
+serde_derive = "1.0"

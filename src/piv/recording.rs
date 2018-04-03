@@ -12,17 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use bincode;
 use error::*;
 use piv::sw::StatusWord;
+use std::fs::File;
 use std::path::Path;
 
 pub type RecordedResult<T> = ::std::result::Result<T, String>;
 
+#[derive(Debug, Deserialize, Serialize)]
 pub struct RecordingEntry {
     pub sent: Vec<u8>,
     pub received: RecordedResult<(StatusWord, Vec<u8>)>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Recording(pub Vec<RecordingEntry>);
 
 impl Recording {
@@ -37,7 +41,7 @@ impl Recording {
     }
 
     pub fn flush<P: AsRef<Path>>(&self, output: P) -> Result<()> {
-        Ok(())
+        Ok(bincode::serialize_into(File::create(output)?, self)?)
     }
 }
 
