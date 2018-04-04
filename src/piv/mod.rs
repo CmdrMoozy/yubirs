@@ -16,7 +16,7 @@ pub mod hal;
 pub mod handle;
 pub mod id;
 mod nid;
-mod recording;
+pub mod recording;
 pub mod scarderr;
 pub mod sw;
 
