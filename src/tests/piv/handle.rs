@@ -118,42 +118,10 @@ fn test_unblock_pin_success() {
     let mut handle = new_test_handle();
     handle
         .get_hal()
-        .push_recording(CHANGE_PIN_WRONG_RECORDING)
-        .unwrap()
         .push_recording(UNBLOCK_PIN_RECORDING)
         .unwrap();
 
     handle.connect(None).unwrap();
-
-    assert_eq!(
-        "The supplied PIN/PUK is incorrect.",
-        handle
-            .change_pin(Some("123"), Some("111111"))
-            .err()
-            .unwrap()
-            .to_string()
-    );
-    assert_eq!(
-        "The supplied PIN/PUK is incorrect.",
-        handle
-            .change_pin(Some("123"), Some("111111"))
-            .err()
-            .unwrap()
-            .to_string()
-    );
-    assert_eq!(
-        "Verifying PIN failed: no more retries",
-        handle
-            .change_pin(Some("123"), Some("111111"))
-            .err()
-            .unwrap()
-            .to_string()
-    );
-
-    // Reconnect in-between the recordings.
-    handle.disconnect();
-    handle.connect(None).unwrap();
-
     assert!(
         handle
             .unblock_pin(Some(DEFAULT_PUK), Some(DEFAULT_PIN))
@@ -219,74 +187,8 @@ fn test_change_puk_wrong_puk() {
 #[test]
 fn test_reset_success() {
     let mut handle = new_test_handle();
-    handle
-        .get_hal()
-        .push_recording(CHANGE_PIN_WRONG_RECORDING)
-        .unwrap()
-        .push_recording(CHANGE_PUK_WRONG_RECORDING)
-        .unwrap()
-        .push_recording(RESET_RECORDING)
-        .unwrap();
+    handle.get_hal().push_recording(RESET_RECORDING).unwrap();
 
     handle.connect(None).unwrap();
-
-    assert_eq!(
-        "The supplied PIN/PUK is incorrect.",
-        handle
-            .change_pin(Some("123"), Some("111111"))
-            .err()
-            .unwrap()
-            .to_string()
-    );
-    assert_eq!(
-        "The supplied PIN/PUK is incorrect.",
-        handle
-            .change_pin(Some("123"), Some("111111"))
-            .err()
-            .unwrap()
-            .to_string()
-    );
-    assert_eq!(
-        "Verifying PIN failed: no more retries",
-        handle
-            .change_pin(Some("123"), Some("111111"))
-            .err()
-            .unwrap()
-            .to_string()
-    );
-
-    // Reconnect in-between the recordings.
-    handle.disconnect();
-    handle.connect(None).unwrap();
-
-    assert_eq!(
-        "The supplied PIN/PUK is incorrect.",
-        handle
-            .change_puk(Some("123"), Some("111111"))
-            .err()
-            .unwrap()
-            .to_string()
-    );
-    assert_eq!(
-        "The supplied PIN/PUK is incorrect.",
-        handle
-            .change_puk(Some("123"), Some("111111"))
-            .err()
-            .unwrap()
-            .to_string()
-    );
-    assert_eq!(
-        "Verifying PUK failed: no more retries",
-        handle
-            .change_puk(Some("123"), Some("111111"))
-            .err()
-            .unwrap()
-            .to_string()
-    );
-
-    // Reconnect in-between the recordings.
-    handle.disconnect();
-    handle.connect(None).unwrap();
-
     assert!(handle.reset().is_ok());
 }
