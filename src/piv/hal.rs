@@ -20,6 +20,7 @@ use piv::recording::Recording;
 use piv::scarderr::SmartCardError;
 use piv::sw::StatusWord;
 use std::ffi::CString;
+use std::fmt;
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::sync::Mutex;
@@ -100,14 +101,78 @@ impl Apdu {
     }
 }
 
+impl fmt::Debug for Apdu {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Apdu {{ cla: {:02x}, ins: {:02x}, p1: {:02x}, p2: {:02x}, lc: {:02x}, data: [{}] }}",
+            self.cla(),
+            self.ins(),
+            self.p1(),
+            self.p2(),
+            self.lc(),
+            self.data()
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>()
+        )
+    }
+}
+
 pub trait PcscHal {
+    /// Construct a new HAL, ready to connect to / interact with underlying
+    /// hardware.
     fn new() -> Result<Self>
     where
         Self: ::std::marker::Sized;
 
+    /// Return a list of the PC/SC readers currently available on the system.
     fn list_readers(&self) -> Result<Vec<String>>;
 
-    fn connect(&mut self, reader: Option<&str>) -> Result<()>;
+    /// Actually connect to the given reader using the native PC/SC library.
+    /// This trait already provides the higher level `connect`, which handles
+    /// selecting the right reader, and performing setup interactions with the
+    /// device after connecting. This function simply wraps the real interaction
+    /// with the underlying hardware.
+    fn connect_impl(&mut self, reader: &str) -> Result<()>;
+
+    /// Connect to the given reader (or the default reader, if none was
+    /// specified). This must be called before e.g. data is sent or transactions
+    /// are started.
+    fn connect(&mut self, reader: Option<&str>) -> Result<()> {
+        let reader = reader.unwrap_or(DEFAULT_READER);
+        let readers = self.list_readers()?;
+        for potential_reader in readers {
+            if !potential_reader.contains(reader) {
+                info!(
+                    "Skipping reader '{}' since it doesn't match '{}'",
+                    potential_reader, reader
+                );
+                continue;
+            }
+
+            info!("Attempting to connect to reader '{}'", potential_reader);
+            self.connect_impl(potential_reader.as_str())?;
+
+            let mut data: [u8; 255] = [0; 255];
+            for (dst, src) in data.iter_mut().zip(APDU_AID.iter()) {
+                *dst = *src;
+            }
+            let apdu = Apdu::from_pieces(0, 0xa4, 0x04, 0, APDU_AID.len() as u8, &data)?;
+
+            let (sw, _) = self.send_data_impl(&apdu.raw)?;
+            sw.error?;
+
+            return Ok(());
+        }
+
+        Err(SmartCardError::new(pcsc_sys::SCARD_E_UNKNOWN_READER)
+            .err()
+            .unwrap()
+            .into())
+    }
+
+    /// Disconnect from the current reader, if any.
     fn disconnect(&mut self);
 
     /// Send data to the underlying hardware. The given byte slice must be formatted as a smart
@@ -115,7 +180,10 @@ pub trait PcscHal {
     /// function should return a status word, as well as any bytes returned by the hardware.
     fn send_data_impl(&self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)>;
 
+    /// Start a new PC/SC transaction with the underlying hardware.
     fn begin_transaction(&self) -> Result<()>;
+
+    /// End a previously started PC/SC transaction with the underlying hardware.
     fn end_transaction(&self) -> Result<()>;
 
     /// A provided, higher-level interface for sending data to the underlying hardware.
@@ -298,48 +366,20 @@ impl PcscHal for PcscHardware {
         Ok(ret?)
     }
 
-    fn connect(&mut self, reader: Option<&str>) -> Result<()> {
-        let reader = reader.unwrap_or(DEFAULT_READER);
-        let readers = self.list_readers()?;
-        for potential_reader in readers {
-            if !potential_reader.contains(reader) {
-                info!(
-                    "Skipping reader '{}' since it doesn't match '{}'",
-                    potential_reader, reader
-                );
-                continue;
-            }
-
-            info!("Attempting to connect to reader '{}'", potential_reader);
-            let potential_reader = CString::new(potential_reader)?;
-            let mut active_protocol: pcsc_sys::DWORD = pcsc_sys::SCARD_PROTOCOL_UNDEFINED;
-            SmartCardError::new(unsafe {
-                pcsc_sys::SCardConnect(
-                    self.context,
-                    potential_reader.as_ptr(),
-                    pcsc_sys::SCARD_SHARE_SHARED,
-                    pcsc_sys::SCARD_PROTOCOL_T1,
-                    &mut self.card,
-                    &mut active_protocol,
-                )
-            })?;
-
-            let mut data: [u8; 255] = [0; 255];
-            for (dst, src) in data.iter_mut().zip(APDU_AID.iter()) {
-                *dst = *src;
-            }
-            let apdu = Apdu::from_pieces(0, 0xa4, 0x04, 0, APDU_AID.len() as u8, &data)?;
-
-            let (sw, _) = self.send_data_impl(&apdu.raw)?;
-            sw.error?;
-
-            return Ok(());
-        }
-
-        Err(SmartCardError::new(pcsc_sys::SCARD_E_UNKNOWN_READER)
-            .err()
-            .unwrap()
-            .into())
+    fn connect_impl(&mut self, reader: &str) -> Result<()> {
+        let reader = CString::new(reader)?;
+        let mut active_protocol: pcsc_sys::DWORD = pcsc_sys::SCARD_PROTOCOL_UNDEFINED;
+        SmartCardError::new(unsafe {
+            pcsc_sys::SCardConnect(
+                self.context,
+                reader.as_ptr(),
+                pcsc_sys::SCARD_SHARE_SHARED,
+                pcsc_sys::SCARD_PROTOCOL_T1,
+                &mut self.card,
+                &mut active_protocol,
+            )
+        })?;
+        Ok(())
     }
 
     fn disconnect(&mut self) {
