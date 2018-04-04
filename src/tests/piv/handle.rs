@@ -20,6 +20,7 @@ const CONNECT_RECORDING: &'static [u8] = include_bytes!("recordings/connect.dr")
 const GET_VERSION_RECORDING: &'static [u8] = include_bytes!("recordings/get_version.dr");
 const CHANGE_PIN_RECORDING: &'static [u8] = include_bytes!("recordings/change_pin.dr");
 const CHANGE_PIN_WRONG_RECORDING: &'static [u8] = include_bytes!("recordings/change_pin_wrong.dr");
+const UNBLOCK_PIN_RECORDING: &'static [u8] = include_bytes!("recordings/unblock_pin.dr");
 const CHANGE_PUK_RECORDING: &'static [u8] = include_bytes!("recordings/change_puk.dr");
 const CHANGE_PUK_WRONG_RECORDING: &'static [u8] = include_bytes!("recordings/change_puk_wrong.dr");
 
@@ -108,6 +109,53 @@ fn test_change_pin_invalid_parameters() {
             .err()
             .unwrap()
             .to_string()
+    );
+}
+
+#[test]
+fn test_unblock_pin_success() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_recording(CHANGE_PIN_WRONG_RECORDING)
+        .unwrap()
+        .push_recording(UNBLOCK_PIN_RECORDING)
+        .unwrap();
+
+    handle.connect(None).unwrap();
+    assert_eq!(
+        "The supplied PIN/PUK is incorrect.",
+        handle
+            .change_pin(Some("123"), Some("111111"))
+            .err()
+            .unwrap()
+            .to_string()
+    );
+    assert_eq!(
+        "The supplied PIN/PUK is incorrect.",
+        handle
+            .change_pin(Some("123"), Some("111111"))
+            .err()
+            .unwrap()
+            .to_string()
+    );
+    assert_eq!(
+        "Verifying PIN failed: no more retries",
+        handle
+            .change_pin(Some("123"), Some("111111"))
+            .err()
+            .unwrap()
+            .to_string()
+    );
+
+    // Reconnect in-between the recordings.
+    handle.disconnect();
+    handle.connect(None).unwrap();
+
+    assert!(
+        handle
+            .unblock_pin(Some(DEFAULT_PUK), Some(DEFAULT_PIN))
+            .is_ok()
     );
 }
 
