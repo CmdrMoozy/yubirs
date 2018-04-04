@@ -12,50 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use bincode;
 use error::*;
-use piv::{DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
+use piv::DEFAULT_READER;
 use piv::hal::*;
-use piv::handle::Version;
-use piv::id::Instruction;
+use piv::recording::{Recording, RecordingEntry};
 use piv::sw::StatusWord;
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::sync::Mutex;
-
-struct MockSendData {
-    remaining: usize,
-    callback: Box<FnMut(Apdu) -> Result<(StatusWord, Vec<u8>)>>,
-}
-
-impl MockSendData {
-    /// Construct a new MockSendData which is intended to be called `calls`
-    /// times, using the given actual callback function.
-    pub fn new<F: 'static + FnMut(Apdu) -> Result<(StatusWord, Vec<u8>)>>(
-        calls: usize,
-        callback: F,
-    ) -> Self {
-        MockSendData {
-            remaining: calls,
-            callback: Box::new(callback),
-        }
-    }
-
-    /// Call this MockSendData function with the given argument. This function
-    /// returns the result from the mock implementation, along with a bool. If
-    /// the bool is true, it means this mock should be left in place for future
-    /// calls. If false, then the caller should pop this mock off, and not call
-    /// it again.
-    pub fn call(&mut self, apdu: Apdu) -> (Result<(StatusWord, Vec<u8>)>, bool) {
-        debug_assert!(self.remaining > 0);
-        let ret = (self.callback)(apdu);
-        self.remaining -= 1;
-        (ret, self.remaining > 0)
-    }
-}
 
 pub struct PcscTestStub {
     connected: bool,
     readers: Vec<String>,
-    send_data_callbacks: Mutex<VecDeque<MockSendData>>,
+    recordings: Mutex<VecDeque<Recording>>,
 }
 
 impl PcscTestStub {
@@ -66,84 +35,12 @@ impl PcscTestStub {
             .collect();
     }
 
-    pub fn push_mock_send_data<F: 'static + FnMut(Apdu) -> Result<(StatusWord, Vec<u8>)>>(
-        &self,
-        calls: usize,
-        callback: F,
-    ) -> &Self {
-        self.send_data_callbacks
+    pub fn push_recording(&self, recording: &[u8]) -> Result<&Self> {
+        self.recordings
             .lock()
             .unwrap()
-            .push_back(MockSendData::new(calls, callback));
-        self
-    }
-
-    pub fn push_mock_get_version(&self, calls: usize, mock_version: Version) -> &Self {
-        self.push_mock_send_data(calls, move |apdu: Apdu| -> Result<(StatusWord, Vec<u8>)> {
-            if apdu.cla() == 0 && apdu.ins() == Instruction::GetVersion.to_value() && apdu.p1() == 0
-                && apdu.p2() == 0 && apdu.lc() == 0
-            {
-                Ok((
-                    StatusWord::new_from_value(0x9000),
-                    vec![mock_version.0, mock_version.1, mock_version.2],
-                ))
-            } else {
-                // Return "invalid instruction byte" status word.
-                Ok((StatusWord::new_from_value(0x6d00), vec![]))
-            }
-        })
-    }
-
-    pub fn push_mock_change(&self, instructions: &[(Instruction, u8)]) -> &Self {
-        let mut instructions: VecDeque<(Instruction, u8)> = instructions.to_vec().into();
-
-        let mut retry_counters: HashMap<(Instruction, u8), usize> = HashMap::new();
-        retry_counters.insert((Instruction::ChangeReference, 0x80), 3);
-        retry_counters.insert((Instruction::ChangeReference, 0x81), 3);
-
-        let mut secrets: HashMap<(Instruction, u8), String> = HashMap::new();
-        secrets.insert((Instruction::ChangeReference, 0x80), DEFAULT_PIN.to_owned());
-        secrets.insert((Instruction::ChangeReference, 0x81), DEFAULT_PUK.to_owned());
-
-        let calls = instructions.len();
-
-        self.push_mock_send_data(calls, move |apdu: Apdu| -> Result<(StatusWord, Vec<u8>)> {
-            let instruction = instructions.pop_front().unwrap();
-
-            let retry_counter: &mut usize = retry_counters.get_mut(&instruction).unwrap();
-            if *retry_counter == 0 {
-                // Return "too many attempts".
-                return Ok((StatusWord::new_from_value(0x6983), vec![]));
-            }
-
-            if apdu.cla() == 0 && apdu.ins() == instruction.0.to_value() && apdu.p1() == 0
-                && apdu.p2() == instruction.1 && apdu.lc() == 16
-            {
-                let existing: Vec<u8> = apdu.data()[0..8].to_owned();
-                let existing: Vec<u8> = existing.into_iter().take_while(|b| *b != 0xff).collect();
-                let existing = String::from_utf8(existing).unwrap();
-                if &existing != secrets.get(&instruction).unwrap() {
-                    // Return "authentication failed" status word.
-                    *retry_counter -= 1;
-                    return Ok((StatusWord::new_from_value(0x6300), vec![]));
-                }
-
-                let new: Vec<u8> = apdu.data()[8..16].to_owned();
-                let new: Vec<u8> = new.into_iter().take_while(|b| *b != 0xff).collect();
-                let new = String::from_utf8(new).unwrap();
-                if new.is_empty() {
-                    // Return "invalid data parameters" status word.
-                    return Ok((StatusWord::new_from_value(0x6a80), vec![]));
-                }
-
-                // Return "success" status word.
-                secrets.insert(instruction, new);
-                return Ok((StatusWord::new_from_value(0x9000), vec![]));
-            } else {
-                // Return "invalid instruction byte" status word.
-                return Ok((StatusWord::new_from_value(0x6d00), vec![]));
-            }
-        })
+            .push_back(bincode::deserialize(recording)?);
+        Ok(self)
     }
 }
 
@@ -152,7 +49,7 @@ impl PcscHal for PcscTestStub {
         Ok(PcscTestStub {
             connected: false,
             readers: vec![DEFAULT_READER.to_owned()],
-            send_data_callbacks: Mutex::new(VecDeque::new()),
+            recordings: Mutex::new(VecDeque::new()),
         })
     }
 
@@ -160,15 +57,9 @@ impl PcscHal for PcscTestStub {
         Ok(self.readers.clone())
     }
 
-    fn connect(&mut self, reader: Option<&str>) -> Result<()> {
-        let reader: &str = reader.unwrap_or(DEFAULT_READER);
-        for r in self.readers.iter() {
-            if r.contains(reader) {
-                self.connected = true;
-                return Ok(());
-            }
-        }
-        bail!("No reading matching '{}' found", reader);
+    fn connect_impl(&mut self, reader: &str) -> Result<()> {
+        self.connected = true;
+        Ok(())
     }
 
     fn disconnect(&mut self) {
@@ -179,18 +70,32 @@ impl PcscHal for PcscTestStub {
         if !self.connected {
             bail!("Can't send data without first being connected.");
         }
-        let apdu = Apdu::from_bytes(apdu)?;
-        let mut callbacks = self.send_data_callbacks.lock().unwrap();
-        let (ret, should_keep) = match callbacks.front_mut() {
-            None => {
-                bail!("Unexpected call to send_data_impl (no mock callbacks to handle this data)")
-            }
-            Some(mut callback) => callback.call(apdu),
-        };
-        if !should_keep {
-            callbacks.pop_front();
+
+        let entry: RecordingEntry;
+        let pop: bool;
+        let mut recordings = self.recordings.lock().unwrap();
+
+        {
+            let recording = match recordings.front_mut() {
+                None => bail!("Unexpected call to send_data_impl (no more mock recordings)"),
+                Some(recording) => recording,
+            };
+            entry = recording.0.pop_front().unwrap();
+            pop = recording.0.is_empty();
         }
-        ret
+
+        if pop {
+            recordings.pop_front();
+        }
+
+        assert_eq!(
+            entry.sent.as_slice(),
+            apdu,
+            "device expected {:?}, got {:?}",
+            Apdu::from_bytes(apdu).unwrap(),
+            Apdu::from_bytes(entry.sent.as_slice()).unwrap()
+        );
+        Ok(entry.received?)
     }
 
     fn begin_transaction(&self) -> Result<()> {
