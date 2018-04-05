@@ -14,6 +14,7 @@
 
 use error::*;
 use libc::c_char;
+use openssl;
 use pcsc_sys;
 use piv::DEFAULT_READER;
 use piv::recording::Recording;
@@ -125,6 +126,9 @@ pub trait PcscHal {
     fn new() -> Result<Self>
     where
         Self: ::std::marker::Sized;
+
+    /// Populate the given buffer with cryptographically secure random bytes.
+    fn secure_random_bytes(&self, buf: &mut [u8]) -> Result<()>;
 
     /// Return a list of the PC/SC readers currently available on the system.
     fn list_readers(&self) -> Result<Vec<String>>;
@@ -334,6 +338,10 @@ impl PcscHardware {
 impl PcscHal for PcscHardware {
     fn new() -> Result<Self> {
         Self::new_impl(None, None)
+    }
+
+    fn secure_random_bytes(&self, buf: &mut [u8]) -> Result<()> {
+        Ok(openssl::rand::rand_bytes(buf)?)
     }
 
     fn list_readers(&self) -> Result<Vec<String>> {

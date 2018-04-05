@@ -53,6 +53,13 @@ impl PcscHal for PcscTestStub {
         })
     }
 
+    fn secure_random_bytes(&self, buf: &mut [u8]) -> Result<()> {
+        for dst in buf.iter_mut() {
+            *dst = 0xff;
+        }
+        Ok(())
+    }
+
     fn list_readers(&self) -> Result<Vec<String>> {
         Ok(self.readers.clone())
     }
