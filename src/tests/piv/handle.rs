@@ -28,6 +28,8 @@ const SET_RETRIES_RECORDING: &'static [u8] = include_bytes!("recordings/set_retr
 const CHANGE_MGM_KEY_RECORDING: &'static [u8] = include_bytes!("recordings/change_mgm_key.dr");
 const CHANGE_MGM_KEY_WRONG_RECORDING: &'static [u8] =
     include_bytes!("recordings/change_mgm_key_wrong.dr");
+const SET_CHUID_RECORDING: &'static [u8] = include_bytes!("recordings/set_chuid.dr");
+const SET_CCC_RECORDING: &'static [u8] = include_bytes!("recordings/set_ccc.dr");
 
 fn new_test_handle() -> Handle<PcscTestStub> {
     let mut handle: Handle<PcscTestStub> = Handle::new().unwrap();
@@ -254,4 +256,25 @@ fn test_change_mgm_key_wrong_key() {
             .unwrap()
             .to_string()
     );
+}
+
+#[test]
+fn test_set_chuid() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_recording(SET_CHUID_RECORDING)
+        .unwrap();
+
+    handle.connect(None).unwrap();
+    assert!(handle.set_chuid(Some(DEFAULT_MGM_KEY)).is_ok());
+}
+
+#[test]
+fn test_set_ccc() {
+    let mut handle = new_test_handle();
+    handle.get_hal().push_recording(SET_CCC_RECORDING).unwrap();
+
+    handle.connect(None).unwrap();
+    assert!(handle.set_ccc(Some(DEFAULT_MGM_KEY)).is_ok());
 }

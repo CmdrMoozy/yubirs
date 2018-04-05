@@ -20,6 +20,7 @@ use piv::DEFAULT_READER;
 use piv::recording::Recording;
 use piv::scarderr::SmartCardError;
 use piv::sw::StatusWord;
+use rand::{self, Rng};
 use std::ffi::CString;
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -129,6 +130,11 @@ pub trait PcscHal {
 
     /// Populate the given buffer with cryptographically secure random bytes.
     fn secure_random_bytes(&self, buf: &mut [u8]) -> Result<()>;
+
+    /// Populate the given buffer with cheap-to-generate but possibly weak
+    /// random bytes. *NOTE*: be extremely careful with using this function in
+    /// cryptographically sensitive situations.
+    fn cheap_random_bytes(&self, buf: &mut [u8]) -> Result<()>;
 
     /// Return a list of the PC/SC readers currently available on the system.
     fn list_readers(&self) -> Result<Vec<String>>;
@@ -342,6 +348,14 @@ impl PcscHal for PcscHardware {
 
     fn secure_random_bytes(&self, buf: &mut [u8]) -> Result<()> {
         Ok(openssl::rand::rand_bytes(buf)?)
+    }
+
+    fn cheap_random_bytes(&self, buf: &mut [u8]) -> Result<()> {
+        let len = buf.len();
+        for (dst, src) in buf.iter_mut().zip(rand::weak_rng().gen_iter().take(len)) {
+            *dst = src;
+        }
+        Ok(())
     }
 
     fn list_readers(&self) -> Result<Vec<String>> {

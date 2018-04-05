@@ -18,7 +18,6 @@ use error::*;
 use piv::hal::{Apdu, PcscHal};
 use piv::id::*;
 use piv::sw::StatusWord;
-use rand::{self, Rng};
 use std::fmt;
 use util::MaybePromptedString;
 
@@ -149,17 +148,21 @@ enum ChangeAction {
     ChangePuk,
 }
 
-fn build_data_object(
+fn build_data_object<T: PcscHal>(
+    hal: &T,
     template: &'static [u8],
     random_offset: usize,
     random_bytes_len: usize,
-) -> Vec<u8> {
+) -> Result<Vec<u8>> {
     let mut object: Vec<u8> = Vec::with_capacity(template.len());
     object.extend_from_slice(&template[..random_offset]);
-    let random_bytes: Vec<u8> = rand::weak_rng().gen_iter().take(random_bytes_len).collect();
+
+    let mut random_bytes: Vec<u8> = vec![0; random_bytes_len];
+    hal.cheap_random_bytes(&mut random_bytes)?;
     object.extend(random_bytes.into_iter());
+
     object.extend_from_slice(&template[random_offset + random_bytes_len..]);
-    object
+    Ok(object)
 }
 
 fn ykpiv_save_object<T: PcscHal>(hal: &T, id: Object, mut buffer: Vec<u8>) -> Result<()> {
@@ -800,7 +803,12 @@ impl<T: PcscHal> Handle<T> {
     /// e.g. after changing stored certificates, the CHUID must also be changed.
     pub fn set_chuid(&mut self, mgm_key: Option<&str>) -> Result<()> {
         self.authenticate_mgm(mgm_key)?;
-        let object = build_data_object(CHUID_TEMPLATE, CHUID_RANDOM_OFFSET, CHUID_RANDOM_BYTES);
+        let object = build_data_object(
+            &self.hal,
+            CHUID_TEMPLATE,
+            CHUID_RANDOM_OFFSET,
+            CHUID_RANDOM_BYTES,
+        )?;
         ykpiv_save_object(&self.hal, Object::Chuid, object)?;
         Ok(())
     }
@@ -811,7 +819,8 @@ impl<T: PcscHal> Handle<T> {
     /// on Yubikeys by default (from the factory).
     pub fn set_ccc(&mut self, mgm_key: Option<&str>) -> Result<()> {
         self.authenticate_mgm(mgm_key)?;
-        let object = build_data_object(CCC_TEMPLATE, CCC_RANDOM_OFFSET, CCC_RANDOM_BYTES);
+        let object =
+            build_data_object(&self.hal, CCC_TEMPLATE, CCC_RANDOM_OFFSET, CCC_RANDOM_BYTES)?;
         ykpiv_save_object(&self.hal, Object::Capability, object)?;
         Ok(())
     }
