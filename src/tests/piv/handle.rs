@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use piv::{DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
+use piv::{DEFAULT_MGM_KEY, DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
 use piv::handle::{Handle, Version};
 use tests::piv::hal::PcscTestStub;
 
@@ -24,6 +24,7 @@ const UNBLOCK_PIN_RECORDING: &'static [u8] = include_bytes!("recordings/unblock_
 const CHANGE_PUK_RECORDING: &'static [u8] = include_bytes!("recordings/change_puk.dr");
 const CHANGE_PUK_WRONG_RECORDING: &'static [u8] = include_bytes!("recordings/change_puk_wrong.dr");
 const RESET_RECORDING: &'static [u8] = include_bytes!("recordings/reset.dr");
+const SET_RETRIES_RECORDING: &'static [u8] = include_bytes!("recordings/set_retries.dr");
 
 fn new_test_handle() -> Handle<PcscTestStub> {
     let mut handle: Handle<PcscTestStub> = Handle::new().unwrap();
@@ -191,4 +192,20 @@ fn test_reset_success() {
 
     handle.connect(None).unwrap();
     assert!(handle.reset().is_ok());
+}
+
+#[test]
+fn test_set_retries() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_recording(SET_RETRIES_RECORDING)
+        .unwrap();
+
+    handle.connect(None).unwrap();
+    assert!(
+        handle
+            .set_retries(Some(DEFAULT_MGM_KEY), Some(DEFAULT_PIN), 6, 6)
+            .is_ok()
+    );
 }
