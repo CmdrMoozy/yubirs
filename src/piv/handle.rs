@@ -15,7 +15,6 @@
 use crypto::*;
 use data_encoding;
 use error::*;
-use openssl;
 use piv::hal::{Apdu, PcscHal};
 use piv::id::*;
 use piv::sw::StatusWord;
@@ -597,7 +596,7 @@ impl<T: PcscHal> Handle<T> {
         (&mut data[4..12]).copy_from_slice(our_challenge.as_slice());
         data[12] = 0x81;
         data[13] = 8;
-        openssl::rand::rand_bytes(&mut data[14..22])?;
+        self.hal.secure_random_bytes(&mut data[14..22])?;
         let expected_card_reply: Vec<u8> = (&data[14..22]).into();
         let apdu = Apdu::from_pieces(
             0,
