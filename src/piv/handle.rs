@@ -544,12 +544,9 @@ impl<T: PcscHal> Handle<T> {
                 );
             }
 
-            let mut data: [u8; 128] = [0; 128];
+            let mut data: [u8; 8] = [0xff; 8];
             for (dst, src) in data.iter_mut().zip(pin.as_bytes()) {
                 *dst = *src;
-            }
-            for b in data.iter_mut().skip(pin.len()).take(8 - pin.len()) {
-                *b = 0xff;
             }
 
             match self.hal
@@ -587,7 +584,7 @@ impl<T: PcscHal> Handle<T> {
         )?;
         let (sw, response) = self.hal.send_data_impl(&apdu.raw)?;
         sw.error?;
-        let card_challenge: Vec<u8> = (&response[4..13]).into();
+        let card_challenge: Vec<u8> = (&response[4..12]).into();
         debug_assert!(card_challenge.len() == 8);
 
         // Send a response to the card's challenge, and a challenge of our own.
@@ -597,17 +594,18 @@ impl<T: PcscHal> Handle<T> {
         data[1] = 20; // 2 + 8 + 2 + 8
         data[2] = 0x80;
         data[3] = 8;
-        (&mut data[4..13]).copy_from_slice(our_challenge.as_slice());
+        (&mut data[4..12]).copy_from_slice(our_challenge.as_slice());
         data[12] = 0x81;
-        openssl::rand::rand_bytes(&mut data[13..21])?;
-        let expected_card_reply: Vec<u8> = (&data[13..21]).into();
+        data[13] = 8;
+        openssl::rand::rand_bytes(&mut data[14..22])?;
+        let expected_card_reply: Vec<u8> = (&data[14..22]).into();
         let apdu = Apdu::from_pieces(
             0,
             Instruction::Authenticate.to_value(),
             Algorithm::Des.to_value(),
             Key::CardManagement.to_value(),
-            21,
-            &[0; 255],
+            22,
+            &data,
         )?;
         let (sw, response) = self.hal.send_data_impl(&apdu.raw)?;
         sw.error?;
@@ -615,7 +613,7 @@ impl<T: PcscHal> Handle<T> {
         // Compare the response from the card with our expected response.
         let expected_card_reply =
             encrypt_des_challenge(mgm_key.as_slice(), expected_card_reply.as_slice())?;
-        if expected_card_reply.as_slice() != &response[4..13] {
+        if expected_card_reply.as_slice() != &response[4..12] {
             bail!("Management key authentication failed");
         }
 
