@@ -25,6 +25,9 @@ const CHANGE_PUK_RECORDING: &'static [u8] = include_bytes!("recordings/change_pu
 const CHANGE_PUK_WRONG_RECORDING: &'static [u8] = include_bytes!("recordings/change_puk_wrong.dr");
 const RESET_RECORDING: &'static [u8] = include_bytes!("recordings/reset.dr");
 const SET_RETRIES_RECORDING: &'static [u8] = include_bytes!("recordings/set_retries.dr");
+const CHANGE_MGM_KEY_RECORDING: &'static [u8] = include_bytes!("recordings/change_mgm_key.dr");
+const CHANGE_MGM_KEY_WRONG_RECORDING: &'static [u8] =
+    include_bytes!("recordings/change_mgm_key_wrong.dr");
 
 fn new_test_handle() -> Handle<PcscTestStub> {
     let mut handle: Handle<PcscTestStub> = Handle::new().unwrap();
@@ -207,5 +210,48 @@ fn test_set_retries() {
         handle
             .set_retries(Some(DEFAULT_MGM_KEY), Some(DEFAULT_PIN), 6, 6)
             .is_ok()
+    );
+}
+
+#[test]
+fn test_change_mgm_key() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_recording(CHANGE_MGM_KEY_RECORDING)
+        .unwrap();
+
+    handle.connect(None).unwrap();
+    assert!(
+        handle
+            .set_management_key(
+                Some(DEFAULT_MGM_KEY),
+                Some("fedcba9876543210fedcba9876543210fedcba9876543210"),
+                false
+            )
+            .is_ok()
+    );
+}
+
+#[test]
+fn test_change_mgm_key_wrong_key() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_recording(CHANGE_MGM_KEY_WRONG_RECORDING)
+        .unwrap();
+
+    handle.connect(None).unwrap();
+    assert_eq!(
+        "Authentication failure",
+        handle
+            .set_management_key(
+                Some("fedcba9876543210fedcba9876543210fedcba9876543210"),
+                Some(DEFAULT_MGM_KEY),
+                false
+            )
+            .err()
+            .unwrap()
+            .to_string()
     );
 }
