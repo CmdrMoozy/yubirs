@@ -42,6 +42,10 @@ impl PcscTestStub {
             .push_back(bincode::deserialize(recording)?);
         Ok(self)
     }
+
+    pub fn no_recordings(&self) -> bool {
+        self.recordings.lock().unwrap().is_empty()
+    }
 }
 
 impl PcscHal for PcscTestStub {

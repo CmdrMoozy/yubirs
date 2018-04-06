@@ -53,6 +53,7 @@ fn test_list_readers() {
 
     let expected_readers = vec![DEFAULT_READER.to_owned(), "foobar".to_owned()];
     assert_eq!(expected_readers, handle.list_readers().unwrap());
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -67,6 +68,7 @@ fn test_get_version() {
     handle.connect(None).unwrap();
     assert_eq!("1.0.4", expected.to_string().as_str());
     assert_eq!(expected, handle.get_version().unwrap());
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -79,6 +81,7 @@ fn test_change_pin_success() {
 
     handle.connect(None).unwrap();
     assert!(handle.change_pin(Some(DEFAULT_PIN), Some("123")).is_ok());
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -98,6 +101,23 @@ fn test_change_pin_wrong_pin() {
             .unwrap()
             .to_string()
     );
+    assert_eq!(
+        "The supplied PIN/PUK is incorrect.",
+        handle
+            .change_pin(Some("123"), Some("111111"))
+            .err()
+            .unwrap()
+            .to_string()
+    );
+    assert_eq!(
+        "Verifying PIN failed: no more retries",
+        handle
+            .change_pin(Some("123"), Some("111111"))
+            .err()
+            .unwrap()
+            .to_string()
+    );
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -122,6 +142,7 @@ fn test_change_pin_invalid_parameters() {
             .unwrap()
             .to_string()
     );
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -138,6 +159,7 @@ fn test_unblock_pin_success() {
             .unblock_pin(Some(DEFAULT_PUK), Some(DEFAULT_PIN))
             .is_ok()
     );
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -162,6 +184,7 @@ fn test_change_puk_invalid_parameters() {
             .unwrap()
             .to_string()
     );
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -174,6 +197,7 @@ fn test_change_puk() {
 
     handle.connect(None).unwrap();
     assert!(handle.change_puk(Some(DEFAULT_PUK), Some("123")).is_ok());
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -193,6 +217,23 @@ fn test_change_puk_wrong_puk() {
             .unwrap()
             .to_string()
     );
+    assert_eq!(
+        "The supplied PIN/PUK is incorrect.",
+        handle
+            .change_puk(Some("123"), Some("111111"))
+            .err()
+            .unwrap()
+            .to_string()
+    );
+    assert_eq!(
+        "Verifying PUK failed: no more retries",
+        handle
+            .change_puk(Some("123"), Some("111111"))
+            .err()
+            .unwrap()
+            .to_string()
+    );
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -202,6 +243,7 @@ fn test_reset_success() {
 
     handle.connect(None).unwrap();
     assert!(handle.reset().is_ok());
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -218,6 +260,7 @@ fn test_set_retries() {
             .set_retries(Some(DEFAULT_MGM_KEY), Some(DEFAULT_PIN), 6, 6)
             .is_ok()
     );
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -238,6 +281,7 @@ fn test_change_mgm_key() {
             )
             .is_ok()
     );
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -261,6 +305,7 @@ fn test_change_mgm_key_wrong_key() {
             .unwrap()
             .to_string()
     );
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -273,6 +318,7 @@ fn test_set_chuid() {
 
     handle.connect(None).unwrap();
     assert!(handle.set_chuid(Some(DEFAULT_MGM_KEY)).is_ok());
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -282,6 +328,7 @@ fn test_set_ccc() {
 
     handle.connect(None).unwrap();
     assert!(handle.set_ccc(Some(DEFAULT_MGM_KEY)).is_ok());
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -294,6 +341,7 @@ fn test_read_object_chuid() {
 
     handle.connect(None).unwrap();
     assert!(handle.read_object(Object::Chuid).is_ok());
+    assert!(handle.get_hal().no_recordings());
 }
 
 #[test]
@@ -309,4 +357,5 @@ fn test_read_object_chuid_missing() {
         "The specified file does not exist in the smart card.",
         handle.read_object(Object::Chuid).err().unwrap().to_string()
     );
+    assert!(handle.get_hal().no_recordings());
 }
