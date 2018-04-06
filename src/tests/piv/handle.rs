@@ -14,6 +14,7 @@
 
 use piv::{DEFAULT_MGM_KEY, DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
 use piv::handle::{Handle, Version};
+use piv::id::*;
 use tests::piv::hal::PcscTestStub;
 
 const CONNECT_RECORDING: &'static [u8] = include_bytes!("recordings/connect.dr");
@@ -30,6 +31,10 @@ const CHANGE_MGM_KEY_WRONG_RECORDING: &'static [u8] =
     include_bytes!("recordings/change_mgm_key_wrong.dr");
 const SET_CHUID_RECORDING: &'static [u8] = include_bytes!("recordings/set_chuid.dr");
 const SET_CCC_RECORDING: &'static [u8] = include_bytes!("recordings/set_ccc.dr");
+const READ_OBJECT_CHUID_RECORDING: &'static [u8] =
+    include_bytes!("recordings/read_object_chuid.dr");
+const READ_OBJECT_CHUID_MISSING_RECORDING: &'static [u8] =
+    include_bytes!("recordings/read_object_chuid_missing.dr");
 
 fn new_test_handle() -> Handle<PcscTestStub> {
     let mut handle: Handle<PcscTestStub> = Handle::new().unwrap();
@@ -277,4 +282,31 @@ fn test_set_ccc() {
 
     handle.connect(None).unwrap();
     assert!(handle.set_ccc(Some(DEFAULT_MGM_KEY)).is_ok());
+}
+
+#[test]
+fn test_read_object_chuid() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_recording(READ_OBJECT_CHUID_RECORDING)
+        .unwrap();
+
+    handle.connect(None).unwrap();
+    assert!(handle.read_object(Object::Chuid).is_ok());
+}
+
+#[test]
+fn test_read_object_chuid_missing() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_recording(READ_OBJECT_CHUID_MISSING_RECORDING)
+        .unwrap();
+
+    handle.connect(None).unwrap();
+    assert_eq!(
+        "The specified file does not exist in the smart card.",
+        handle.read_object(Object::Chuid).err().unwrap().to_string()
+    );
 }
