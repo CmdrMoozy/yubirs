@@ -828,9 +828,10 @@ impl<T: PcscHal> Handle<T> {
     /// Read a data object from the Yubikey, returning the byte contents.
     pub fn read_object(&self, id: Object) -> Result<Vec<u8>> {
         let mut data: Vec<u8> = Vec::new();
-        // TODO: Deduplicate this if statement? It appears in one other place.
+        // TODO: Deduplicate this setup code? It appears in one other place.
+        data.push(0x5c);
         if id == Object::Discovery {
-            data.extend_from_slice(&[1, Object::Discovery.to_value() as u8]);
+            data.extend_from_slice(&[1, id.to_value() as u8]);
         } else if id.to_value() > 0xffff && id.to_value() <= 0xffffff {
             data.extend_from_slice(&[
                 3,
@@ -846,7 +847,8 @@ impl<T: PcscHal> Handle<T> {
         )?;
         sw.error?;
 
-        recv.remove(0); // The first byte is not part of the object or length?
+        // TODO: This code might be duplicated elsewhere, combine?
+        recv.remove(0); // TODO: The first byte is not part of object or length?
         if recv[0] < 0x81 {
             let length = recv[0] as usize;
             recv.remove(0);
