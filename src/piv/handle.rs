@@ -432,9 +432,9 @@ fn change_impl<T: PcscHal>(
             format!(
                 "Invalid existing {}; it exceeds 8 characters",
                 match action {
-                    ChangeAction::ChangePin => "PIN",
-                    ChangeAction::UnblockPin => "PUK",
-                    ChangeAction::ChangePuk => "PUK",
+                    ChangeAction::ChangePin => PIN_NAME,
+                    ChangeAction::UnblockPin => PUK_NAME,
+                    ChangeAction::ChangePuk => PUK_NAME,
                 }
             ).into(),
         );
@@ -444,9 +444,9 @@ fn change_impl<T: PcscHal>(
             format!(
                 "Invalid new {}; it exceeds 8 characters",
                 match action {
-                    ChangeAction::ChangePin => "PIN",
-                    ChangeAction::UnblockPin => "PIN",
-                    ChangeAction::ChangePuk => "PUK",
+                    ChangeAction::ChangePin => PIN_NAME,
+                    ChangeAction::UnblockPin => PIN_NAME,
+                    ChangeAction::ChangePuk => PUK_NAME,
                 }
             ).into(),
         );
