@@ -123,7 +123,6 @@ where
 fn verification_change_loop<F>(
     existing_name: &str,
     existing: Option<&str>,
-    new_name: &str,
     new: Option<&str>,
     existing_prompt: &str,
     new_prompt: &str,
@@ -664,7 +663,6 @@ impl<T: PcscHal> Handle<T> {
         verification_change_loop(
             PIN_NAME,
             old_pin,
-            PIN_NAME,
             new_pin,
             PIN_PROMPT,
             NEW_PIN_PROMPT,
@@ -685,7 +683,6 @@ impl<T: PcscHal> Handle<T> {
         verification_change_loop(
             PUK_NAME,
             puk,
-            PIN_NAME,
             new_pin,
             PUK_PROMPT,
             NEW_PIN_PROMPT,
@@ -705,7 +702,6 @@ impl<T: PcscHal> Handle<T> {
         verification_change_loop(
             PUK_NAME,
             old_puk,
-            PUK_NAME,
             new_puk,
             PUK_PROMPT,
             NEW_PUK_PROMPT,
