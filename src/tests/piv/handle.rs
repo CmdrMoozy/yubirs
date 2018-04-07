@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use data_encoding;
 use piv::{DEFAULT_MGM_KEY, DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
 use piv::handle::{Handle, Version};
 use piv::id::*;
@@ -35,6 +36,7 @@ const READ_OBJECT_CHUID_RECORDING: &'static [u8] =
     include_bytes!("recordings/read_object_chuid.dr");
 const READ_OBJECT_CHUID_MISSING_RECORDING: &'static [u8] =
     include_bytes!("recordings/read_object_chuid_missing.dr");
+const WRITE_OBJECT_RECORDING: &'static [u8] = include_bytes!("recordings/write_object.dr");
 
 fn new_test_handle() -> Handle<PcscTestStub> {
     let mut handle: Handle<PcscTestStub> = Handle::new().unwrap();
@@ -356,6 +358,29 @@ fn test_read_object_chuid_missing() {
     assert_eq!(
         "The specified file does not exist in the smart card.",
         handle.read_object(Object::Chuid).err().unwrap().to_string()
+    );
+    assert!(handle.get_hal().no_recordings());
+}
+
+#[test]
+fn test_write_object() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_recording(WRITE_OBJECT_RECORDING)
+        .unwrap();
+
+    handle.connect(None).unwrap();
+    let data: Vec<u8> = data_encoding::BASE64
+        .decode(
+            "MBnU5znac5ztOc5znYNoWCEIQhCEIThCEMP1NBD/////////////////////NQgyMDMwMDEwMT4A/gA="
+                .as_bytes(),
+        )
+        .unwrap();
+    assert!(
+        handle
+            .write_object(Some(DEFAULT_MGM_KEY), Object::Chuid, data)
+            .is_ok()
     );
     assert!(handle.get_hal().no_recordings());
 }
