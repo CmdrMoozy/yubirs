@@ -17,6 +17,7 @@ use data_encoding;
 use error::*;
 use piv::hal::{Apdu, PcscHal};
 use piv::id::*;
+use piv::pkey::PublicKey;
 use piv::sw::StatusWord;
 use std::fmt;
 use util::MaybePromptedString;
@@ -880,11 +881,54 @@ impl<T: PcscHal> Handle<T> {
         Ok(())
     }
 
-    /// This is a convenience function to read a certificate's data object from
-    /// the Yubikey, and then return it formatted in a specified way.
-    pub fn read_certificate(&mut self, id: Key, format: Format) -> Result<String> {
-        let data = self.read_object(id.to_object()?)?;
-        format_certificate(data.as_slice(), format)
+    pub fn generate(
+        &mut self,
+        mgm_key: Option<&str>,
+        slot: Key,
+        algorithm: Algorithm,
+        pin_policy: PinPolicy,
+        touch_policy: TouchPolicy,
+    ) -> Result<PublicKey> {
+        if !(algorithm.is_rsa() || algorithm.is_ecc()) {
+            bail!("Only RSA and ECC algorithms are supported by this function");
+        }
+
+        if algorithm.is_rsa() {
+            let version = self.get_version()?;
+            if version >= Version(4, 2, 6) && version <= Version(4, 3, 4) {
+                bail!("This device is affected by https://yubi.co/ysa201701/, so RSA key generation is disabled");
+            }
+        }
+
+        self.authenticate_mgm(mgm_key)?;
+
+        let template: [u8; 4] = [
+            0,
+            Instruction::GenerateAsymmetric.to_value(),
+            0,
+            slot.to_value(),
+        ];
+
+        let mut data: Vec<u8> = vec![0xac, 3, Tag::Algorithm.to_value(), 1, algorithm.to_value()];
+        if pin_policy != PinPolicy::Default {
+            data[1] += 3;
+            data.extend_from_slice(&[Tag::PinPolicy.to_value(), 1, pin_policy.to_value()]);
+        }
+        if touch_policy != TouchPolicy::Default {
+            data[1] += 3;
+            data.extend_from_slice(&[Tag::TouchPolicy.to_value(), 1, touch_policy.to_value()]);
+        }
+
+        let (sw, recv) = self.hal.send_data(&template, data.as_slice())?;
+        sw.error?;
+
+        if algorithm.is_rsa() {
+            PublicKey::from_rsa_structure(recv.as_slice())
+        } else if algorithm.is_ecc() {
+            PublicKey::from_ec_structure(algorithm, recv.as_slice())
+        } else {
+            unreachable!(); // We already checked the algorithm type above.
+        }
     }
 }
 
