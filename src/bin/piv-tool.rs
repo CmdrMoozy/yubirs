@@ -22,6 +22,8 @@ use std::fs::File;
 use std::io::Read;
 use yubirs::error::*;
 use yubirs::piv::*;
+use yubirs::piv::id::{PinPolicy, TouchPolicy};
+use yubirs::piv::pkey::Format;
 
 fn new_handle(values: &Values) -> Result<Handle<PcscHardware>> {
     match values.get_single("output_recording") {
@@ -141,16 +143,21 @@ fn write_object(values: Values) -> Result<()> {
     Ok(())
 }
 
-fn read_certificate(values: Values) -> Result<()> {
+fn generate(values: Values) -> Result<()> {
     let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
-    println!(
-        "{}",
-        handle.read_certificate(
-            values.get_required_parsed("certificate_id")?,
-            values.get_required_parsed("format")?
-        )?
-    );
+    let public_key = handle.generate(
+        None,
+        values.get_required_parsed("slot")?,
+        values.get_required_parsed("algorithm")?,
+        values.get_required_parsed("pin_policy")?,
+        values.get_required_parsed("touch_policy")?,
+    )?;
+    print_data(
+        public_key
+            .format(values.get_required_parsed("format")?)?
+            .as_slice(),
+    )?;
     Ok(())
 }
 
@@ -444,8 +451,8 @@ fn main() {
             Box::new(write_object),
         ),
         Command::new(
-            "read_certificate",
-            "Read a certificate from the Yubikey",
+            "generate",
+            "Generate a new asymmetric key pair",
             Specs::new(vec![
                 Spec::required(
                     "reader",
@@ -462,19 +469,37 @@ fn main() {
                     None,
                 ),
                 Spec::required(
-                    "certificate_id",
-                    "The human-readable ID of the certificate to read.",
-                    Some('c'),
+                    "slot",
+                    "The key slot to write the generated key to.",
+                    Some('s'),
                     None,
                 ),
                 Spec::required(
+                    "algorithm",
+                    "The algorithm to use for key generation.",
+                    Some('a'),
+                    None,
+                ),
+                Spec::required(
+                    "pin_policy",
+                    "The PIN verification policy to use.",
+                    Some('p'),
+                    Some(PinPolicy::Default.to_string().as_str()),
+                ),
+                Spec::required(
+                    "touch_policy",
+                    "The touch verification policy to use.",
+                    Some('t'),
+                    Some(TouchPolicy::Default.to_string().as_str()),
+                ),
+                Spec::required(
                     "format",
-                    "The output format to use.",
+                    "The format for the public key written to stdout.",
                     Some('f'),
-                    Some("PEM"),
+                    Some(Format::Pem.to_string().as_str()),
                 ),
             ]).unwrap(),
-            Box::new(read_certificate),
+            Box::new(generate),
         ),
     ]);
 }

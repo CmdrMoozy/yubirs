@@ -14,9 +14,7 @@
 
 use error::*;
 use openssl;
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::str::FromStr;
+use std::collections::HashSet;
 
 /// The number of bytes a binary management key must contain (3DES keys are 8 bytes each, so
 /// 8 * 3 = 24 bytes total).
@@ -155,47 +153,4 @@ pub fn encrypt_des_challenge(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
     ciphertext.truncate(count + rest);
 
     Ok(ciphertext)
-}
-
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub enum Format {
-    Pem,
-    Der,
-    Ssh,
-}
-
-lazy_static! {
-    static ref FORMAT_STRINGS: HashMap<Format, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert(Format::Pem, "PEM");
-        m.insert(Format::Der, "DER");
-        m.insert(Format::Ssh, "SSH");
-        m
-    };
-
-    static ref STRING_FORMATS: HashMap<String, Format> = {
-        FORMAT_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
-    };
-}
-
-impl fmt::Display for Format {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", FORMAT_STRINGS.get(self).map_or("", |s| *s))
-    }
-}
-
-impl FromStr for Format {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let s = s.to_uppercase();
-        Ok(match STRING_FORMATS.get(&s) {
-            None => bail!("Invalid Format '{}'", s),
-            Some(o) => *o,
-        })
-    }
-}
-
-pub fn format_certificate(certificate: &[u8], format: Format) -> Result<String> {
-    bail!("Not implemented");
 }

@@ -16,9 +16,11 @@ pub mod hal;
 pub mod handle;
 pub mod id;
 mod nid;
+pub mod pkey;
 pub mod recording;
 pub mod scarderr;
 pub mod sw;
+mod util;
 
 /// The default reader string to use. The first reader (as returned by list_readers) which contains
 /// this string as a substring is the one which will be used. So, this default will result in us
