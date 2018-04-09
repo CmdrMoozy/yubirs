@@ -162,7 +162,16 @@ fn generate(values: Values) -> Result<()> {
 }
 
 fn main() {
-    bdrck::logging::init(None, None, false);
+    let debug: bool = cfg!(debug_assertions);
+    bdrck::logging::init(bdrck::logging::OptionsBuilder::new()
+        .set_filters(match debug {
+            false => "warn".parse().unwrap(),
+            true => "debug".parse().unwrap(),
+        })
+        .set_panic_on_output_failure(debug)
+        .set_always_flush(true)
+        .build()
+        .unwrap());
     yubirs::init().unwrap();
 
     main_impl_multiple_commands(vec![
