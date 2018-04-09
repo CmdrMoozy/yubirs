@@ -881,6 +881,9 @@ impl<T: PcscHal> Handle<T> {
         Ok(())
     }
 
+    /// Generate a new private / public key pair, using the underlying
+    /// hardware's generation capability. Store the private key in the given key
+    /// slot, and return the public key.
     pub fn generate(
         &mut self,
         mgm_key: Option<&str>,
