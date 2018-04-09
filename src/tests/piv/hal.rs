@@ -72,7 +72,7 @@ impl PcscHal for PcscTestStub {
         Ok(self.readers.clone())
     }
 
-    fn connect_impl(&mut self, reader: &str) -> Result<()> {
+    fn connect_impl(&mut self, _reader: &str) -> Result<()> {
         self.connected = true;
         Ok(())
     }
