@@ -34,9 +34,13 @@ fn new_handle(values: &Values) -> Result<Handle<PcscHardware>> {
     }
 }
 
-fn print_data(data: &[u8]) -> Result<()> {
+fn print_data(data: &[u8], text: bool) -> Result<()> {
     if isatty::stdout_isatty() {
-        println!("{}", data_encoding::BASE64.encode(data));
+        if text {
+            println!("{}", ::std::str::from_utf8(data)?);
+        } else {
+            println!("{}", data_encoding::BASE64.encode(data));
+        }
     } else {
         use std::io::Write;
         let mut stdout = ::std::io::stdout();
@@ -131,7 +135,7 @@ fn read_object(values: Values) -> Result<()> {
     let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     let data = handle.read_object(values.get_required_parsed("object_id")?)?;
-    print_data(data.as_slice())?;
+    print_data(data.as_slice(), false)?;
     Ok(())
 }
 
@@ -157,21 +161,24 @@ fn generate(values: Values) -> Result<()> {
         public_key
             .format(values.get_required_parsed("format")?)?
             .as_slice(),
+        true,
     )?;
     Ok(())
 }
 
 fn main() {
     let debug: bool = cfg!(debug_assertions);
-    bdrck::logging::init(bdrck::logging::OptionsBuilder::new()
-        .set_filters(match debug {
-            false => "warn".parse().unwrap(),
-            true => "debug".parse().unwrap(),
-        })
-        .set_panic_on_output_failure(debug)
-        .set_always_flush(true)
-        .build()
-        .unwrap());
+    bdrck::logging::init(
+        bdrck::logging::OptionsBuilder::new()
+            .set_filters(match debug {
+                false => "warn".parse().unwrap(),
+                true => "debug".parse().unwrap(),
+            })
+            .set_panic_on_output_failure(debug)
+            .set_always_flush(true)
+            .build()
+            .unwrap(),
+    );
     yubirs::init().unwrap();
 
     main_impl_multiple_commands(vec![
