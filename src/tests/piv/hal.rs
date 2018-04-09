@@ -65,10 +65,7 @@ impl PcscHal for PcscTestStub {
     }
 
     fn cheap_random_bytes(&self, buf: &mut [u8]) -> Result<()> {
-        for dst in buf.iter_mut() {
-            *dst = 0xff;
-        }
-        Ok(())
+        self.secure_random_bytes(buf)
     }
 
     fn list_readers(&self) -> Result<Vec<String>> {
