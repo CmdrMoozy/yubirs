@@ -16,6 +16,7 @@ use data_encoding;
 use piv::{DEFAULT_MGM_KEY, DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
 use piv::handle::{Handle, Version};
 use piv::id::*;
+use piv::pkey::Format;
 use tests::piv::hal::PcscTestStub;
 
 const CONNECT_RECORDING: &'static [u8] = include_bytes!("recordings/connect.dr");
@@ -37,6 +38,11 @@ const READ_OBJECT_CHUID_RECORDING: &'static [u8] =
 const READ_OBJECT_CHUID_MISSING_RECORDING: &'static [u8] =
     include_bytes!("recordings/read_object_chuid_missing.dr");
 const WRITE_OBJECT_RECORDING: &'static [u8] = include_bytes!("recordings/write_object.dr");
+const GENERATE_RSA_RECORDING: &'static [u8] = include_bytes!("recordings/generate_rsa.dr");
+const GENERATE_RSA_EXPECTED_PEM: &'static [u8] =
+    include_bytes!("recordings/generate_rsa_expected.pem");
+const GENERATE_RSA_EXPECTED_DER: &'static [u8] =
+    include_bytes!("recordings/generate_rsa_expected.der");
 
 fn new_test_handle() -> Handle<PcscTestStub> {
     let mut handle: Handle<PcscTestStub> = Handle::new().unwrap();
@@ -381,6 +387,35 @@ fn test_write_object() {
         handle
             .write_object(Some(DEFAULT_MGM_KEY), Object::Chuid, data)
             .is_ok()
+    );
+    assert!(handle.get_hal().no_recordings());
+}
+
+#[test]
+fn test_generate_rsa() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_recording(GENERATE_RSA_RECORDING)
+        .unwrap();
+
+    handle.connect(None).unwrap();
+    let public_key = handle
+        .generate(
+            Some(DEFAULT_MGM_KEY),
+            Key::Authentication,
+            Algorithm::Rsa2048,
+            PinPolicy::Default,
+            TouchPolicy::Default,
+        )
+        .unwrap();
+    assert_eq!(
+        GENERATE_RSA_EXPECTED_PEM,
+        public_key.format(Format::Pem).unwrap().as_slice()
+    );
+    assert_eq!(
+        GENERATE_RSA_EXPECTED_DER,
+        public_key.format(Format::Der).unwrap().as_slice()
     );
     assert!(handle.get_hal().no_recordings());
 }
