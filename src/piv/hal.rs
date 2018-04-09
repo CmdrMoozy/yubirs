@@ -252,8 +252,6 @@ pub trait PcscHal {
             if sw.error.is_err() {
                 return Ok((sw, out_data));
             }
-            let recv_len = recv.len() - 2;
-            recv.truncate(recv_len);
             out_data.append(&mut recv);
         }
 
@@ -310,8 +308,8 @@ impl PcscHardware {
                 .collect::<String>()
         );
 
-        // Upstream uses a 261-byte buffer in all cases, even though this number seems mostly made
-        // up. It seems like a sane default for now.
+        // TODO: Upstream uses a 261-byte buffer in all cases, even though this
+        // number seems mostly made up. It seems like a sane default for now.
         let mut recv_buffer: Vec<u8> = vec![0; 261];
         let mut recv_length = recv_buffer.len() as pcsc_sys::DWORD;
         SmartCardError::new(unsafe {
