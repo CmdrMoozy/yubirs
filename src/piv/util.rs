@@ -37,6 +37,9 @@ pub fn get_required<T: Clone + Copy>(data: &[T], index: usize) -> Result<T> {
 /// the input slice excluding the bytes which comprise the length itself, and
 /// the parsed length. The caller should read the returned number of bytes from
 /// the beginning of the returned slice to extract the value.
+///
+/// Note that since the given data may contain *several* "objects", the returned
+/// slice may be *longer* than the returned length.
 pub fn read_length<'a>(data: &'a [u8]) -> Result<(&'a [u8], usize)> {
     if get_required(data, 0)? < 0x81 {
         let length = get_required_as::<u8, usize>(data, 0)?;
