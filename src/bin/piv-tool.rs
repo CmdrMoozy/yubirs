@@ -166,6 +166,19 @@ fn generate(values: Values) -> Result<()> {
     Ok(())
 }
 
+fn read_certificate(values: Values) -> Result<()> {
+    let mut handle = new_handle(&values)?;
+    handle.connect(Some(values.get_required("reader")))?;
+    let public_key_cert = handle.read_certificate(values.get_required_parsed("slot")?)?;
+    print_data(
+        public_key_cert
+            .format(values.get_required_parsed("format")?)?
+            .as_slice(),
+        true,
+    )?;
+    Ok(())
+}
+
 fn main() {
     let debug: bool = cfg!(debug_assertions);
     bdrck::logging::init(
@@ -516,6 +529,39 @@ fn main() {
                 ),
             ]).unwrap(),
             Box::new(generate),
+        ),
+        Command::new(
+            "read_certificate",
+            "Read a public key certificate from the device",
+            Specs::new(vec![
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
+                    ),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
+                ),
+                Spec::required(
+                    "slot",
+                    "The key slot to read the public key certificate from.",
+                    Some('s'),
+                    None,
+                ),
+                Spec::required(
+                    "format",
+                    "The format for the public key certificate written to stdout.",
+                    Some('f'),
+                    Some(Format::Pem.to_string().as_str()),
+                ),
+            ]).unwrap(),
+            Box::new(read_certificate),
         ),
     ]);
 }
