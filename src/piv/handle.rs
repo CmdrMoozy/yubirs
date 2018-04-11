@@ -17,7 +17,7 @@ use data_encoding;
 use error::*;
 use piv::hal::{Apdu, PcscHal};
 use piv::id::*;
-use piv::pkey::PublicKey;
+use piv::pkey::{PublicKey, PublicKeyCertificate};
 use piv::sw::StatusWord;
 use std::fmt;
 use util::MaybePromptedString;
@@ -937,6 +937,33 @@ impl<T: PcscHal> Handle<T> {
         } else {
             unreachable!(); // We already checked the algorithm type above.
         }
+    }
+
+    pub fn read_certificate(&self, slot: Key) -> Result<PublicKeyCertificate> {
+        // TODO: This seems to not work if the key was generated with the
+        // "generate" command, I *think* because that writes a public key to the
+        // card instead of a full X509 certificate. At least,
+        // generate -> request-certificate also fails with upstream's code, so
+        // this seems to be intended behavior. Revisit this + add tests once a
+        // function to write X509 certificates is implemented + tested.
+        let object = self.read_object(slot.to_object()?)?;
+        if object.len() < 2 {
+            bail!(
+                "Expected at least two bytes in the stored object, got {}",
+                object.len()
+            );
+        }
+
+        let has_tag: bool = match object.get(0) {
+            None => false,
+            Some(byte) => *byte == 0x70,
+        };
+        if !has_tag {
+            bail!("The object stored on the device lacks the expected tag");
+        }
+
+        let (der, len) = ::piv::util::read_length(&object[1..])?;
+        Ok(PublicKeyCertificate::from_der(&der[0..len])?)
     }
 }
 

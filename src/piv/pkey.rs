@@ -59,7 +59,8 @@ impl FromStr for Format {
     }
 }
 
-/// A public key.
+/// A public key. Note that this structure denotes *just the key*, not the other
+/// metadata which would be included in a full X.509 certificate.
 pub struct PublicKey {
     inner: openssl::pkey::PKey<openssl::pkey::Public>,
 }
@@ -137,6 +138,29 @@ impl PublicKey {
             Format::Pem => self.inner.public_key_to_pem()?,
             Format::Der => self.inner.public_key_to_der()?,
             Format::Ssh => bail!("SSH format is not supported for public keys"),
+        })
+    }
+}
+
+/// An X.509 public key. This includes both the key itself, as well as the other
+/// metadata which comes with a standard X.509 certificate.
+pub struct PublicKeyCertificate {
+    inner: openssl::x509::X509,
+}
+
+impl PublicKeyCertificate {
+    /// Load the given standard DER-encoded X.509 certificate.
+    pub fn from_der(der: &[u8]) -> Result<Self> {
+        Ok(PublicKeyCertificate {
+            inner: openssl::x509::X509::from_der(der)?,
+        })
+    }
+
+    pub fn format(&self, format: Format) -> Result<Vec<u8>> {
+        Ok(match format {
+            Format::Pem => self.inner.to_pem()?,
+            Format::Der => self.inner.to_der()?,
+            Format::Ssh => bail!("SSH format is not supported for public key certificates"),
         })
     }
 }
