@@ -896,6 +896,11 @@ impl<T: PcscHal> Handle<T> {
             bail!("Only RSA and ECC algorithms are supported by this function");
         }
 
+        // As per https://developers.yubico.com/yubico-piv-tool/YKCS11_release_notes.html
+        if algorithm == Algorithm::Eccp384 {
+            bail!("384-bit EC key generation is not supported");
+        }
+
         if algorithm.is_rsa() {
             let version = self.get_version()?;
             if version >= Version(4, 2, 6) && version <= Version(4, 3, 4) {
