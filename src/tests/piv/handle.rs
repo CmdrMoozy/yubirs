@@ -43,6 +43,11 @@ const GENERATE_RSA_EXPECTED_PEM: &'static [u8] =
     include_bytes!("recordings/generate_rsa_expected.pem");
 const GENERATE_RSA_EXPECTED_DER: &'static [u8] =
     include_bytes!("recordings/generate_rsa_expected.der");
+const GENERATE_EC_RECORDING: &'static [u8] = include_bytes!("recordings/generate_ec.dr");
+const GENERATE_EC_EXPECTED_PEM: &'static [u8] =
+    include_bytes!("recordings/generate_ec_expected.pem");
+const GENERATE_EC_EXPECTED_DER: &'static [u8] =
+    include_bytes!("recordings/generate_ec_expected.der");
 
 fn new_test_handle() -> Handle<PcscTestStub> {
     let mut handle: Handle<PcscTestStub> = Handle::new().unwrap();
@@ -415,6 +420,35 @@ fn test_generate_rsa() {
     );
     assert_eq!(
         GENERATE_RSA_EXPECTED_DER,
+        public_key.format(Format::Der).unwrap().as_slice()
+    );
+    assert!(handle.get_hal().no_recordings());
+}
+
+#[test]
+fn test_generate_ec() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_recording(GENERATE_EC_RECORDING)
+        .unwrap();
+
+    handle.connect(None).unwrap();
+    let public_key = handle
+        .generate(
+            Some(DEFAULT_MGM_KEY),
+            Key::Authentication,
+            Algorithm::Eccp256,
+            PinPolicy::Default,
+            TouchPolicy::Default,
+        )
+        .unwrap();
+    assert_eq!(
+        GENERATE_EC_EXPECTED_PEM,
+        public_key.format(Format::Pem).unwrap().as_slice()
+    );
+    assert_eq!(
+        GENERATE_EC_EXPECTED_DER,
         public_key.format(Format::Der).unwrap().as_slice()
     );
     assert!(handle.get_hal().no_recordings());
