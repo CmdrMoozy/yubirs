@@ -481,7 +481,7 @@ fn main() {
         ),
         Command::new(
             "generate",
-            "Generate a new asymmetric key pair",
+            "Generate a private key, store it on the device, and return the public key",
             Specs::new(vec![
                 Spec::required(
                     "reader",
