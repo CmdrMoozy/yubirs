@@ -511,13 +511,13 @@ fn main() {
                 ),
                 Spec::required(
                     "pin_policy",
-                    "The PIN verification policy to use.",
+                    "The PIN verification policy to enforce on future key access.",
                     Some('p'),
                     Some(PinPolicy::Default.to_string().as_str()),
                 ),
                 Spec::required(
                     "touch_policy",
-                    "The touch verification policy to use.",
+                    "The touch verification policy to enforce on future key access.",
                     Some('t'),
                     Some(TouchPolicy::Default.to_string().as_str()),
                 ),
