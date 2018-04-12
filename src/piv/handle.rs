@@ -883,7 +883,8 @@ impl<T: PcscHal> Handle<T> {
 
     /// Generate a new private / public key pair, using the underlying
     /// hardware's generation capability. Store the private key in the given key
-    /// slot, and return the public key.
+    /// slot, and return the public key. The specified PIN and touch policies
+    /// will be enforced whenever this key is used in the future.
     pub fn generate(
         &mut self,
         mgm_key: Option<&str>,
