@@ -18,24 +18,35 @@ use std::fmt;
 /// The Application ID to send in an APDU when connecting to a Yubikey.
 const APDU_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
 
+/// The total number of bytes in a single APDU.
+const APDU_BYTES: usize = 260;
 /// The number of bytes an APDU's properties (instruction class, instruction
 /// code, ...) occupy. These bytes are unavailable for arbitrary data.
 const APDU_PROPERTY_BYTES: usize = 5;
+/// The number of arbitrary non-property bytes which can be sent along with a
+/// single APDU.
+const APDU_DATA_BYTES: usize = APDU_BYTES - APDU_PROPERTY_BYTES;
 
 /// APDU stands for "smart card Application Protocol Data Unit". This union
 /// definition is used by upstream's library to alternate between treating APDU
 /// data in a structured or unstructured way.
 #[derive(Clone, Copy)]
 pub struct Apdu {
-    raw: [u8; 230],
+    raw: [u8; APDU_BYTES],
 }
 
 impl Apdu {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() != 230 {
-            bail!("Invalid APDU data; expected 230 bytes, got {}", bytes.len());
+        if bytes.len() > APDU_BYTES {
+            bail!(
+                "Invalid APDU data; expected at most {} bytes, got {}",
+                APDU_BYTES,
+                bytes.len()
+            );
         }
-        let mut apdu = Apdu { raw: [0; 230] };
+        let mut apdu = Apdu {
+            raw: [0; APDU_BYTES],
+        };
         for (dst, src) in apdu.raw.iter_mut().zip(bytes.iter()) {
             *dst = *src;
         }
@@ -43,16 +54,22 @@ impl Apdu {
     }
 
     pub fn from_pieces(cla: u8, ins: u8, p1: u8, p2: u8, lc: u8, data: &[u8]) -> Result<Self> {
-        if data.len() != 255 {
-            bail!("Invalid APDU data; expected 255 bytes, got {}", data.len());
+        if data.len() > APDU_DATA_BYTES {
+            bail!(
+                "Invalid APDU data; expected at most {} bytes, got {}",
+                APDU_DATA_BYTES,
+                data.len()
+            );
         }
-        let mut apdu = Apdu { raw: [0; 230] };
+        let mut apdu = Apdu {
+            raw: [0; APDU_BYTES],
+        };
         apdu.raw[0] = cla;
         apdu.raw[1] = ins;
         apdu.raw[2] = p1;
         apdu.raw[3] = p2;
         apdu.raw[4] = lc;
-        for (dst, src) in apdu.raw[5..].iter_mut().zip(data.iter()) {
+        for (dst, src) in apdu.raw[APDU_PROPERTY_BYTES..].iter_mut().zip(data.iter()) {
             *dst = *src;
         }
         Ok(apdu)
@@ -61,11 +78,7 @@ impl Apdu {
     /// Construct a new Application ID APDU, which should be sent to the
     /// underlying hardware when we connect to it.
     pub fn new_aid() -> Result<Self> {
-        let mut data: [u8; 255] = [0; 255];
-        for (dst, src) in data.iter_mut().zip(APDU_AID.iter()) {
-            *dst = *src;
-        }
-        Self::from_pieces(0, 0xa4, 0x04, 0, APDU_AID.len() as u8, &data)
+        Self::from_pieces(0, 0xa4, 0x04, 0, APDU_AID.len() as u8, &APDU_AID)
     }
 
     /// Return this APDU's raw data, including the various properties which are
@@ -116,7 +129,14 @@ impl Apdu {
     /// The command data. The official specification says this can be up to
     /// 65535 bytes long, but upstream defines it as a static 255 bytes.
     pub fn data(&self) -> &[u8] {
-        &self.raw[5..]
+        &self.raw[APDU_PROPERTY_BYTES..]
+    }
+
+    /// Returns the same data as `data`, but it excludes the extra trailing 0
+    /// bytes (i.e., it only includes `lc` bytes or arbitrary data).
+    pub fn data_minimal(&self) -> &[u8] {
+        let end = self.lc() as usize + APDU_PROPERTY_BYTES;
+        &self.raw[APDU_PROPERTY_BYTES..end]
     }
 }
 
@@ -130,10 +150,18 @@ impl fmt::Debug for Apdu {
             self.p1(),
             self.p2(),
             self.lc(),
-            self.data()
+            self.data_minimal()
                 .iter()
                 .map(|b| format!("{:02x}", b))
                 .collect::<String>()
         )
     }
 }
+
+impl PartialEq for Apdu {
+    fn eq(&self, other: &Apdu) -> bool {
+        self.raw_minimal() == other.raw_minimal()
+    }
+}
+
+impl Eq for Apdu {}
