@@ -23,7 +23,7 @@ const APDU_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
 /// data in a structured or unstructured way.
 #[derive(Clone, Copy)]
 pub struct Apdu {
-    pub raw: [u8; 230],
+    raw: [u8; 230],
 }
 
 impl Apdu {
