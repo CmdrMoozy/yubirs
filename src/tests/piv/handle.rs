@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use bdrck::testing::temp;
 use data_encoding;
 use piv::{DEFAULT_MGM_KEY, DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
 use piv::handle::{Handle, Version};
 use piv::id::*;
 use piv::pkey::Format;
+use std::fs::File;
+use std::io::Write;
 use tests::piv::hal::PcscTestStub;
 
 const CONNECT_RECORDING: &'static [u8] = include_bytes!("recordings/connect.dr");
@@ -48,6 +51,14 @@ const GENERATE_EC_EXPECTED_PEM: &'static [u8] =
     include_bytes!("recordings/generate_ec_expected.pem");
 const GENERATE_EC_EXPECTED_DER: &'static [u8] =
     include_bytes!("recordings/generate_ec_expected.der");
+const IMPORT_KEY_RSA_INPUT: &'static [u8] = include_bytes!("recordings/import_key_rsa_input.pem");
+const IMPORT_KEY_RSA_RECORDING: &'static [u8] = include_bytes!("recordings/import_key_rsa.dr");
+const IMPORT_KEY_RSA_EXPECTED_PEM: &'static [u8] =
+    include_bytes!("recordings/import_key_rsa_expected.pem");
+const IMPORT_KEY_EC_INPUT: &'static [u8] = include_bytes!("recordings/import_key_ec_input.pem");
+const IMPORT_KEY_EC_RECORDING: &'static [u8] = include_bytes!("recordings/import_key_ec.dr");
+const IMPORT_KEY_EC_EXPECTED_PEM: &'static [u8] =
+    include_bytes!("recordings/import_key_ec_expected.pem");
 
 fn new_test_handle() -> Handle<PcscTestStub> {
     let mut handle: Handle<PcscTestStub> = Handle::new().unwrap();
@@ -450,6 +461,74 @@ fn test_generate_ec() {
     assert_eq!(
         GENERATE_EC_EXPECTED_DER,
         public_key.format(Format::Der).unwrap().as_slice()
+    );
+    assert!(handle.get_hal().no_recordings());
+}
+
+#[test]
+fn test_import_key_rsa() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_recording(IMPORT_KEY_RSA_RECORDING)
+        .unwrap();
+
+    let input_file = temp::File::new_file().unwrap();
+    {
+        let mut f = File::create(input_file.path()).unwrap();
+        f.write_all(IMPORT_KEY_RSA_INPUT).unwrap();
+        f.flush().unwrap();
+    }
+
+    handle.connect(None).unwrap();
+    let public_key = handle
+        .import_key(
+            Some(DEFAULT_MGM_KEY),
+            input_file.path(),
+            Key::Authentication,
+            false,
+            None,
+            PinPolicy::Default,
+            TouchPolicy::Default,
+        )
+        .unwrap();
+    assert_eq!(
+        IMPORT_KEY_RSA_EXPECTED_PEM,
+        public_key.format(Format::Pem).unwrap().as_slice()
+    );
+    assert!(handle.get_hal().no_recordings());
+}
+
+#[test]
+fn test_import_key_ec() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_recording(IMPORT_KEY_EC_RECORDING)
+        .unwrap();
+
+    let input_file = temp::File::new_file().unwrap();
+    {
+        let mut f = File::create(input_file.path()).unwrap();
+        f.write_all(IMPORT_KEY_EC_INPUT).unwrap();
+        f.flush().unwrap();
+    }
+
+    handle.connect(None).unwrap();
+    let public_key = handle
+        .import_key(
+            Some(DEFAULT_MGM_KEY),
+            input_file.path(),
+            Key::Authentication,
+            false,
+            None,
+            PinPolicy::Default,
+            TouchPolicy::Default,
+        )
+        .unwrap();
+    assert_eq!(
+        IMPORT_KEY_EC_EXPECTED_PEM,
+        public_key.format(Format::Pem).unwrap().as_slice()
     );
     assert!(handle.get_hal().no_recordings());
 }
