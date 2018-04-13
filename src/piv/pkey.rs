@@ -18,7 +18,14 @@ use piv::id::Algorithm;
 use piv::util::*;
 use std::collections::HashMap;
 use std::fmt;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 use std::str::FromStr;
+use util::MaybePromptedString;
+
+const MEGABYTE: usize = 1048576;
+const PASSPHRASE_PROMPT: &'static str = "Passphrase: ";
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub enum Format {
@@ -138,6 +145,103 @@ impl PublicKey {
             Format::Pem => self.inner.public_key_to_pem()?,
             Format::Der => self.inner.public_key_to_der()?,
             Format::Ssh => bail!("SSH format is not supported for public keys"),
+        })
+    }
+}
+
+pub struct PrivateKey {
+    inner: openssl::pkey::PKey<openssl::pkey::Private>,
+}
+
+impl PrivateKey {
+    pub fn from_pem<P: AsRef<Path>>(
+        path: P,
+        encrypted: bool,
+        passphrase: Option<&str>,
+    ) -> Result<Self> {
+        let mut data: Vec<u8> = Vec::new();
+        {
+            let mut f = File::open(path)?;
+            if f.metadata()?.len() > MEGABYTE as u64 {
+                bail!("The provided input certificate exceeded 1 MiB in size");
+            }
+            f.read_to_end(&mut data)?;
+        }
+
+        Ok(PrivateKey {
+            inner: match encrypted {
+                false => openssl::pkey::PKey::private_key_from_pem(data.as_slice())?,
+                true => {
+                    let passphrase =
+                        MaybePromptedString::new(passphrase, PASSPHRASE_PROMPT, false)?;
+                    openssl::pkey::PKey::private_key_from_pem_passphrase(
+                        data.as_slice(),
+                        passphrase.as_bytes(),
+                    )?
+                }
+            },
+        })
+    }
+
+    pub fn get_algorithm(&self) -> Result<Algorithm> {
+        let id = self.inner.id();
+        let bits = self.inner.bits();
+        Ok(match id {
+            openssl::pkey::Id::RSA => match bits {
+                1024 => Algorithm::Rsa1024,
+                2048 => Algorithm::Rsa2048,
+                _ => bail!("Unsupported key algorithm RSA-{}", bits),
+            },
+            openssl::pkey::Id::EC => match bits {
+                256 => Algorithm::Eccp256,
+                384 => Algorithm::Eccp384,
+                _ => bail!("Unsupported key algorithm {}-bit EC", bits),
+            },
+            _ => bail!("Unsupported key algorithm {:?}", id),
+        })
+    }
+
+    pub fn to_public_key(&self) -> Result<PublicKey> {
+        let der = self.inner.public_key_to_der()?;
+        Ok(PublicKey {
+            inner: openssl::pkey::PKey::public_key_from_der(der.as_slice())?,
+        })
+    }
+
+    /// Return the components which make up this private key. For RSA keys, this
+    /// returns the p, q, dmp1, dmq1, and iqmp values as big-endian bytes, and
+    /// for EC keys this returns the single EC private key value as big-endian
+    /// bytes.
+    pub fn get_components(&self) -> Result<Vec<Vec<u8>>> {
+        let algorithm = self.get_algorithm()?;
+        Ok(if algorithm.is_rsa() {
+            let rsa = self.inner.rsa()?;
+            vec![
+                match rsa.p() {
+                    None => bail!("This RSA key has no 'p' factor"),
+                    Some(p) => p.to_vec(),
+                },
+                match rsa.q() {
+                    None => bail!("This RSA key has no 'q' factor"),
+                    Some(q) => q.to_vec(),
+                },
+                match rsa.dmp1() {
+                    None => bail!("This RSA key has no 'dmp1' CRT exponent"),
+                    Some(dmp1) => dmp1.to_vec(),
+                },
+                match rsa.dmq1() {
+                    None => bail!("This RSA key has no 'dmq1' CRT exponent"),
+                    Some(dmq1) => dmq1.to_vec(),
+                },
+                match rsa.iqmp() {
+                    None => bail!("This RSA key has no 'iqmp' CRT coefficient"),
+                    Some(iqmp) => iqmp.to_vec(),
+                },
+            ]
+        } else if algorithm.is_ecc() {
+            vec![self.inner.ec_key()?.private_key().to_vec()]
+        } else {
+            bail!("Unsupported algorithm {:?}", algorithm);
         })
     }
 }

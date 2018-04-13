@@ -18,9 +18,10 @@ use error::*;
 use piv::apdu::Apdu;
 use piv::hal::PcscHal;
 use piv::id::*;
-use piv::pkey::{PublicKey, PublicKeyCertificate};
+use piv::pkey::{PrivateKey, PublicKey, PublicKeyCertificate};
 use piv::sw::StatusWord;
 use std::fmt;
+use std::path::Path;
 use util::MaybePromptedString;
 
 const PIN_NAME: &'static str = "PIN";
@@ -340,22 +341,14 @@ fn ykpiv_decipher_data<T: PcscHal>(
     sign_decipher_impl(hal, data, algorithm, key, true)
 }
 
-fn ykpiv_import_private_key<T: PcscHal>(
+fn import_private_key<T: PcscHal>(
     hal: &T,
-    id: Key,
-    algorithm: Algorithm,
-    p: &[u8],
-    q: &[u8],
-    dp: &[u8],
-    dq: &[u8],
-    qinv: &[u8],
-    ec_data: &[u8],
+    slot: Key,
+    key: &PrivateKey,
     pin_policy: PinPolicy,
     touch_policy: TouchPolicy,
 ) -> Result<()> {
-    if !algorithm.is_rsa() && !algorithm.is_ecc() {
-        bail!("Certificate functions only support RSA or ECC algorithms");
-    }
+    let algorithm = key.get_algorithm()?;
 
     let elem_len: usize = match algorithm {
         Algorithm::Rsa1024 => 64,
@@ -365,13 +358,7 @@ fn ykpiv_import_private_key<T: PcscHal>(
         _ => 0,
     };
 
-    let params: Vec<&[u8]> = if algorithm.is_rsa() {
-        vec![p, q, dp, dq, qinv]
-    } else if algorithm.is_ecc() {
-        vec![ec_data]
-    } else {
-        vec![]
-    };
+    let params = key.get_components()?;
 
     let param_tag: u8 = match algorithm {
         Algorithm::Rsa1024 => 0x01,
@@ -381,6 +368,7 @@ fn ykpiv_import_private_key<T: PcscHal>(
         _ => 0,
     };
 
+    // TODO: Actually verify `params` lengths match `elem_len`.
     let mut key_data: Vec<u8> = Vec::with_capacity(1024);
     for i in 0..params.len() {
         key_data.push(param_tag + (i as u8));
@@ -397,7 +385,7 @@ fn ykpiv_import_private_key<T: PcscHal>(
         }
         let new_len = key_data.len() + (elem_len - params[i].len());
         key_data.resize(new_len, 0);
-        key_data.extend_from_slice(params[i]);
+        key_data.extend_from_slice(params[i].as_slice());
     }
 
     if pin_policy != PinPolicy::Default {
@@ -413,7 +401,7 @@ fn ykpiv_import_private_key<T: PcscHal>(
             0,
             Instruction::ImportKey.to_value(),
             algorithm.to_value(),
-            id.to_value(),
+            slot.to_value(),
         ],
         key_data.as_slice(),
     )?;
@@ -939,6 +927,30 @@ impl<T: PcscHal> Handle<T> {
         } else {
             unreachable!(); // We already checked the algorithm type above.
         }
+    }
+
+    /// Import an RSA or EC private key into the given key slot. The provided
+    /// input key must be a PEM-encoded private key file. The caller must
+    /// indicate if the private key is encrypted or not. If the key is
+    /// encrypted, and no passphrase is provided, one will be prompted for. The
+    /// specified PIN and touch policies will be enforced whenever this key is
+    /// used in the future.
+    pub fn import_key<P: AsRef<Path>>(
+        &mut self,
+        mgm_key: Option<&str>,
+        input: P,
+        slot: Key,
+        encrypted: bool,
+        passphrase: Option<&str>,
+        pin_policy: PinPolicy,
+        touch_policy: TouchPolicy,
+    ) -> Result<PublicKey> {
+        let key = PrivateKey::from_pem(input, encrypted, passphrase)?;
+
+        self.authenticate_mgm(mgm_key)?;
+
+        import_private_key(&self.hal, slot, &key, pin_policy, touch_policy)?;
+        Ok(key.to_public_key()?)
     }
 
     pub fn read_certificate(&self, slot: Key) -> Result<PublicKeyCertificate> {

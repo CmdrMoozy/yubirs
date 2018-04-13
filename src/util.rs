@@ -16,6 +16,7 @@ use error::*;
 use rpassword;
 use std::ffi::CString;
 
+// TODO: Return an error if stderr/stdin are not TTYs.
 /// This is a utility function to prompt the user for a sensitive string, e.g. a password.
 fn prompt_for_string(prompt: &str, confirm: bool) -> Result<String> {
     loop {
