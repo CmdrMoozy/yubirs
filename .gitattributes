@@ -1,0 +1,2 @@
+# Diff device recordings with hexdump.
+*.dr binary diff=hex
