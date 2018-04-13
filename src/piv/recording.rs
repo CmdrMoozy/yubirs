@@ -14,6 +14,7 @@
 
 use bincode;
 use error::*;
+use piv::apdu::Apdu;
 use piv::sw::StatusWord;
 use std::collections::VecDeque;
 use std::fs::File;
@@ -31,9 +32,9 @@ pub struct RecordingEntry {
 pub struct Recording(pub VecDeque<RecordingEntry>);
 
 impl Recording {
-    pub fn record(&mut self, sent: &[u8], received: &::error::Result<(StatusWord, Vec<u8>)>) {
+    pub fn record(&mut self, sent: &Apdu, received: &::error::Result<(StatusWord, Vec<u8>)>) {
         self.0.push_back(RecordingEntry {
-            sent: sent.to_vec(),
+            sent: sent.raw().to_vec(),
             received: match received {
                 &Err(ref e) => Err(e.to_string()),
                 &Ok(ref tuple) => Ok(tuple.clone()),

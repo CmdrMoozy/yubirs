@@ -585,7 +585,7 @@ impl<T: PcscHal> Handle<T> {
             0x04,
             &data,
         )?;
-        let (sw, response) = self.hal.send_data_impl(apdu.raw())?;
+        let (sw, response) = self.hal.send_data_impl(&apdu)?;
         sw.error?;
         let card_challenge: Vec<u8> = (&response[4..12]).into();
         debug_assert!(card_challenge.len() == 8);
@@ -610,7 +610,7 @@ impl<T: PcscHal> Handle<T> {
             22,
             &data,
         )?;
-        let (sw, response) = self.hal.send_data_impl(apdu.raw())?;
+        let (sw, response) = self.hal.send_data_impl(&apdu)?;
         sw.error?;
 
         // Compare the response from the card with our expected response.
@@ -786,7 +786,7 @@ impl<T: PcscHal> Handle<T> {
             &data,
         )?;
 
-        let (sw, _) = self.hal.send_data_impl(apdu.raw())?;
+        let (sw, _) = self.hal.send_data_impl(&apdu)?;
         sw.error?;
         Ok(())
     }
