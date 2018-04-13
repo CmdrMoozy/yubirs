@@ -15,6 +15,7 @@
 use bincode;
 use error::*;
 use piv::DEFAULT_READER;
+use piv::apdu::Apdu;
 use piv::hal::*;
 use piv::recording::{Recording, RecordingEntry};
 use piv::sw::StatusWord;
