@@ -70,7 +70,7 @@ pub trait PcscHal {
             info!("Attempting to connect to reader '{}'", potential_reader);
             self.connect_impl(potential_reader.as_str())?;
 
-            let (sw, _) = self.send_data_impl(Apdu::new_aid()?.raw())?;
+            let (sw, _) = self.send_data_impl(&Apdu::new_aid()?)?;
             sw.error?;
 
             return Ok(());
@@ -88,7 +88,7 @@ pub trait PcscHal {
     /// Send data to the underlying hardware. The given byte slice must be formatted as a smart
     /// card APDU (https://en.wikipedia.org/wiki/Smart_card_application_protocol_data_unit). This
     /// function should return a status word, as well as any bytes returned by the hardware.
-    fn send_data_impl(&self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)>;
+    fn send_data_impl(&self, apdu: &Apdu) -> Result<(StatusWord, Vec<u8>)>;
 
     /// Start a new PC/SC transaction with the underlying hardware.
     fn begin_transaction(&self) -> Result<()>;
@@ -132,7 +132,7 @@ pub trait PcscHal {
                 chunk.len(),
                 data.len()
             );
-            let (sw_new, mut recv) = self.send_data_impl(apdu.raw())?;
+            let (sw_new, mut recv) = self.send_data_impl(&apdu)?;
             sw = sw_new;
             if sw.error.is_err() {
                 return Ok((sw, out_data));
@@ -147,7 +147,7 @@ pub trait PcscHal {
                 "The card indicates there are {} more bytes of data to read",
                 bytes_remaining
             );
-            let (sw_new, mut recv) = self.send_data_impl(apdu.raw())?;
+            let (sw_new, mut recv) = self.send_data_impl(&apdu)?;
             sw = sw_new;
             if sw.error.is_err() {
                 return Ok((sw, out_data));
@@ -316,14 +316,14 @@ impl PcscHal for PcscHardware {
         }
     }
 
-    fn send_data_impl(&self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)> {
+    fn send_data_impl(&self, apdu: &Apdu) -> Result<(StatusWord, Vec<u8>)> {
         if let Some(recording) = self.recording.as_ref() {
             let mut lock = recording.lock().unwrap();
-            let ret = self.send_data_impl_impl(apdu);
+            let ret = self.send_data_impl_impl(apdu.raw());
             lock.record(apdu, &ret);
             ret
         } else {
-            self.send_data_impl_impl(apdu)
+            self.send_data_impl_impl(apdu.raw())
         }
     }
 
