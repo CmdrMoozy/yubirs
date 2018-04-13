@@ -20,6 +20,7 @@ extern crate yubirs;
 use bdrck::flags::*;
 use std::fs::File;
 use std::io::Read;
+use std::path::PathBuf;
 use yubirs::error::*;
 use yubirs::piv::*;
 use yubirs::piv::id::{PinPolicy, TouchPolicy};
@@ -154,6 +155,27 @@ fn generate(values: Values) -> Result<()> {
         None,
         values.get_required_parsed("slot")?,
         values.get_required_parsed("algorithm")?,
+        values.get_required_parsed("pin_policy")?,
+        values.get_required_parsed("touch_policy")?,
+    )?;
+    print_data(
+        public_key
+            .format(values.get_required_parsed("format")?)?
+            .as_slice(),
+        true,
+    )?;
+    Ok(())
+}
+
+fn import_key(values: Values) -> Result<()> {
+    let mut handle = new_handle(&values)?;
+    handle.connect(Some(values.get_required("reader")))?;
+    let public_key = handle.import_key(
+        None,
+        &values.get_required_as::<PathBuf>("input_file"),
+        values.get_required_parsed("slot")?,
+        values.get_boolean("encrypted"),
+        None,
         values.get_required_parsed("pin_policy")?,
         values.get_required_parsed("touch_policy")?,
     )?;
@@ -529,6 +551,62 @@ fn main() {
                 ),
             ]).unwrap(),
             Box::new(generate),
+        ),
+        Command::new(
+            "import_key",
+            "Import an existing private key, store it on the device, and return the public key",
+            Specs::new(vec![
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
+                    ),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
+                ),
+                Spec::required(
+                    "input_file",
+                    "The input file containing the private key, in PEM format.",
+                    Some('i'),
+                    None,
+                ),
+                Spec::required(
+                    "slot",
+                    "The key slot to write the generated key to.",
+                    Some('s'),
+                    None,
+                ),
+                Spec::boolean(
+                    "encrypted",
+                    "The input key is encrypted and requires a passphrase to import.",
+                    Some('e'),
+                ),
+                Spec::required(
+                    "pin_policy",
+                    "The PIN verification policy to enforce on future key access.",
+                    Some('p'),
+                    Some(PinPolicy::Default.to_string().as_str()),
+                ),
+                Spec::required(
+                    "touch_policy",
+                    "The touch verification policy to enforce on future key access.",
+                    Some('t'),
+                    Some(TouchPolicy::Default.to_string().as_str()),
+                ),
+                Spec::required(
+                    "format",
+                    "The format for the public key written to stdout.",
+                    Some('f'),
+                    Some(Format::Pem.to_string().as_str()),
+                ),
+            ]).unwrap(),
+            Box::new(import_key),
         ),
         Command::new(
             "read_certificate",
