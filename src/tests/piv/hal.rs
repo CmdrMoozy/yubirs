@@ -82,7 +82,7 @@ impl PcscHal for PcscTestStub {
         self.connected = false;
     }
 
-    fn send_data_impl(&self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)> {
+    fn send_data_impl(&self, apdu: &Apdu) -> Result<(StatusWord, Vec<u8>)> {
         if !self.connected {
             bail!("Can't send data without first being connected.");
         }
@@ -106,9 +106,9 @@ impl PcscHal for PcscTestStub {
 
         assert_eq!(
             entry.sent.as_slice(),
-            apdu,
+            apdu.raw(),
             "device expected {:?}, got {:?}",
-            Apdu::from_bytes(apdu).unwrap(),
+            apdu,
             Apdu::from_bytes(entry.sent.as_slice()).unwrap()
         );
         Ok(entry.received?)
