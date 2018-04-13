@@ -15,7 +15,8 @@
 use crypto::*;
 use data_encoding;
 use error::*;
-use piv::hal::{Apdu, PcscHal};
+use piv::apdu::Apdu;
+use piv::hal::PcscHal;
 use piv::id::*;
 use piv::pkey::{PublicKey, PublicKeyCertificate};
 use piv::sw::StatusWord;
