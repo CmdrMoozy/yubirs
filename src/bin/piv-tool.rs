@@ -590,7 +590,7 @@ fn main() {
                 ),
                 Spec::required(
                     "slot",
-                    "The key slot to write the generated key to.",
+                    "The key slot to write the imported key to.",
                     Some('s'),
                     None,
                 ),
