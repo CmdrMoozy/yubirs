@@ -39,3 +39,7 @@ pcsc_scan
 ## Yubikey PIV Functionality
 
 yubirs provides a command-line interface, piv-tool, as well as a high-level API for interacting with the Yubikey's PIV functionality. Many of the concepts used may be unfamiliar to those who don't have a lot of experience with the Yubikey. The [official upstream documentation](https://developers.yubico.com/PIV/Introduction/YubiKey_and_PIV.html) provides a good overview of the concepts involved.
+
+## Development
+
+This repository includes some extra Git configuration which makes development easier. To use this configuration, run `git config --local include.path ../.gitconfig` from the repository root. *NOTE*: including arbitrary Git configurations is a security vulnerability, so you should audit this custom configuration before including it.
