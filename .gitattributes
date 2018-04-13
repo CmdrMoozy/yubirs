@@ -1,2 +1,4 @@
 # Diff device recordings with hexdump.
 *.dr binary diff=hex
+# Diff binary DER-encoded certificates with hexdump.
+*.der binary diff=hex
