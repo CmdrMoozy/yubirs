@@ -18,6 +18,10 @@ use std::fmt;
 /// The Application ID to send in an APDU when connecting to a Yubikey.
 const APDU_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
 
+/// The number of bytes an APDU's properties (instruction class, instruction
+/// code, ...) occupy. These bytes are unavailable for arbitrary data.
+const APDU_PROPERTY_BYTES: usize = 5;
+
 /// APDU stands for "smart card Application Protocol Data Unit". This union
 /// definition is used by upstream's library to alternate between treating APDU
 /// data in a structured or unstructured way.
@@ -69,6 +73,14 @@ impl Apdu {
     /// `data`).
     pub fn raw(&self) -> &[u8] {
         &self.raw
+    }
+
+    /// Returns the same data as `raw`, but it excludes the extra tailing 0
+    /// bytes (i.e., it only includes the APDU's properties along with `lc`
+    /// bytes of arbitrary data).
+    pub fn raw_minimal(&self) -> &[u8] {
+        let len = APDU_PROPERTY_BYTES + self.lc() as usize;
+        &self.raw[0..len]
     }
 
     /// Instruction class - indicates the type of command, e.g. interindustry or
