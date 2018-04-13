@@ -953,6 +953,25 @@ impl<T: PcscHal> Handle<T> {
         Ok(key.to_public_key()?)
     }
 
+    /// Attest returns an X.509 certificate signed with the private key in the
+    /// given slot if and only if the private key was generated on the device
+    /// rather than imported. Note that this feature is only supported by some
+    /// newer hardware devices. For details, see:
+    /// https://developers.yubico.com/yubico-piv-tool/Attestation.html
+    pub fn attest(&self, slot: Key) -> Result<PublicKeyCertificate> {
+        let (sw, recv) = self.hal.send_data(
+            &[0, Instruction::Attest.to_value(), slot.to_value(), 0],
+            &[],
+        )?;
+        sw.error?;
+
+        if *recv.get(0).unwrap_or(&0) != 0x30 {
+            bail!("Failed to attest key; got invalid response from device");
+        }
+
+        Ok(PublicKeyCertificate::from_der(recv.as_slice())?)
+    }
+
     pub fn read_certificate(&self, slot: Key) -> Result<PublicKeyCertificate> {
         // TODO: This seems to not work if the key was generated with the
         // "generate" command, I *think* because that writes a public key to the
