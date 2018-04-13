@@ -132,7 +132,7 @@ pub trait PcscHal {
                 chunk.len(),
                 data.len()
             );
-            let (sw_new, mut recv) = self.send_data_impl(&apdu.raw)?;
+            let (sw_new, mut recv) = self.send_data_impl(apdu.raw())?;
             sw = sw_new;
             if sw.error.is_err() {
                 return Ok((sw, out_data));
@@ -147,7 +147,7 @@ pub trait PcscHal {
                 "The card indicates there are {} more bytes of data to read",
                 bytes_remaining
             );
-            let (sw_new, mut recv) = self.send_data_impl(&apdu.raw)?;
+            let (sw_new, mut recv) = self.send_data_impl(apdu.raw())?;
             sw = sw_new;
             if sw.error.is_err() {
                 return Ok((sw, out_data));
