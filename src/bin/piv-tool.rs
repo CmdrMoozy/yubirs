@@ -14,6 +14,8 @@
 
 extern crate bdrck;
 extern crate data_encoding;
+#[macro_use]
+extern crate error_chain;
 extern crate isatty;
 extern crate yubirs;
 
@@ -210,6 +212,49 @@ fn read_certificate(values: Values) -> Result<()> {
             .as_slice(),
         true,
     )?;
+    Ok(())
+}
+
+fn test_decrypt(values: Values) -> Result<()> {
+    let mut handle = new_handle(&values)?;
+    handle.connect(Some(values.get_required("reader")))?;
+    let mut plaintext: Vec<u8> = vec![0; 32];
+    handle.get_hal().cheap_random_bytes(&mut plaintext)?;
+    let (algorithm, ciphertext) = handle.encrypt(
+        &values.get_required_as::<PathBuf>("input_file"),
+        plaintext.as_slice(),
+    )?;
+    let result_plaintext = handle.decrypt(
+        None,
+        &ciphertext,
+        values.get_required_parsed("slot")?,
+        algorithm,
+    )?;
+    println!(
+        "Original:  {}",
+        plaintext
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>()
+    );
+    println!(
+        "Encrypted: {}",
+        ciphertext
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>()
+    );
+    println!(
+        "Decrypted: {}",
+        result_plaintext
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>()
+    );
+    if plaintext != result_plaintext {
+        bail!("Decryption test failed; decrypted result did not match original plaintext");
+    }
+    println!("Success!");
     Ok(())
 }
 
@@ -685,6 +730,39 @@ fn main() {
                 ),
             ]).unwrap(),
             Box::new(read_certificate),
+        ),
+        Command::new(
+            "test_decrypt",
+            "Test encrypt / decrypt functionality with a keypair on the device",
+            Specs::new(vec![
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
+                    ),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
+                ),
+                Spec::required(
+                    "input_file",
+                    "The input file containing the public key, in PEM format.",
+                    Some('i'),
+                    None,
+                ),
+                Spec::required(
+                    "slot",
+                    "The slot which contains the private key to use for decryption.",
+                    Some('s'),
+                    None,
+                ),
+            ]).unwrap(),
+            Box::new(test_decrypt),
         ),
     ]);
 }

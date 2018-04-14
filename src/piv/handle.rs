@@ -15,6 +15,9 @@
 use crypto::*;
 use data_encoding;
 use error::*;
+use libc::c_int;
+use openssl;
+use openssl_sys;
 use piv::apdu::Apdu;
 use piv::hal::PcscHal;
 use piv::id::*;
@@ -210,7 +213,7 @@ fn sign_decipher_impl<T: PcscHal>(
     decipher: bool,
 ) -> Result<Vec<u8>> {
     if !algorithm.is_rsa() && !algorithm.is_ecc() {
-        bail!("Data signing / deciphering only supports RSA or ECC algorithms");
+        bail!("Data signing / deciphering only supports RSA or EC algorithms");
     }
 
     let key_len: usize = match algorithm {
@@ -222,12 +225,15 @@ fn sign_decipher_impl<T: PcscHal>(
     };
 
     if algorithm.is_rsa() && data.len() != key_len {
-        bail!("Invalid input data; expected {} bytes", key_len);
+        bail!("Invalid input data; expected exactly {} bytes", key_len);
     } else if algorithm.is_ecc() {
         if !decipher && data.len() > key_len {
             bail!("Invalid input data; expected at most {} bytes", key_len);
         } else if decipher && data.len() != (key_len * 2) + 1 {
-            bail!("Invalid input data; expected {} bytes", (key_len * 2) + 1);
+            bail!(
+                "Invalid input data; expected exactly {} bytes",
+                (key_len * 2) + 1
+            );
         }
     }
 
@@ -282,45 +288,38 @@ fn sign_decipher_impl<T: PcscHal>(
             algorithm.to_value(),
             key.to_value(),
         ],
-        data,
+        &data_to_send,
     )?;
     sw.error?;
 
     // Skip the first 7c tag.
-    if recv[0] != 0x7c {
-        bail!("Failed to parse tag from signature reply");
+    match recv.get(0) {
+        None => bail!("Failed to parse tag from signature reply: reply too short"),
+        Some(b) => if *b != 0x7c {
+            bail!(
+                "Failed to parse tag from signature reply: got {:02x}, expected {:02x}",
+                *b,
+                0x7c
+            );
+        },
     }
-    let recv_slice = if recv[1] < 0x81 {
-        let len = recv[1] as usize;
-        &recv[2 + len..]
-    } else if (recv[1] & 0x7f) == 1 {
-        let len = recv[2] as usize;
-        &recv[3 + len..]
-    } else if (recv[1] & 0x7f) == 2 {
-        let len = ((recv[2] as usize) << 8) + (recv[3] as usize);
-        &recv[4 + len..]
-    } else {
-        bail!("Failed to parse tag length from signature reply");
-    };
+    let (recv_slice, _) = ::piv::util::read_length(&recv[1..])?;
+    // Note that we *don't* skip over len bytes here. This is intentional.
 
     // Skip the 82 tag.
-    if recv_slice[0] != 0x82 {
-        bail!("Failed to parse tag from signature reply");
+    match recv_slice.get(0) {
+        None => bail!("Failed to parse tag from signature reply: reply too short"),
+        Some(b) => if *b != 0x82 {
+            bail!(
+                "Failed to parse tag from signature reply: got {:02x}, expected {:02x}",
+                *b,
+                0x82
+            );
+        },
     }
-    let recv_slice = if recv_slice[1] < 0x81 {
-        let len = recv_slice[1] as usize;
-        &recv_slice[2 + len..]
-    } else if (recv_slice[1] & 0x7f) == 1 {
-        let len = recv_slice[2] as usize;
-        &recv_slice[3 + len..]
-    } else if (recv_slice[1] & 0x7f) == 2 {
-        let len = ((recv_slice[2] as usize) << 8) + (recv_slice[3] as usize);
-        &recv_slice[4 + len..]
-    } else {
-        bail!("Failed to parse tag length from signature reply");
-    };
+    let (recv_slice, len) = ::piv::util::read_length(&recv_slice[1..])?;
 
-    Ok(recv_slice.into())
+    Ok((&recv_slice[0..len]).into())
 }
 
 fn ykpiv_sign_data<T: PcscHal>(
@@ -330,15 +329,6 @@ fn ykpiv_sign_data<T: PcscHal>(
     key: Key,
 ) -> Result<Vec<u8>> {
     sign_decipher_impl(hal, data, algorithm, key, false)
-}
-
-fn ykpiv_decipher_data<T: PcscHal>(
-    hal: &T,
-    data: &[u8],
-    algorithm: Algorithm,
-    key: Key,
-) -> Result<Vec<u8>> {
-    sign_decipher_impl(hal, data, algorithm, key, true)
 }
 
 fn import_private_key<T: PcscHal>(
@@ -997,6 +987,64 @@ impl<T: PcscHal> Handle<T> {
 
         let (der, len) = ::piv::util::read_length(&object[1..])?;
         Ok(PublicKeyCertificate::from_der(&der[0..len])?)
+    }
+
+    /// Encrypts the given data with the given public key. It is assumed that
+    /// the matching private key is stored on the device, in which case the
+    /// returned encrypted data can later be deciphered using the hardware
+    /// device.
+    ///
+    /// Note that the given input key must be an RSA key in PEM format.
+    ///
+    /// Refer to `piv::pkey::PublicKey::encrypt` for more details.
+    pub fn encrypt<P: AsRef<Path>>(
+        &self,
+        input_public_key: P,
+        plaintext: &[u8],
+    ) -> Result<(Algorithm, Vec<u8>)> {
+        let public_key = PublicKey::from_pem(input_public_key)?;
+        let algorithm = public_key.get_algorithm()?;
+        Ok((algorithm, public_key.encrypt(plaintext)?))
+    }
+
+    /// Decrypts the given ciphertext with the private key in the given key
+    /// slot. The specified key must be an RSA key, and the cipertext must
+    /// have been encrypted with padding as per the `encrypt` function.
+    pub fn decrypt(
+        &mut self,
+        pin: Option<&str>,
+        ciphertext: &[u8],
+        slot: Key,
+        algorithm: Algorithm,
+    ) -> Result<Vec<u8>> {
+        self.authenticate_pin(pin)?;
+
+        let mut plaintext = sign_decipher_impl(&self.hal, ciphertext, algorithm, slot, true)?;
+        let mut unpadded: Vec<u8> = vec![0; plaintext.len()];
+        let len = unsafe {
+            openssl_sys::RSA_padding_check_PKCS1_type_2(
+                unpadded.as_mut_ptr(),
+                unpadded.len() as c_int,
+                plaintext.as_mut_ptr().offset(1),
+                (plaintext.len() - 1) as c_int,
+                match algorithm {
+                    Algorithm::Rsa1024 => 1024 / 8,
+                    Algorithm::Rsa2048 => 2048 / 8,
+                    _ => bail!("Unsupported algorithm {:?}", algorithm),
+                },
+            )
+        };
+        if len == -1 {
+            bail!(
+                "Verifying plaintext padding failed: {}",
+                match openssl::error::Error::get() {
+                    None => "unknown error".to_owned(),
+                    Some(err) => err.to_string(),
+                }
+            );
+        }
+        unpadded.truncate(len as usize);
+        Ok(unpadded)
     }
 }
 

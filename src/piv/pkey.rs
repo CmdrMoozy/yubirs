@@ -66,6 +66,26 @@ impl FromStr for Format {
     }
 }
 
+fn get_algorithm<T: openssl::pkey::HasPublic>(
+    key: &openssl::pkey::PKeyRef<T>,
+) -> Result<Algorithm> {
+    let id = key.id();
+    let bits = key.bits();
+    Ok(match id {
+        openssl::pkey::Id::RSA => match bits {
+            1024 => Algorithm::Rsa1024,
+            2048 => Algorithm::Rsa2048,
+            _ => bail!("Unsupported key algorithm RSA-{}", bits),
+        },
+        openssl::pkey::Id::EC => match bits {
+            256 => Algorithm::Eccp256,
+            384 => Algorithm::Eccp384,
+            _ => bail!("Unsupported key algorithm {}-bit EC", bits),
+        },
+        _ => bail!("Unsupported key algorithm {:?}", id),
+    })
+}
+
 /// A public key. Note that this structure denotes *just the key*, not the other
 /// metadata which would be included in a full X.509 certificate.
 pub struct PublicKey {
@@ -73,6 +93,21 @@ pub struct PublicKey {
 }
 
 impl PublicKey {
+    pub fn from_pem<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let mut data: Vec<u8> = Vec::new();
+        {
+            let mut f = File::open(path)?;
+            if f.metadata()?.len() > MEGABYTE as u64 {
+                bail!("The provided input certificate exceeded 1 MiB in size");
+            }
+            f.read_to_end(&mut data)?;
+        }
+
+        Ok(PublicKey {
+            inner: openssl::pkey::PKey::public_key_from_pem(data.as_slice())?,
+        })
+    }
+
     /// Construct a PublicKey from the raw RSA structure returned from the
     /// underlying hardware. The provided `data` should be the entire response
     /// from the device to a `generate` command.
@@ -140,6 +175,60 @@ impl PublicKey {
         })
     }
 
+    pub fn get_algorithm(&self) -> Result<Algorithm> {
+        get_algorithm(self.inner.as_ref())
+    }
+
+    /// This function returns the maximum number of bytes `encrypt` can encrypt
+    /// using the given algorithm.
+    pub fn max_encrypt_len(&self) -> Result<usize> {
+        // Divide key size by 8 to convert to bytes. The padding standard
+        // upstream uses occupies 11 bytes at minimum.
+        Ok(match self.get_algorithm()? {
+            Algorithm::Rsa1024 => 1024 / 8,
+            Algorithm::Rsa2048 => 2048 / 8,
+            _ => bail!("Unsupported encryption algorithm {:?}", algorithm),
+        } - 11)
+    }
+
+    /// Encrypt the given data using this RSA public key. In order to decipher
+    /// the returned ciphertext, the caller must have access to the matching
+    /// private key.
+    ///
+    /// Note that only RSA is supported, because OpenSSL likewise only (easily)
+    /// supports this kind of encryption with an RSA key.
+    ///
+    /// Also note that this *should not* be used to encrypt large amounts of
+    /// data. In fact, as per the docs
+    /// (https://www.openssl.org/docs/manmaster/man3/RSA_public_encrypt.html),
+    /// this function can only encrypt at most `max_encrypt_len` bytes of data.
+    ///
+    /// In order to use this feature to encrypt larger amounts of data, this
+    /// function should be used to wrap a *key* which is then used with a more
+    /// normal cipher like AES.
+    pub fn encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>> {
+        let algorithm = self.get_algorithm()?;
+        if algorithm.is_rsa() {
+            let rsa = self.inner.rsa()?;
+            if plaintext.len() + 11 > rsa.size() as usize {
+                bail!(
+                    "Invalid input data; this function can only encrypt at most {} bytes",
+                    rsa.size() - 11
+                );
+            }
+            let mut ciphertext = vec![0; rsa.size() as usize];
+            let len = rsa.public_encrypt(plaintext, &mut ciphertext, openssl::rsa::Padding::PKCS1)?;
+            debug_assert!(len > plaintext.len());
+            ciphertext.truncate(len);
+            Ok(ciphertext)
+        } else {
+            bail!(
+                "Unsupported public key encryption algorithm {:?}",
+                algorithm
+            );
+        }
+    }
+
     pub fn format(&self, format: Format) -> Result<Vec<u8>> {
         Ok(match format {
             Format::Pem => self.inner.public_key_to_pem()?,
@@ -184,21 +273,7 @@ impl PrivateKey {
     }
 
     pub fn get_algorithm(&self) -> Result<Algorithm> {
-        let id = self.inner.id();
-        let bits = self.inner.bits();
-        Ok(match id {
-            openssl::pkey::Id::RSA => match bits {
-                1024 => Algorithm::Rsa1024,
-                2048 => Algorithm::Rsa2048,
-                _ => bail!("Unsupported key algorithm RSA-{}", bits),
-            },
-            openssl::pkey::Id::EC => match bits {
-                256 => Algorithm::Eccp256,
-                384 => Algorithm::Eccp384,
-                _ => bail!("Unsupported key algorithm {}-bit EC", bits),
-            },
-            _ => bail!("Unsupported key algorithm {:?}", id),
-        })
+        get_algorithm(self.inner.as_ref())
     }
 
     pub fn to_public_key(&self) -> Result<PublicKey> {
