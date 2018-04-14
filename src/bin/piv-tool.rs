@@ -37,6 +37,7 @@ fn new_handle(values: &Values) -> Result<Handle<PcscHardware>> {
     }
 }
 
+// TODO: This function's (or callers') behavior is wrong for DER output.
 fn print_data(data: &[u8], text: bool) -> Result<()> {
     if isatty::stdout_isatty() {
         if text {
