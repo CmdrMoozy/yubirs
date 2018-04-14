@@ -482,6 +482,40 @@ impl fmt::Display for Version {
     }
 }
 
+/// A Handle representing a connection to an underlying PC/SC device. This
+/// struct is parameterized on a PcscHal implementation, so the underlying
+/// hardware implementation can be swapped out as long as it is "compatible"
+/// with the PC/SC library, in some sense.
+///
+/// Users of this struct must `connect` before calling most API functions.
+///
+/// Many API functions also require authentication. The authentication secrets
+/// can either be passed in, or alternatively will be prompted for on stdin. The
+/// following table denotes which functions require which kind of
+/// authentication:
+///
+/// | Function           | MGM Key | PIN | PUK | Notes                      |
+/// | ------------------ |:-------:|:---:|:---:| -------------------------- |
+/// | list_readers       |         |     |     |                            |
+/// | connect            |         |     |     |                            |
+/// | disconnect         |         |     |     |                            |
+/// | get_version        |         |     |     |                            |
+/// | change_pin         |         | X   |     |                            |
+/// | unblock_pin        |         |     | X   |                            |
+/// | change_puk         |         |     | X   |                            |
+/// | reset              |         |     |     | PIN + PUK must be blocked. |
+/// | set_retries        | X       | X   |     |                            |
+/// | set_management_key | X       |     |     |                            |
+/// | set_chuid          | X       |     |     |                            |
+/// | set_ccc            | X       |     |     |                            |
+/// | read_object        |         |     |     |                            |
+/// | write_object       | X       |     |     |                            |
+/// | generate           | X       |     |     |                            |
+/// | import_key         | X       |     |     |                            |
+/// | attest             |         |     |     |                            |
+/// | read_certificate   |         |     |     |                            |
+/// | encrypt            |         |     |     |                            |
+/// | decrypt            |         | X   |     |                            |
 pub struct Handle<T: PcscHal> {
     hal: T,
     authenticated_pin: bool,
