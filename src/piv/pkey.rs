@@ -182,9 +182,10 @@ impl PublicKey {
     /// This function returns the maximum number of bytes `encrypt` can encrypt
     /// using the given algorithm.
     pub fn max_encrypt_len(&self) -> Result<usize> {
+        let algorithm = self.get_algorithm()?;
         // Divide key size by 8 to convert to bytes. The padding standard
         // upstream uses occupies 11 bytes at minimum.
-        Ok(match self.get_algorithm()? {
+        Ok(match algorithm {
             Algorithm::Rsa1024 => 1024 / 8,
             Algorithm::Rsa2048 => 2048 / 8,
             _ => bail!("Unsupported encryption algorithm {:?}", algorithm),
