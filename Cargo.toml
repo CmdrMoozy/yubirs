@@ -1,6 +1,6 @@
 [package]
 name = "yubirs"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Axel Rasmussen <axel.rasmussen1@gmail.com>"]
 description = "A YubiKey OTP validation library"
 homepage = "https://github.com/CmdrMoozy/yubirs"
@@ -22,8 +22,8 @@ log = "0.4"
 openssl = "~0.10.10"
 openssl-sys = "~0.9.33"
 pcsc-sys = "1.0"
-rand = "0.4"
-regex = "0.2"
+rand = "0.5"
+regex = "1.0"
 rpassword = "2.0"
 serde = "1.0"
 serde_derive = "1.0"

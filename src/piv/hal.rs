@@ -16,12 +16,14 @@ use error::*;
 use libc::c_char;
 use openssl;
 use pcsc_sys;
-use piv::DEFAULT_READER;
 use piv::apdu::Apdu;
 use piv::recording::Recording;
 use piv::scarderr::SmartCardError;
 use piv::sw::StatusWord;
-use rand::{self, Rng};
+use piv::DEFAULT_READER;
+use rand::distributions::Standard;
+use rand::rngs::SmallRng;
+use rand::{FromEntropy, Rng};
 use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::ptr;
@@ -250,7 +252,9 @@ impl PcscHal for PcscHardware {
 
     fn cheap_random_bytes(&self, buf: &mut [u8]) -> Result<()> {
         let len = buf.len();
-        for (dst, src) in buf.iter_mut().zip(rand::weak_rng().gen_iter().take(len)) {
+        for (dst, src) in buf.iter_mut()
+            .zip(SmallRng::from_entropy().sample_iter(&Standard).take(len))
+        {
             *dst = src;
         }
         Ok(())
