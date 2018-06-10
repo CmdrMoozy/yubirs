@@ -11,15 +11,16 @@ license = "Apache-2.0"
 bdrck = "0.7"
 bincode = "1.0"
 chrono = "0.4"
-curl = { path = "3rdparty/curl", version = "0.4" }
+curl = "0.4"
 data-encoding = "2.1"
 error-chain = "0.11"
 isatty = "0.1"
 lazy_static = "1.0"
 libc = "0.2"
 log = "0.4"
-openssl = { path = "3rdparty/openssl/openssl", version = "~0.10.4" }
-openssl-sys = { path = "3rdparty/openssl/openssl-sys", version = "^0.9.28" }
+# Version >= 0.10.10 / 0.9.33 is needed for new bindings submitted to upstream.
+openssl = "~0.10.10"
+openssl-sys = "~0.9.33"
 pcsc-sys = "1.0"
 rand = "0.4"
 regex = "0.2"

@@ -12,7 +12,9 @@ Here are some helpful resources on how to use the Yubikey:
 - https://developers.yubico.com/OTP/
 - https://developers.yubico.com/PIV/
 
-In particular, a few pieces of setup are necessary in order to fully use the Yubikey. OTP mode generally works without any additional setup (since we only rely on the Yubikey's USB keyboard functionality), but for PIV / smartcard features some additional setup is needed. On Arch Linux, as an example, the following packages and services are needed:
+In particular, a few pieces of setup are necessary in order to fully use the Yubikey. OTP mode generally works without any additional setup (since we only rely on the Yubikey's USB keyboard functionality), but for PIV / smartcard features some additional setup is needed.
+
+### Arch Linux
 
 - `libu2f-host` provides udev rules for using the Yubikey as a non-root user.
 - `yubikey-manager` provides some utilities for managing the Yubikey.
@@ -28,6 +30,28 @@ sudo pacman -S libu2f-host yubikey-manager pcsclite pcsc-tools ccid libusb-compa
 sudo systemctl start pcscd.service
 sudo systemctl enable pcscd.service
 ```
+
+### Gentoo Linux
+
+The process on Gentoo is very similar:
+
+```shell
+# Install necessary packages.
+emerge -av libu2f-host yubikey-manager pcsc-lite pcsc-tools ccid libusb-compat
+
+# Add your user to the right group to be able to access the device. Replace
+# $MY_USER with your username.
+gpasswd -a $MY_USER plugdev
+
+# Configure hotplugging by setting rc_hotplug="pcscd" in this file:
+vim /etc/rc.conf
+
+# Start pcscd, and configure it to start on boot.
+rc-update add pcscd default
+/etc/init.d/pcscd start
+```
+
+### Testing
 
 To verify that everything is setup right, the following commands should both work and print out information about the Yubikey:
 
