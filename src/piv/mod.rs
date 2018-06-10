@@ -16,6 +16,7 @@ pub mod apdu;
 pub mod hal;
 pub mod handle;
 pub mod id;
+pub mod key;
 mod nid;
 pub mod pkey;
 pub mod recording;
