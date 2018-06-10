@@ -24,9 +24,9 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 use yubirs::error::*;
-use yubirs::piv::*;
 use yubirs::piv::id::{PinPolicy, TouchPolicy};
 use yubirs::piv::pkey::Format;
+use yubirs::piv::*;
 
 fn new_handle(values: &Values) -> Result<Handle<PcscHardware>> {
     match values.get_single("output_recording") {
@@ -278,13 +278,11 @@ fn main() {
         Command::new(
             "list_readers",
             "List the available PC/SC readers",
-            Specs::new(vec![
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-            ]).unwrap(),
+            Specs::new(vec![Spec::optional(
+                "output_recording",
+                "Record interactions with the hardware, and write it to this file.",
+                None,
+            )]).unwrap(),
             Box::new(list_readers),
         ),
         Command::new(

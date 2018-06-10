@@ -14,11 +14,11 @@
 
 use bincode;
 use error::*;
-use piv::DEFAULT_READER;
 use piv::apdu::Apdu;
 use piv::hal::*;
 use piv::recording::{Recording, RecordingEntry};
 use piv::sw::StatusWord;
+use piv::DEFAULT_READER;
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
@@ -107,11 +107,9 @@ impl PcscHal for PcscTestStub {
         // Since expected_sent is for the assertion, we really do want to unwrap().
         let expected_sent = Apdu::from_bytes(entry.sent.as_slice()).unwrap();
         assert_eq!(
-            &expected_sent,
-            apdu,
+            &expected_sent, apdu,
             "device expected {:?}, got {:?}",
-            expected_sent,
-            apdu
+            expected_sent, apdu
         );
 
         Ok(entry.received?)

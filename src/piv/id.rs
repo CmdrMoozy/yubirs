@@ -38,9 +38,11 @@ lazy_static! {
         m.insert(Algorithm::Eccp384, "ECCP384");
         m
     };
-
     static ref STRING_ALGORITHMS: HashMap<String, Algorithm> = {
-        ALGORITHM_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
+        ALGORITHM_STRINGS
+            .iter()
+            .map(|pair| (pair.1.to_uppercase(), *pair.0))
+            .collect()
     };
 }
 
@@ -125,9 +127,11 @@ lazy_static! {
         m.insert(Instruction::Verify, "Verify");
         m
     };
-
     static ref STRING_INSTRUCTIONS: HashMap<String, Instruction> = {
-        INSTRUCTION_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
+        INSTRUCTION_STRINGS
+            .iter()
+            .map(|pair| (pair.1.to_uppercase(), *pair.0))
+            .collect()
     };
 }
 
@@ -245,9 +249,11 @@ lazy_static! {
         m.insert(Key::Attestation, "Attestation");
         m
     };
-
     static ref STRING_KEYS: HashMap<String, Key> = {
-        KEY_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
+        KEY_STRINGS
+            .iter()
+            .map(|pair| (pair.1.to_uppercase(), *pair.0))
+            .collect()
     };
 }
 
@@ -416,9 +422,11 @@ lazy_static! {
         m.insert(Object::Attestation, "Attestation");
         m
     };
-
     static ref STRING_OBJECTS: HashMap<String, Object> = {
-        OBJECT_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
+        OBJECT_STRINGS
+            .iter()
+            .map(|pair| (pair.1.to_uppercase(), *pair.0))
+            .collect()
     };
 }
 
@@ -498,9 +506,11 @@ lazy_static! {
         m.insert(PinPolicy::Always, "Always");
         m
     };
-
     static ref STRING_PIN_POLICIES: HashMap<String, PinPolicy> = {
-        PIN_POLICY_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
+        PIN_POLICY_STRINGS
+            .iter()
+            .map(|pair| (pair.1.to_uppercase(), *pair.0))
+            .collect()
     };
 }
 
@@ -548,9 +558,11 @@ lazy_static! {
         m.insert(Tag::TouchPolicy, "TouchPolicy");
         m
     };
-
     static ref STRING_TAGS: HashMap<String, Tag> = {
-        TAG_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
+        TAG_STRINGS
+            .iter()
+            .map(|pair| (pair.1.to_uppercase(), *pair.0))
+            .collect()
     };
 }
 
@@ -599,9 +611,11 @@ lazy_static! {
         m.insert(TouchPolicy::Cached, "Cached");
         m
     };
-
     static ref STRING_TOUCH_POLICIES: HashMap<String, TouchPolicy> = {
-        TOUCH_POLICY_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
+        TOUCH_POLICY_STRINGS
+            .iter()
+            .map(|pair| (pair.1.to_uppercase(), *pair.0))
+            .collect()
     };
 }
 

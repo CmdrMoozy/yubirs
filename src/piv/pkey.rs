@@ -42,9 +42,11 @@ lazy_static! {
         m.insert(Format::Ssh, "SSH");
         m
     };
-
     static ref STRING_FORMATS: HashMap<String, Format> = {
-        FORMAT_STRINGS.iter().map(|pair| (pair.1.to_uppercase(), *pair.0)).collect()
+        FORMAT_STRINGS
+            .iter()
+            .map(|pair| (pair.1.to_uppercase(), *pair.0))
+            .collect()
     };
 }
 
@@ -169,8 +171,7 @@ impl PublicKey {
 
         Ok(PublicKey {
             inner: openssl::pkey::PKey::from_ec_key(openssl::ec::EcKey::from_public_key(
-                &group,
-                &point,
+                &group, &point,
             )?)?,
         })
     }

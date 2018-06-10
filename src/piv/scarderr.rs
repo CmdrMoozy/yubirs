@@ -92,76 +92,195 @@ lazy_static! {
         let mut m = HashMap::new();
         m.insert(pcsc_sys::SCARD_E_BAD_SEEK, SmartCardError::BadSeek);
         m.insert(0x00000109, SmartCardError::BrokenPipe);
-        m.insert(pcsc_sys::SCARD_W_CACHE_ITEM_NOT_FOUND, SmartCardError::CacheItemNotFound);
-        m.insert(pcsc_sys::SCARD_W_CACHE_ITEM_STALE, SmartCardError::CacheItemStale);
-        m.insert(pcsc_sys::SCARD_W_CACHE_ITEM_TOO_BIG, SmartCardError::CacheItemTooBig);
+        m.insert(
+            pcsc_sys::SCARD_W_CACHE_ITEM_NOT_FOUND,
+            SmartCardError::CacheItemNotFound,
+        );
+        m.insert(
+            pcsc_sys::SCARD_W_CACHE_ITEM_STALE,
+            SmartCardError::CacheItemStale,
+        );
+        m.insert(
+            pcsc_sys::SCARD_W_CACHE_ITEM_TOO_BIG,
+            SmartCardError::CacheItemTooBig,
+        );
         m.insert(pcsc_sys::SCARD_E_CANCELLED, SmartCardError::Cancelled);
-        m.insert(pcsc_sys::SCARD_W_CANCELLED_BY_USER, SmartCardError::CancelledByUser);
+        m.insert(
+            pcsc_sys::SCARD_W_CANCELLED_BY_USER,
+            SmartCardError::CancelledByUser,
+        );
         m.insert(pcsc_sys::SCARD_E_CANT_DISPOSE, SmartCardError::CantDispose);
-        m.insert(pcsc_sys::SCARD_W_CARD_NOT_AUTHENTICATED, SmartCardError::CardNotAuthenticated);
-        m.insert(pcsc_sys::SCARD_E_CARD_UNSUPPORTED, SmartCardError::CardUnsupported);
-        m.insert(pcsc_sys::SCARD_E_CERTIFICATE_UNAVAILABLE, SmartCardError::CertificateUnavailable);
+        m.insert(
+            pcsc_sys::SCARD_W_CARD_NOT_AUTHENTICATED,
+            SmartCardError::CardNotAuthenticated,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_CARD_UNSUPPORTED,
+            SmartCardError::CardUnsupported,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_CERTIFICATE_UNAVAILABLE,
+            SmartCardError::CertificateUnavailable,
+        );
         m.insert(pcsc_sys::SCARD_W_CHV_BLOCKED, SmartCardError::ChvBlocked);
-        m.insert(pcsc_sys::SCARD_E_COMM_DATA_LOST, SmartCardError::CommDataLost);
+        m.insert(
+            pcsc_sys::SCARD_E_COMM_DATA_LOST,
+            SmartCardError::CommDataLost,
+        );
         m.insert(pcsc_sys::SCARD_F_COMM_ERROR, SmartCardError::CommError);
         m.insert(pcsc_sys::SCARD_E_DIR_NOT_FOUND, SmartCardError::DirNotFound);
-        m.insert(pcsc_sys::SCARD_E_DUPLICATE_READER, SmartCardError::DuplicateReader);
+        m.insert(
+            pcsc_sys::SCARD_E_DUPLICATE_READER,
+            SmartCardError::DuplicateReader,
+        );
         m.insert(pcsc_sys::SCARD_W_EOF, SmartCardError::Eof);
-        m.insert(pcsc_sys::SCARD_E_FILE_NOT_FOUND, SmartCardError::FileNotFound);
-        m.insert(pcsc_sys::SCARD_E_ICC_CREATEORDER, SmartCardError::IccCreateOrder);
-        m.insert(pcsc_sys::SCARD_E_ICC_INSTALLATION, SmartCardError::IccInstallation);
-        m.insert(pcsc_sys::SCARD_E_INSUFFICIENT_BUFFER, SmartCardError::InsufficientBuffer);
-        m.insert(pcsc_sys::SCARD_F_INTERNAL_ERROR, SmartCardError::InternalError);
+        m.insert(
+            pcsc_sys::SCARD_E_FILE_NOT_FOUND,
+            SmartCardError::FileNotFound,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_ICC_CREATEORDER,
+            SmartCardError::IccCreateOrder,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_ICC_INSTALLATION,
+            SmartCardError::IccInstallation,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_INSUFFICIENT_BUFFER,
+            SmartCardError::InsufficientBuffer,
+        );
+        m.insert(
+            pcsc_sys::SCARD_F_INTERNAL_ERROR,
+            SmartCardError::InternalError,
+        );
         m.insert(pcsc_sys::SCARD_E_INVALID_ATR, SmartCardError::InvalidAtr);
         m.insert(pcsc_sys::SCARD_E_INVALID_CHV, SmartCardError::InvalidChv);
-        m.insert(pcsc_sys::SCARD_E_INVALID_HANDLE, SmartCardError::InvalidHandle);
-        m.insert(pcsc_sys::SCARD_E_INVALID_PARAMETER, SmartCardError::InvalidParameter);
-        m.insert(pcsc_sys::SCARD_E_INVALID_TARGET, SmartCardError::InvalidTarget);
-        m.insert(pcsc_sys::SCARD_E_INVALID_VALUE, SmartCardError::InvalidValue);
+        m.insert(
+            pcsc_sys::SCARD_E_INVALID_HANDLE,
+            SmartCardError::InvalidHandle,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_INVALID_PARAMETER,
+            SmartCardError::InvalidParameter,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_INVALID_TARGET,
+            SmartCardError::InvalidTarget,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_INVALID_VALUE,
+            SmartCardError::InvalidValue,
+        );
         m.insert(pcsc_sys::SCARD_E_NO_ACCESS, SmartCardError::NoAccess);
         m.insert(pcsc_sys::SCARD_E_NO_DIR, SmartCardError::NoDir);
         m.insert(pcsc_sys::SCARD_E_NO_FILE, SmartCardError::NoFile);
-        m.insert(pcsc_sys::SCARD_E_NO_KEY_CONTAINER, SmartCardError::NoKeyContainer);
+        m.insert(
+            pcsc_sys::SCARD_E_NO_KEY_CONTAINER,
+            SmartCardError::NoKeyContainer,
+        );
         m.insert(pcsc_sys::SCARD_E_NO_MEMORY, SmartCardError::NoMemory);
         m.insert(0x80100033, SmartCardError::NoPinCache);
-        m.insert(pcsc_sys::SCARD_E_NO_READERS_AVAILABLE, SmartCardError::NoReadersAvailable);
+        m.insert(
+            pcsc_sys::SCARD_E_NO_READERS_AVAILABLE,
+            SmartCardError::NoReadersAvailable,
+        );
         m.insert(pcsc_sys::SCARD_E_NO_SERVICE, SmartCardError::NoService);
         m.insert(pcsc_sys::SCARD_E_NO_SMARTCARD, SmartCardError::NoSmartCard);
-        m.insert(pcsc_sys::SCARD_E_NO_SUCH_CERTIFICATE, SmartCardError::NoSuchCertificate);
+        m.insert(
+            pcsc_sys::SCARD_E_NO_SUCH_CERTIFICATE,
+            SmartCardError::NoSuchCertificate,
+        );
         m.insert(pcsc_sys::SCARD_E_NOT_READY, SmartCardError::NotReady);
-        m.insert(pcsc_sys::SCARD_E_NOT_TRANSACTED, SmartCardError::NotTransacted);
+        m.insert(
+            pcsc_sys::SCARD_E_NOT_TRANSACTED,
+            SmartCardError::NotTransacted,
+        );
         m.insert(pcsc_sys::SCARD_E_PCI_TOO_SMALL, SmartCardError::PciTooSmall);
         m.insert(0x80100032, SmartCardError::PinCacheExpired);
-        m.insert(pcsc_sys::SCARD_E_PROTO_MISMATCH, SmartCardError::ProtoMismatch);
-        m.insert(pcsc_sys::SCARD_E_READER_UNAVAILABLE, SmartCardError::ReaderUnavailable);
-        m.insert(pcsc_sys::SCARD_E_READER_UNSUPPORTED, SmartCardError::ReaderUnsupported);
+        m.insert(
+            pcsc_sys::SCARD_E_PROTO_MISMATCH,
+            SmartCardError::ProtoMismatch,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_READER_UNAVAILABLE,
+            SmartCardError::ReaderUnavailable,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_READER_UNSUPPORTED,
+            SmartCardError::ReaderUnsupported,
+        );
         m.insert(0x80100034, SmartCardError::ReadOnlyCard);
         m.insert(pcsc_sys::SCARD_W_REMOVED_CARD, SmartCardError::RemovedCard);
         m.insert(pcsc_sys::SCARD_W_RESET_CARD, SmartCardError::ResetCard);
-        m.insert(pcsc_sys::SCARD_W_SECURITY_VIOLATION, SmartCardError::SecurityViolation);
-        m.insert(pcsc_sys::SCARD_E_SERVER_TOO_BUSY, SmartCardError::ServerTooBusy);
-        m.insert(pcsc_sys::SCARD_E_SERVICE_STOPPED, SmartCardError::ServiceStopped);
-        m.insert(pcsc_sys::SCARD_E_SHARING_VIOLATION, SmartCardError::SharingViolation);
+        m.insert(
+            pcsc_sys::SCARD_W_SECURITY_VIOLATION,
+            SmartCardError::SecurityViolation,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_SERVER_TOO_BUSY,
+            SmartCardError::ServerTooBusy,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_SERVICE_STOPPED,
+            SmartCardError::ServiceStopped,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_SHARING_VIOLATION,
+            SmartCardError::SharingViolation,
+        );
         m.insert(pcsc_sys::SCARD_P_SHUTDOWN, SmartCardError::Shutdown);
-        m.insert(pcsc_sys::SCARD_E_SYSTEM_CANCELLED, SmartCardError::SystemCancelled);
+        m.insert(
+            pcsc_sys::SCARD_E_SYSTEM_CANCELLED,
+            SmartCardError::SystemCancelled,
+        );
         m.insert(pcsc_sys::SCARD_E_TIMEOUT, SmartCardError::Timeout);
         m.insert(pcsc_sys::SCARD_E_UNEXPECTED, SmartCardError::Unexpected);
         m.insert(pcsc_sys::SCARD_E_UNKNOWN_CARD, SmartCardError::UnknownCard);
-        m.insert(pcsc_sys::SCARD_F_UNKNOWN_ERROR, SmartCardError::UnknownError);
-        m.insert(pcsc_sys::SCARD_E_UNKNOWN_READER, SmartCardError::UnknownReader);
-        m.insert(pcsc_sys::SCARD_E_UNKNOWN_RES_MNG, SmartCardError::UnknownResMng);
-        m.insert(pcsc_sys::SCARD_W_UNPOWERED_CARD, SmartCardError::UnpoweredCard);
-        m.insert(pcsc_sys::SCARD_W_UNRESPONSIVE_CARD, SmartCardError::UnresponsiveCard);
-        m.insert(pcsc_sys::SCARD_W_UNSUPPORTED_CARD, SmartCardError::UnsupportedCard);
-        m.insert(pcsc_sys::SCARD_E_UNSUPPORTED_FEATURE, SmartCardError::UnsupportedFeature);
-        m.insert(pcsc_sys::SCARD_F_WAITED_TOO_LONG, SmartCardError::WaitedTooLong);
-        m.insert(pcsc_sys::SCARD_E_WRITE_TOO_MANY, SmartCardError::WriteTooMany);
+        m.insert(
+            pcsc_sys::SCARD_F_UNKNOWN_ERROR,
+            SmartCardError::UnknownError,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_UNKNOWN_READER,
+            SmartCardError::UnknownReader,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_UNKNOWN_RES_MNG,
+            SmartCardError::UnknownResMng,
+        );
+        m.insert(
+            pcsc_sys::SCARD_W_UNPOWERED_CARD,
+            SmartCardError::UnpoweredCard,
+        );
+        m.insert(
+            pcsc_sys::SCARD_W_UNRESPONSIVE_CARD,
+            SmartCardError::UnresponsiveCard,
+        );
+        m.insert(
+            pcsc_sys::SCARD_W_UNSUPPORTED_CARD,
+            SmartCardError::UnsupportedCard,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_UNSUPPORTED_FEATURE,
+            SmartCardError::UnsupportedFeature,
+        );
+        m.insert(
+            pcsc_sys::SCARD_F_WAITED_TOO_LONG,
+            SmartCardError::WaitedTooLong,
+        );
+        m.insert(
+            pcsc_sys::SCARD_E_WRITE_TOO_MANY,
+            SmartCardError::WriteTooMany,
+        );
         m.insert(pcsc_sys::SCARD_W_WRONG_CHV, SmartCardError::WrongChv);
         m
     };
-
     static ref TO_SCARDERR_H_MAPPING: HashMap<SmartCardError, pcsc_sys::LONG> =
-        FROM_SCARDERR_H_MAPPING.iter().map(|pair| (*pair.1, *pair.0)).collect();
+        FROM_SCARDERR_H_MAPPING
+            .iter()
+            .map(|pair| (*pair.1, *pair.0))
+            .collect();
 }
 
 impl SmartCardError {

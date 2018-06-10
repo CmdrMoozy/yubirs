@@ -14,10 +14,10 @@
 
 use bdrck::testing::temp;
 use data_encoding;
-use piv::{DEFAULT_MGM_KEY, DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
 use piv::handle::{Handle, Version};
 use piv::id::*;
 use piv::pkey::Format;
+use piv::{DEFAULT_MGM_KEY, DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
 use std::fs::File;
 use std::io::Write;
 use tests::piv::hal::PcscTestStub;

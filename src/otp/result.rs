@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::DateTime;
 use chrono::offset::Utc;
+use chrono::DateTime;
 use data_encoding;
 use error::Result;
-use otp::Otp;
 use otp::util;
+use otp::Otp;
 use regex::Regex;
 use std::collections::HashMap;
 
@@ -107,9 +107,10 @@ lazy_static! {
         m.insert("sl", Field::SuccessPercent);
         m
     };
-
-    static ref FIELD_TO_STRING: HashMap<Field, &'static str> =
-        STRING_TO_FIELD.iter().map(|pair| (*pair.1, *pair.0)).collect();
+    static ref FIELD_TO_STRING: HashMap<Field, &'static str> = STRING_TO_FIELD
+        .iter()
+        .map(|pair| (*pair.1, *pair.0))
+        .collect();
 }
 
 fn string_to_field(s: &str) -> Result<Field> {
@@ -147,8 +148,8 @@ fn get_signature(fields: &HashMap<Field, &str>) -> Result<Vec<u8>> {
 }
 
 lazy_static! {
-    static ref DATETIME_REGEX: Regex = Regex::new(
-        r"^(?P<d>\d{4}-\d{2}-\d{2})T(?P<t>\d{2}:\d{2}:\d{2})Z(?P<ms>\d{4})$").unwrap();
+    static ref DATETIME_REGEX: Regex =
+        Regex::new(r"^(?P<d>\d{4}-\d{2}-\d{2})T(?P<t>\d{2}:\d{2}:\d{2})Z(?P<ms>\d{4})$").unwrap();
 }
 
 fn get_timestamp(fields: &HashMap<Field, &str>) -> Result<DateTime<Utc>> {

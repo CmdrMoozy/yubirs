@@ -25,7 +25,6 @@ use std::fmt;
 lazy_static! {
     static ref DVORAK_OTP_RE: Regex = Regex::new(r"^[jxe.uidchtnbpygk]{32,48}$").unwrap();
     static ref QWERTY_OTP_RE: Regex = Regex::new(r"^[cbdefghijklnrtuv]{32,48}$").unwrap();
-
     static ref DVORAK_TO_QWERTY: HashMap<char, char> = {
         let mut m = HashMap::new();
         m.insert('j', 'c');

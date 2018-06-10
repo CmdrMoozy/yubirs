@@ -15,8 +15,8 @@
 use data_encoding;
 use error::*;
 use openssl::rand::rand_bytes;
-use otp::Otp;
 use otp::util;
+use otp::Otp;
 use std::fmt;
 
 /// Generate a 40 character long string with random unique data. Note that the Yubico API will only
