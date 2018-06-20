@@ -1,6 +1,6 @@
 [package]
 name = "yubirs"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Axel Rasmussen <axel.rasmussen1@gmail.com>"]
 description = "A YubiKey OTP validation library"
 homepage = "https://github.com/CmdrMoozy/yubirs"
