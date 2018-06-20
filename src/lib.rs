@@ -18,7 +18,7 @@ extern crate chrono;
 extern crate curl;
 extern crate data_encoding;
 #[macro_use]
-extern crate error_chain;
+extern crate failure;
 extern crate isatty;
 #[macro_use]
 extern crate lazy_static;

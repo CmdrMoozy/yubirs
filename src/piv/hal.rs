@@ -276,7 +276,9 @@ impl PcscHal for PcscHardware {
             )
         })?;
         if readers_len as usize != buffer.len() {
-            bail!("Failed to retrieve full reader list due to buffer size race.");
+            return Err(Error::Internal(format_err!(
+                "Failed to retrieve full reader list due to buffer size race."
+            )));
         }
 
         let ret: ::std::result::Result<Vec<String>, ::std::str::Utf8Error> = buffer

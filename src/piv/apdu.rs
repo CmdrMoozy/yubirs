@@ -38,11 +38,11 @@ pub struct Apdu {
 impl Apdu {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > APDU_BYTES {
-            bail!(
+            return Err(Error::InvalidArgument(format_err!(
                 "Invalid APDU data; expected at most {} bytes, got {}",
                 APDU_BYTES,
                 bytes.len()
-            );
+            )));
         }
         let mut apdu = Apdu {
             raw: [0; APDU_BYTES],
@@ -55,11 +55,11 @@ impl Apdu {
 
     pub fn from_pieces(cla: u8, ins: u8, p1: u8, p2: u8, lc: u8, data: &[u8]) -> Result<Self> {
         if data.len() > APDU_DATA_BYTES {
-            bail!(
+            return Err(Error::InvalidArgument(format_err!(
                 "Invalid APDU data; expected at most {} bytes, got {}",
                 APDU_DATA_BYTES,
                 data.len()
-            );
+            )));
         }
         let mut apdu = Apdu {
             raw: [0; APDU_BYTES],

@@ -72,10 +72,10 @@ const ODD_PARITY_BYTES: [u8; 256] = [
 /// The given management key should be in binary, and must be MGM_KEY_BYTES in length.
 pub fn is_weak_mgm_key(mgm_key: &[u8]) -> Result<bool> {
     if mgm_key.len() != MGM_KEY_BYTES {
-        bail!(
+        return Err(Error::InvalidArgument(format_err!(
             "Invalid management key; must be {} bytes long",
             MGM_KEY_BYTES
-        );
+        )));
     }
     let mgm_key: Vec<u8> = mgm_key
         .iter()
@@ -91,16 +91,16 @@ pub fn is_weak_mgm_key(mgm_key: &[u8]) -> Result<bool> {
 
 pub fn decrypt_des_challenge(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>> {
     if key.len() != MGM_KEY_BYTES {
-        bail!(
+        return Err(Error::InvalidArgument(format_err!(
             "Invalid management key; must be {} bytes long",
             MGM_KEY_BYTES
-        );
+        )));
     }
     if ciphertext.len() != DES_CHALLENGE_BYTES {
-        bail!(
+        return Err(Error::InvalidArgument(format_err!(
             "Invalid challenge; must be {} bytes long",
             DES_CHALLENGE_BYTES
-        );
+        )));
     }
 
     let mut crypter = openssl::symm::Crypter::new(
@@ -124,16 +124,16 @@ pub fn decrypt_des_challenge(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>> {
 
 pub fn encrypt_des_challenge(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
     if key.len() != MGM_KEY_BYTES {
-        bail!(
+        return Err(Error::InvalidArgument(format_err!(
             "Invalid management key; must be {} bytes long",
             MGM_KEY_BYTES
-        );
+        )));
     }
     if plaintext.len() != DES_CHALLENGE_BYTES {
-        bail!(
+        return Err(Error::InvalidArgument(format_err!(
             "Invalid challenge; must be {} bytes long",
             DES_CHALLENGE_BYTES
-        );
+        )));
     }
 
     let mut crypter = openssl::symm::Crypter::new(

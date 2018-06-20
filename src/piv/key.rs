@@ -19,13 +19,14 @@ use piv::handle::Handle;
 use piv::id;
 use piv::pkey::{Format, PublicKey};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 /// Key is an AbstractKey structure using a public/private key pair stored on a
 /// PC/SC hardware device. The idea is that we can use a hardware key for
 /// encryption / decryption, and thus can use it as a wrapping key in a
 /// KeyStore.
 pub struct Key<T: PcscHal> {
-    handle: Handle<T>,
+    handle: Mutex<Handle<T>>,
     pin: Option<String>,
     slot: id::Key,
     public_key_path: PathBuf,
@@ -56,7 +57,7 @@ impl<T: PcscHal> Key<T> {
         let data = pk.format(Format::Pem)?;
 
         Ok(Key {
-            handle: handle,
+            handle: Mutex::new(handle),
             pin: pin.map(|p| p.to_owned()),
             slot: slot,
             public_key_path: public_key.as_ref().to_path_buf(),
@@ -74,30 +75,35 @@ impl<T: PcscHal> AbstractKey for Key<T> {
     }
 
     fn encrypt(
-        &mut self,
+        &self,
         plaintext: &[u8],
     ) -> ::std::result::Result<(Option<Nonce>, Vec<u8>), Self::Err> {
-        Ok((
-            None,
-            self.handle
-                .encrypt(self.public_key_path.as_path(), plaintext)?
-                .1,
-        ))
+        let ciphertext = {
+            let handle = self.handle.lock().unwrap();
+            handle.encrypt(self.public_key_path.as_path(), plaintext)?.1
+        };
+        Ok((None, ciphertext))
     }
 
     fn decrypt(
-        &mut self,
+        &self,
         nonce: Option<&Nonce>,
         ciphertext: &[u8],
     ) -> ::std::result::Result<Vec<u8>, Self::Err> {
         if nonce.is_some() {
-            bail!("PC/SC hardware key decryption does not use nonces");
+            return Err(Error::InvalidArgument(format_err!(
+                "Smart card hardware key decryption does not use nonces"
+            )));
         }
-        Ok(self.handle.decrypt(
-            self.pin.as_ref().map(|p| p.as_str()),
-            ciphertext,
-            self.slot,
-            self.public_key.get_algorithm()?,
-        )?)
+        let plaintext = {
+            let mut handle = self.handle.lock().unwrap();
+            handle.decrypt(
+                self.pin.as_ref().map(|p| p.as_str()),
+                ciphertext,
+                self.slot,
+                self.public_key.get_algorithm()?,
+            )?
+        };
+        Ok(plaintext)
     }
 }

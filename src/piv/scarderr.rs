@@ -16,7 +16,7 @@ use pcsc_sys;
 use std::collections::HashMap;
 use std::fmt;
 
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum SmartCardError {
     BadSeek,
     BrokenPipe,
@@ -58,6 +58,7 @@ pub enum SmartCardError {
     NoSuchCertificate,
     NotReady,
     NotTransacted,
+    Other(String),
     PciTooSmall,
     PinCacheExpired,
     ProtoMismatch,
@@ -279,7 +280,7 @@ lazy_static! {
     static ref TO_SCARDERR_H_MAPPING: HashMap<SmartCardError, pcsc_sys::LONG> =
         FROM_SCARDERR_H_MAPPING
             .iter()
-            .map(|pair| (*pair.1, *pair.0))
+            .map(|pair| (pair.1.clone(), *pair.0))
             .collect();
 }
 
@@ -288,21 +289,28 @@ impl SmartCardError {
         match code {
             pcsc_sys::SCARD_S_SUCCESS => Ok(()),
             _ => if let Some(e) = FROM_SCARDERR_H_MAPPING.get(&code) {
-                Err(*e)
+                Err(e.clone())
             } else {
                 Err(SmartCardError::UnknownResMng)
             },
         }
     }
 
+    pub fn new_other(s: &str) -> Self {
+        SmartCardError::Other(s.to_owned())
+    }
+
     pub fn get_code(&self) -> pcsc_sys::LONG {
-        *TO_SCARDERR_H_MAPPING.get(self).unwrap()
+        match self {
+            SmartCardError::Other(_) => pcsc_sys::SCARD_F_UNKNOWN_ERROR,
+            _ => *TO_SCARDERR_H_MAPPING.get(self).unwrap(),
+        }
     }
 }
 
 impl ::std::error::Error for SmartCardError {
     fn description(&self) -> &str {
-        match *self {
+        match self {
             SmartCardError::BadSeek => {
                 "An error occurred in setting the smart card file object pointer."
             }
@@ -389,6 +397,7 @@ impl ::std::error::Error for SmartCardError {
             SmartCardError::NotTransacted => {
                 "An attempt was made to end a nonexistent transaction."
             }
+            SmartCardError::Other(_) => "Other / unknown smart card error.",
             SmartCardError::PciTooSmall => "The PCI receive buffer was too small.",
             SmartCardError::PinCacheExpired => "The smart card PIN cache has expired.",
             SmartCardError::ProtoMismatch => {
@@ -453,7 +462,14 @@ impl ::std::error::Error for SmartCardError {
 impl fmt::Display for SmartCardError {
     fn fmt(&self, f: &mut fmt::Formatter) -> ::std::result::Result<(), fmt::Error> {
         use std::error::Error;
-        write!(f, "{}", self.description())
+        write!(
+            f,
+            "{}",
+            match self {
+                SmartCardError::Other(message) => message.as_str(),
+                _ => self.description(),
+            }
+        )
     }
 }
 

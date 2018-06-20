@@ -58,55 +58,55 @@ impl StatusWord {
         } else if value & 0xff00 == 0x6700 {
             Err(SmartCardError::InvalidParameter.into())
         } else if value & 0xff00 == 0x6c00 {
-            Err("Incorrect P3 length".into())
+            Err(SmartCardError::new_other("Incorrect P3 length").into())
         } else if value & 0xff00 == 0x9200 {
             Err(SmartCardError::NoMemory.into())
         } else if value & 0xff00 == 0x9400 {
-            Err("File error".into())
+            Err(SmartCardError::new_other("File error").into())
         } else if value & 0xff00 == 0x9800 {
-            Err("Security error".into())
+            Err(SmartCardError::new_other("Security error").into())
         } else {
             match value {
-                0x6200 => Err("No information given".into()),
-                0x6281 => Err("Returned data may be corrupted".into()),
+                0x6200 => Err(SmartCardError::new_other("No information given").into()),
+                0x6281 => Err(SmartCardError::new_other("Returned data may be corrupted").into()),
                 0x6282 => Err(SmartCardError::Eof.into()),
-                0x6283 => Err("Invalid DF".into()),
-                0x6284 => Err("Selected file is not valid; file descriptor error".into()),
+                0x6283 => Err(SmartCardError::new_other("Invalid DF").into()),
+                0x6284 => Err(SmartCardError::new_other("Selected file is not valid; file descriptor error").into()),
                 0x6300 => Err(SmartCardError::InvalidChv.into()),
-                0x6381 => Err("File filled up by the last write".into()),
-                0x6501 => Err("Memory failure; there have been problems in writing or reading the EEPROM; other hardware problems may also bring this error".into()),
-                0x6581 => Err("Write problem / memory failure / unknown mode".into()),
-                0x6700 => Err("Incorrect length or address range error".into()),
+                0x6381 => Err(SmartCardError::new_other("File filled up by the last write").into()),
+                0x6501 => Err(SmartCardError::new_other("Memory failure; there have been problems in writing or reading the EEPROM; other hardware problems may also bring this error").into()),
+                0x6581 => Err(SmartCardError::new_other("Write problem / memory failure / unknown mode").into()),
+                0x6700 => Err(SmartCardError::new_other("Incorrect length or address range error").into()),
                 0x6800 => Err(SmartCardError::UnsupportedFeature.into()),
-                0x6881 => Err("Logical channel not supported".into()),
-                0x6882 => Err("Secure messaging not supported".into()),
-                0x6900 => Err("No successful transaction executed during session".into()),
-                0x6981 => Err("Cannot select indicated file, command not compatible with file organization".into()),
-                0x6982 => Err("Authentication failure".into()),
+                0x6881 => Err(SmartCardError::new_other("Logical channel not supported").into()),
+                0x6882 => Err(SmartCardError::new_other("Secure messaging not supported").into()),
+                0x6900 => Err(SmartCardError::new_other("No successful transaction executed during session").into()),
+                0x6981 => Err(SmartCardError::new_other("Cannot select indicated file, command not compatible with file organization").into()),
+                0x6982 => Err(SmartCardError::new_other("Authentication failure").into()),
                 0x6983 => Err(SmartCardError::ChvBlocked.into()),
-                0x6984 => Err("Referenced data invalidated".into()),
-                0x6985 => Err("No currently selected EF, no command to monitor / no Transaction Manager File".into()),
-                0x6986 => Err("Command not allowed (no current EF)".into()),
-                0x6987 => Err("Expected SM data objects missing".into()),
-                0x6988 => Err("SM data objects incorrect".into()),
-                0x6a00 => Err("Bytes P1 and / or P2 are incorrect".into()),
+                0x6984 => Err(SmartCardError::new_other("Referenced data invalidated").into()),
+                0x6985 => Err(SmartCardError::new_other("No currently selected EF, no command to monitor / no Transaction Manager File").into()),
+                0x6986 => Err(SmartCardError::new_other("Command not allowed (no current EF)").into()),
+                0x6987 => Err(SmartCardError::new_other("Expected SM data objects missing").into()),
+                0x6988 => Err(SmartCardError::new_other("SM data objects incorrect").into()),
+                0x6a00 => Err(SmartCardError::new_other("Bytes P1 and / or P2 are incorrect").into()),
                 0x6a80 => Err(SmartCardError::InvalidParameter.into()),
-                0x6a81 => Err("Card is blocked or command not supported".into()),
+                0x6a81 => Err(SmartCardError::new_other("Card is blocked or command not supported").into()),
                 0x6a82 => Err(SmartCardError::FileNotFound.into()),
-                0x6a83 => Err("Record not found".into()),
+                0x6a83 => Err(SmartCardError::new_other("Record not found").into()),
                 0x6a84 => Err(SmartCardError::NoMemory.into()),
-                0x6a85 => Err("L_C inconsistent with TLV structure".into()),
-                0x6a86 => Err("Incorrect parameters P1-P2".into()),
-                0x6a87 => Err("The P3 value is not consistent with the P1 and P2 values".into()),
-                0x6a88 => Err("Referenced data not found".into()),
-                0x6b00 => Err("Incorrect object or key slot".into()),
-                0x6d00 => Err("Command not allowed; invalid instruction byte".into()),
-                0x6e00 => Err("Incorrect application; invalid CLA parameter".into()),
-                0x6f00 => Err("Checking error".into()),
+                0x6a85 => Err(SmartCardError::new_other("L_C inconsistent with TLV structure").into()),
+                0x6a86 => Err(SmartCardError::new_other("Incorrect parameters P1-P2").into()),
+                0x6a87 => Err(SmartCardError::new_other("The P3 value is not consistent with the P1 and P2 values").into()),
+                0x6a88 => Err(SmartCardError::new_other("Referenced data not found").into()),
+                0x6b00 => Err(SmartCardError::new_other("Incorrect object or key slot").into()),
+                0x6d00 => Err(SmartCardError::new_other("Command not allowed; invalid instruction byte").into()),
+                0x6e00 => Err(SmartCardError::new_other("Incorrect application; invalid CLA parameter").into()),
+                0x6f00 => Err(SmartCardError::new_other("Checking error").into()),
                 0x9000 => Ok(()),
-                0x9100 => Err("Purse balance error: cannot perform transaction".into()),
-                0x9102 => Err("Purse balance error".into()),
-                _ => Err(format!("Unknown status word error code {:#x}", value).into()),
+                0x9100 => Err(SmartCardError::new_other("Purse balance error: cannot perform transaction").into()),
+                0x9102 => Err(SmartCardError::new_other("Purse balance error").into()),
+                _ => Err(SmartCardError::new_other(format!("Unknown status word error code {:#x}", value).as_str()).into()),
             }
         };
 

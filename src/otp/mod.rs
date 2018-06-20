@@ -17,7 +17,7 @@ pub mod request;
 pub mod result;
 pub mod util;
 
-use error::Result;
+use error::*;
 use regex::Regex;
 use std::collections::HashMap;
 use std::fmt;
@@ -57,11 +57,7 @@ fn to_qwerty(otp: &str) -> Result<String> {
     } else if QWERTY_OTP_RE.is_match(otp.as_str()) {
         Ok(otp.to_owned())
     } else {
-        bail!(
-            "'{}' is not a valid Yubikey OTP. It is the wrong length or contains invalid \
-             characters.",
-            otp
-        );
+        return Err(Error::InvalidArgument(format_err!("'{}' is not a valid Yubikey OTP. It is the wrong length or contains invalid characters", otp)));
     }
 }
 

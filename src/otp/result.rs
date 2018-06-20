@@ -15,7 +15,7 @@
 use chrono::offset::Utc;
 use chrono::DateTime;
 use data_encoding;
-use error::Result;
+use error::*;
 use otp::util;
 use otp::Otp;
 use regex::Regex;
@@ -67,7 +67,10 @@ fn string_to_status(s: &str) -> Result<Status> {
     if let Some(status) = STRING_TO_STATUS.get(s) {
         return Ok(*status);
     } else {
-        bail!("Invalid status '{}'", s);
+        return Err(Error::InvalidArgument(format_err!(
+            "Invalid status '{}'",
+            s
+        )));
     }
 }
 
@@ -117,7 +120,10 @@ fn string_to_field(s: &str) -> Result<Field> {
     if let Some(field) = STRING_TO_FIELD.get(s) {
         return Ok(*field);
     } else {
-        bail!("Invalid field name '{}'", s);
+        return Err(Error::InvalidArgument(format_err!(
+            "Invalid field name '{}'",
+            s
+        )));
     }
 }
 
@@ -136,7 +142,9 @@ fn get_required_field<'a>(fields: &HashMap<Field, &'a str>, field: Field) -> Res
     if let Some(s) = fields.get(&field) {
         return Ok(s);
     }
-    bail!("Required field missing from response");
+    return Err(Error::InvalidArgument(format_err!(
+        "Required field missing from response"
+    )));
 }
 
 fn get_cloned_string_field(fields: &HashMap<Field, &str>, field: Field) -> Option<String> {
@@ -164,7 +172,9 @@ fn get_timestamp(fields: &HashMap<Field, &str>) -> Result<DateTime<Utc>> {
         );
         return Ok(Utc.datetime_from_str(reformatted.as_str(), "%Y-%m-%d %H:%M:%S %f")?);
     }
-    bail!("Response contained incorrectly formatted 't' field");
+    return Err(Error::InvalidArgument(format_err!(
+        "Response contained incorrectly formatted 't' field"
+    )));
 }
 
 fn get_success_percent(fields: &HashMap<Field, &str>) -> Result<Option<u8>> {
@@ -238,17 +248,23 @@ impl VerificationResult {
 
         if result.status == Status::Ok {
             if result.otp.as_ref().map_or("", |s| s.as_str()) != expected_otp.to_string() {
-                bail!("OTP in response did not match OTP sent with request");
+                return Err(Error::Authentication(format_err!(
+                    "OTP in response did not match OTP sent with request"
+                )));
             }
         }
         if result.status == Status::Ok {
             if result.nonce.as_ref().map_or("", |s| s.as_str()) != expected_nonce {
-                bail!("Nonce in response did not match nonce sent with request");
+                return Err(Error::Authentication(format_err!(
+                    "Nonce in response did not match nonce sent with request"
+                )));
             }
         }
 
         if util::generate_signature(api_key, result.signature_data.clone())? != result.signature {
-            bail!("Verifying response signature failed");
+            return Err(Error::Authentication(format_err!(
+                "Verifying response signature failed"
+            )));
         }
 
         Ok(result)

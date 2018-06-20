@@ -84,7 +84,9 @@ impl PcscHal for PcscTestStub {
 
     fn send_data_impl(&self, apdu: &Apdu) -> Result<(StatusWord, Vec<u8>)> {
         if !self.connected {
-            bail!("Can't send data without first being connected.");
+            return Err(Error::Internal(format_err!(
+                "Can't send data without first being connected"
+            )));
         }
 
         let entry: RecordingEntry;
@@ -93,7 +95,11 @@ impl PcscHal for PcscTestStub {
 
         {
             let recording = match recordings.front_mut() {
-                None => bail!("Unexpected call to send_data_impl (no more mock recordings)"),
+                None => {
+                    return Err(Error::Internal(format_err!(
+                        "Unexpected call to send_data_impl (no more mock recordings)"
+                    )))
+                }
                 Some(recording) => recording,
             };
             entry = recording.0.pop_front().unwrap();
@@ -112,19 +118,26 @@ impl PcscHal for PcscTestStub {
             expected_sent, apdu
         );
 
-        Ok(entry.received?)
+        Ok(match entry.received {
+            Ok(v) => v,
+            Err(msg) => return Err(Error::Internal(format_err!("{}", msg))),
+        })
     }
 
     fn begin_transaction(&self) -> Result<()> {
         if !self.connected {
-            bail!("Can't begin transaction without first being connected.");
+            return Err(Error::Internal(format_err!(
+                "Can't begin transaction without first being connected."
+            )));
         }
         Ok(())
     }
 
     fn end_transaction(&self) -> Result<()> {
         if !self.connected {
-            bail!("Can't end transaction without first being connected.");
+            return Err(Error::Internal(format_err!(
+                "Can't end transaction without first being connected."
+            )));
         }
         Ok(())
     }

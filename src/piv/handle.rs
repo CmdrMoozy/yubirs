@@ -110,14 +110,17 @@ where
                 // retrying with the same value over again. In this case, just bail now.
                 match value.was_provided() {
                     false => eprintln!("Incorrect {}, try again - {} tries remaining", name, tries),
-                    true => bail!(err),
+                    true => return Err(err),
                 };
             }
             VerificationResult::PermanentFailure(err) => {
                 debug!("Incorrect {}, 0 tries remaining: {}", name, err);
-                bail!("Verifying {} failed: no more retries", name);
+                return Err(Error::Authentication(format_err!(
+                    "Verifying {} failed: no more retries",
+                    name
+                )));
             }
-            VerificationResult::OtherFailure(err) => bail!(err),
+            VerificationResult::OtherFailure(err) => return Err(err),
         }
     }
 }
@@ -213,7 +216,9 @@ fn sign_decipher_impl<T: PcscHal>(
     decipher: bool,
 ) -> Result<Vec<u8>> {
     if !algorithm.is_rsa() && !algorithm.is_ecc() {
-        bail!("Data signing / deciphering only supports RSA or EC algorithms");
+        return Err(Error::InvalidArgument(format_err!(
+            "Data signing / deciphering only supports RSA or EC algorithms"
+        )));
     }
 
     let key_len: usize = match algorithm {
@@ -225,15 +230,21 @@ fn sign_decipher_impl<T: PcscHal>(
     };
 
     if algorithm.is_rsa() && data.len() != key_len {
-        bail!("Invalid input data; expected exactly {} bytes", key_len);
+        return Err(Error::InvalidArgument(format_err!(
+            "Invalid input data; expected exactly {} bytes",
+            key_len
+        )));
     } else if algorithm.is_ecc() {
         if !decipher && data.len() > key_len {
-            bail!("Invalid input data; expected at most {} bytes", key_len);
+            return Err(Error::InvalidArgument(format_err!(
+                "Invalid input data; expected at most {} bytes",
+                key_len
+            )));
         } else if decipher && data.len() != (key_len * 2) + 1 {
-            bail!(
+            return Err(Error::InvalidArgument(format_err!(
                 "Invalid input data; expected exactly {} bytes",
                 (key_len * 2) + 1
-            );
+            )));
         }
     }
 
@@ -294,13 +305,17 @@ fn sign_decipher_impl<T: PcscHal>(
 
     // Skip the first 7c tag.
     match recv.get(0) {
-        None => bail!("Failed to parse tag from signature reply: reply too short"),
+        None => {
+            return Err(Error::Internal(format_err!(
+                "Failed to parse tag from signature reply: reply too short"
+            )))
+        }
         Some(b) => if *b != 0x7c {
-            bail!(
+            return Err(Error::Internal(format_err!(
                 "Failed to parse tag from signature reply: got {:02x}, expected {:02x}",
                 *b,
                 0x7c
-            );
+            )));
         },
     }
     let (recv_slice, _) = ::piv::util::read_length(&recv[1..])?;
@@ -308,13 +323,17 @@ fn sign_decipher_impl<T: PcscHal>(
 
     // Skip the 82 tag.
     match recv_slice.get(0) {
-        None => bail!("Failed to parse tag from signature reply: reply too short"),
+        None => {
+            return Err(Error::Internal(format_err!(
+                "Failed to parse tag from signature reply: reply too short"
+            )))
+        }
         Some(b) => if *b != 0x82 {
-            bail!(
+            return Err(Error::Internal(format_err!(
                 "Failed to parse tag from signature reply: got {:02x}, expected {:02x}",
                 *b,
                 0x82
-            );
+            )));
         },
     }
     let (recv_slice, len) = ::piv::util::read_length(&recv_slice[1..])?;
@@ -408,28 +427,24 @@ fn change_impl<T: PcscHal>(
     new: &MaybePromptedString,
 ) -> VerificationResult {
     if existing.len() > 8 {
-        return VerificationResult::OtherFailure(
-            format!(
-                "Invalid existing {}; it exceeds 8 characters",
-                match action {
-                    ChangeAction::ChangePin => PIN_NAME,
-                    ChangeAction::UnblockPin => PUK_NAME,
-                    ChangeAction::ChangePuk => PUK_NAME,
-                }
-            ).into(),
-        );
+        return VerificationResult::OtherFailure(Error::InvalidArgument(format_err!(
+            "Invalid existing {}; it exceeds 8 characters",
+            match action {
+                ChangeAction::ChangePin => PIN_NAME,
+                ChangeAction::UnblockPin => PIN_NAME,
+                ChangeAction::ChangePuk => PUK_NAME,
+            }
+        )));
     }
     if new.len() > 8 {
-        return VerificationResult::OtherFailure(
-            format!(
-                "Invalid new {}; it exceeds 8 characters",
-                match action {
-                    ChangeAction::ChangePin => PIN_NAME,
-                    ChangeAction::UnblockPin => PIN_NAME,
-                    ChangeAction::ChangePuk => PUK_NAME,
-                }
-            ).into(),
-        );
+        return VerificationResult::OtherFailure(Error::InvalidArgument(format_err!(
+            "Invalid new {}; it exceeds 8 characters",
+            match action {
+                ChangeAction::ChangePin => PIN_NAME,
+                ChangeAction::UnblockPin => PIN_NAME,
+                ChangeAction::ChangePuk => PUK_NAME,
+            }
+        )));
     }
 
     let mut templ: Vec<u8> = vec![0, Instruction::ChangeReference.to_value(), 0, 0x80];
@@ -470,7 +485,9 @@ pub struct Version(pub u8, pub u8, pub u8);
 impl Version {
     pub fn new(data: &[u8]) -> Result<Version> {
         if data.len() < 3 {
-            bail!("Version data must be three bytes long.");
+            return Err(Error::InvalidArgument(format_err!(
+                "Version data must be three bytes long."
+            )));
         }
         Ok(Version(data[0], data[1], data[2]))
     }
@@ -554,9 +571,9 @@ impl<T: PcscHal> Handle<T> {
 
         verification_loop(PIN_NAME, pin, PIN_PROMPT, |pin| {
             if pin.len() > 8 {
-                return VerificationResult::OtherFailure(
-                    "Invalid PIN; it exceeds 8 characters".into(),
-                );
+                return VerificationResult::OtherFailure(Error::InvalidArgument(format_err!(
+                    "Invalid PIN; it exceeds 8 characters"
+                )));
             }
 
             let mut data: [u8; 8] = [0xff; 8];
@@ -629,7 +646,9 @@ impl<T: PcscHal> Handle<T> {
         let expected_card_reply =
             encrypt_des_challenge(mgm_key.as_slice(), expected_card_reply.as_slice())?;
         if expected_card_reply.as_slice() != &response[4..12] {
-            bail!("Management key authentication failed");
+            return Err(Error::Authentication(format_err!(
+                "Management key authentication failed"
+            )));
         }
 
         Ok(())
@@ -780,7 +799,9 @@ impl<T: PcscHal> Handle<T> {
         let new_mgm_key: Vec<u8> = data_encoding::HEXLOWER_PERMISSIVE
             .decode(MaybePromptedString::new(new_mgm_key, NEW_MGM_KEY_PROMPT, true)?.as_bytes())?;
         if is_weak_mgm_key(new_mgm_key.as_slice())? {
-            bail!("Refusing to set new management key because it contains weak DES keys");
+            return Err(Error::InvalidArgument(format_err!(
+                "Refusing to set new management key because it contains weak DES keys"
+            )));
         }
 
         let mut data: [u8; 255] = [0; 255];
@@ -875,7 +896,9 @@ impl<T: PcscHal> Handle<T> {
             recv.remove(0);
             recv.truncate(length);
         } else {
-            bail!("Failed to determine size of returned data object");
+            return Err(Error::Internal(format_err!(
+                "Failed to determine size of returned data object"
+            )));
         }
 
         Ok(recv)
@@ -907,18 +930,22 @@ impl<T: PcscHal> Handle<T> {
         touch_policy: TouchPolicy,
     ) -> Result<PublicKey> {
         if !(algorithm.is_rsa() || algorithm.is_ecc()) {
-            bail!("Only RSA and ECC algorithms are supported by this function");
+            return Err(Error::InvalidArgument(format_err!(
+                "Only RSA and ECC algorithms are supported by this function"
+            )));
         }
 
         // As per https://developers.yubico.com/yubico-piv-tool/YKCS11_release_notes.html
         if algorithm == Algorithm::Eccp384 {
-            bail!("384-bit EC key generation is not supported");
+            return Err(Error::InvalidArgument(format_err!(
+                "384-bit EC key generation is not supported"
+            )));
         }
 
         if algorithm.is_rsa() {
             let version = self.get_version()?;
             if version >= Version(4, 2, 6) && version <= Version(4, 3, 4) {
-                bail!("This device is affected by https://yubi.co/ysa201701/, so RSA key generation is disabled");
+                return Err(Error::InvalidArgument(format_err!("This device is affected by https://yubi.co/ysa201701/, so RSA key generation is disabled")));
             }
         }
 
@@ -990,7 +1017,9 @@ impl<T: PcscHal> Handle<T> {
         sw.error?;
 
         if *recv.get(0).unwrap_or(&0) != 0x30 {
-            bail!("Failed to attest key; got invalid response from device");
+            return Err(Error::Internal(format_err!(
+                "Failed to attest key; got invalid response from device"
+            )));
         }
 
         Ok(PublicKeyCertificate::from_der(recv.as_slice())?)
@@ -1005,10 +1034,10 @@ impl<T: PcscHal> Handle<T> {
         // function to write X509 certificates is implemented + tested.
         let object = self.read_object(slot.to_object()?)?;
         if object.len() < 2 {
-            bail!(
+            return Err(Error::Internal(format_err!(
                 "Expected at least two bytes in the stored object, got {}",
                 object.len()
-            );
+            )));
         }
 
         let has_tag: bool = match object.get(0) {
@@ -1016,7 +1045,9 @@ impl<T: PcscHal> Handle<T> {
             Some(byte) => *byte == 0x70,
         };
         if !has_tag {
-            bail!("The object stored on the device lacks the expected tag");
+            return Err(Error::Internal(format_err!(
+                "The object stored on the device lacks the expected tag"
+            )));
         }
 
         let (der, len) = ::piv::util::read_length(&object[1..])?;
@@ -1064,18 +1095,22 @@ impl<T: PcscHal> Handle<T> {
                 match algorithm {
                     Algorithm::Rsa1024 => 1024 / 8,
                     Algorithm::Rsa2048 => 2048 / 8,
-                    _ => bail!("Unsupported algorithm {:?}", algorithm),
+                    _ => {
+                        return Err(Error::InvalidArgument(format_err!(
+                            "Unsupported algorithm {:?}",
+                            algorithm
+                        )))
+                    }
                 },
             )
         };
         if len == -1 {
-            bail!(
-                "Verifying plaintext padding failed: {}",
-                match openssl::error::Error::get() {
-                    None => "unknown error".to_owned(),
-                    Some(err) => err.to_string(),
-                }
-            );
+            let errors = openssl::error::ErrorStack::get();
+            let has_errors = errors.errors().is_empty();
+            return Err(match has_errors {
+                false => Error::Unknown(format_err!("Unknown error")),
+                true => errors.into(),
+            });
         }
         unpadded.truncate(len as usize);
         Ok(unpadded)

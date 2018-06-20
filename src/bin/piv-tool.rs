@@ -15,7 +15,7 @@
 extern crate bdrck;
 extern crate data_encoding;
 #[macro_use]
-extern crate error_chain;
+extern crate failure;
 extern crate isatty;
 extern crate yubirs;
 
@@ -253,7 +253,9 @@ fn test_decrypt(values: Values) -> Result<()> {
             .collect::<String>()
     );
     if plaintext != result_plaintext {
-        bail!("Decryption test failed; decrypted result did not match original plaintext");
+        return Err(Error::Internal(format_err!(
+            "Decryption test failed; decrypted result did not match original plaintext"
+        )));
     }
     println!("Success!");
     Ok(())

@@ -16,11 +16,13 @@ use error::*;
 
 pub fn get_required_as<T: Clone + Copy, R: From<T>>(data: &[T], index: usize) -> Result<R> {
     Ok(match data.get(index) {
-        None => bail!(
-            "The provided slice has only {} items, expected at least {}",
-            data.len(),
-            index + 1
-        ),
+        None => {
+            return Err(Error::InvalidArgument(format_err!(
+                "The provided slice has only {} items, expected at least {}",
+                data.len(),
+                index + 1
+            )))
+        }
         Some(item) => (*item).into(),
     })
 }
@@ -45,22 +47,22 @@ pub fn read_length<'a>(data: &'a [u8]) -> Result<(&'a [u8], usize)> {
         let length = get_required_as::<u8, usize>(data, 0)?;
         let data = &data[1..];
         if data.len() < length {
-            bail!(
+            return Err(Error::InvalidArgument(format_err!(
                 "Parsed length says there should be at least {} more bytes, but found only {}",
                 length,
                 data.len()
-            );
+            )));
         }
         return Ok((data, length));
     } else if (get_required(data, 0)? & 0x7f) == 1 {
         let length = get_required_as::<u8, usize>(data, 1)?;
         let data = &data[2..];
         if data.len() < length {
-            bail!(
+            return Err(Error::InvalidArgument(format_err!(
                 "Parsed length says there should be at least {} more bytes, but found only {}",
                 length,
                 data.len()
-            );
+            )));
         }
         return Ok((data, length));
     } else if (get_required(data, 0)? & 0x7f) == 2 {
@@ -68,13 +70,16 @@ pub fn read_length<'a>(data: &'a [u8]) -> Result<(&'a [u8], usize)> {
             (get_required_as::<u8, usize>(data, 1)? << 8) + get_required_as::<u8, usize>(data, 2)?;
         let data = &data[3..];
         if data.len() < length {
-            bail!(
+            return Err(Error::InvalidArgument(format_err!(
                 "Parsed length says there should be at least {} more bytes, but found only {}",
                 length,
                 data.len()
-            );
+            )));
         }
         return Ok((data, length));
     }
-    bail!("Failed to parse length from the given slice");
+
+    Err(Error::InvalidArgument(format_err!(
+        "Failed to parse length from the given slice"
+    )))
 }
