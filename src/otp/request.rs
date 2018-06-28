@@ -42,7 +42,7 @@ fn gen_yubico_api_nonce() -> Result<String> {
 /// The possible values for the "success percentage" request parameter. From the validation server
 /// specification, this value is: "A value of 0 to 100 indicating percentage of syncing required by
 /// client, or strings 'fast' or 'secure' to use server-configured values."
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum SuccessPercentage {
     Fast,
     Secure,

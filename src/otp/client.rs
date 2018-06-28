@@ -22,7 +22,7 @@ use rpassword::prompt_password_stderr;
 use std::collections::HashMap;
 
 /// The protocol to use to make the verification request.
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum Protocol {
     /// Use plain HTTP. Not recommended.
     Http,

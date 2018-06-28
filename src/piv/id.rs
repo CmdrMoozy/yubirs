@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum Algorithm {
     Des,
     Rsa1024,
@@ -97,7 +97,7 @@ impl Algorithm {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum Instruction {
     Attest,
     Authenticate,
@@ -185,7 +185,7 @@ impl Instruction {
 
 /// This enumeration describes the identifiers for the various slots the Yubikey has for
 /// certificates.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum Key {
     /// Used to authenticate the card and the cardholder. Used for things like system login. The
     /// PIN is required to perform any private key operations.
@@ -360,7 +360,7 @@ impl Key {
 }
 
 /// This enumeration describes the identifiers for the various objects a YubiKey can store.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum Object {
     Capability,
     Chuid,
@@ -509,7 +509,7 @@ impl Object {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum PinPolicy {
     Default,
     Never,
@@ -568,7 +568,7 @@ impl PinPolicy {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum Tag {
     Algorithm,
     PinPolicy,
@@ -619,7 +619,7 @@ impl Tag {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum TouchPolicy {
     Default,
     Never,
