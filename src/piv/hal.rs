@@ -252,7 +252,8 @@ impl PcscHal for PcscHardware {
 
     fn cheap_random_bytes(&self, buf: &mut [u8]) -> Result<()> {
         let len = buf.len();
-        for (dst, src) in buf.iter_mut()
+        for (dst, src) in buf
+            .iter_mut()
             .zip(SmallRng::from_entropy().sample_iter(&Standard).take(len))
         {
             *dst = src;
@@ -286,8 +287,7 @@ impl PcscHal for PcscHardware {
             .filter_map(|slice| match slice.len() {
                 0 => None,
                 _ => Some(::std::str::from_utf8(slice).map(|s| s.to_owned())),
-            })
-            .collect();
+            }).collect();
 
         Ok(ret?)
     }

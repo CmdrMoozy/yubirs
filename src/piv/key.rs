@@ -77,7 +77,13 @@ impl<T: PcscHal> AbstractKey for Key<T> {
     fn encrypt(
         &self,
         plaintext: &[u8],
+        nonce: Option<Nonce>,
     ) -> ::std::result::Result<(Option<Nonce>, Vec<u8>), Self::Err> {
+        if nonce.is_some() {
+            return Err(Error::InvalidArgument(format_err!(
+                "Smart card hardware key encryption does not use nonces"
+            )));
+        }
         let ciphertext = {
             let handle = self.handle.lock().unwrap();
             handle.encrypt(self.public_key_path.as_path(), plaintext)?.1

@@ -581,7 +581,8 @@ impl<T: PcscHal> Handle<T> {
                 *dst = *src;
             }
 
-            match self.hal
+            match self
+                .hal
                 .send_data(&[0, Instruction::Verify.to_value(), 0x00, 0x80], &data)
             {
                 Err(e) => VerificationResult::OtherFailure(e),
@@ -678,7 +679,8 @@ impl<T: PcscHal> Handle<T> {
     /// Note that connect() must be called before this function, or an error
     /// will be returned.
     pub fn get_version(&self) -> Result<Version> {
-        let (sw, buffer) = self.hal
+        let (sw, buffer) = self
+            .hal
             .send_data(&[0, Instruction::GetVersion.to_value(), 0, 0, 0], &[])?;
         sw.error?;
         Ok(Version::new(buffer.as_slice())?)
@@ -752,7 +754,8 @@ impl<T: PcscHal> Handle<T> {
     /// unusable). Otherwise, the change_pin, unblock_pin, and change_puk
     /// functions should be used instead of this function.
     pub fn reset(&mut self) -> Result<()> {
-        let (sw, _) = self.hal
+        let (sw, _) = self
+            .hal
             .send_data(&[0, Instruction::Reset.to_value(), 0, 0], &[])?;
         sw.error?;
         Ok(())

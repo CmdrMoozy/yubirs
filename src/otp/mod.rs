@@ -50,7 +50,8 @@ lazy_static! {
 fn to_qwerty(otp: &str) -> Result<String> {
     let otp = otp.to_lowercase();
     if DVORAK_OTP_RE.is_match(otp.as_str()) {
-        let otp: String = otp.chars()
+        let otp: String = otp
+            .chars()
             .map(|c| *DVORAK_TO_QWERTY.get(&c).unwrap())
             .collect();
         Ok(otp)

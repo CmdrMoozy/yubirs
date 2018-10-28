@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+extern crate atty;
 extern crate bdrck;
 extern crate bincode;
 extern crate chrono;
@@ -19,7 +20,6 @@ extern crate curl;
 extern crate data_encoding;
 #[macro_use]
 extern crate failure;
-extern crate isatty;
 #[macro_use]
 extern crate lazy_static;
 extern crate libc;

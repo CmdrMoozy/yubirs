@@ -263,7 +263,8 @@ impl PublicKey {
                 )));
             }
             let mut ciphertext = vec![0; rsa.size() as usize];
-            let len = rsa.public_encrypt(plaintext, &mut ciphertext, openssl::rsa::Padding::PKCS1)?;
+            let len =
+                rsa.public_encrypt(plaintext, &mut ciphertext, openssl::rsa::Padding::PKCS1)?;
             debug_assert!(len > plaintext.len());
             ciphertext.truncate(len);
             Ok(ciphertext)

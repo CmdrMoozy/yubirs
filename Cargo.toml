@@ -1,6 +1,6 @@
 [package]
 name = "yubirs"
-version = "0.3.1"
+version = "0.4.0"
 authors = ["Axel Rasmussen <axel.rasmussen1@gmail.com>"]
 description = "A YubiKey OTP validation library"
 homepage = "https://github.com/CmdrMoozy/yubirs"
@@ -8,17 +8,18 @@ repository = "https://github.com/CmdrMoozy/yubirs"
 license = "Apache-2.0"
 
 [dependencies]
-bdrck = "0.9"
+atty = "0.2"
+bdrck = "0.11"
 bincode = "1.0"
 chrono = "0.4"
 curl = "0.4"
 data-encoding = "2.1"
 failure = "0.1"
-isatty = "0.1"
-lazy_static = "1.0"
+lazy_static = "1.1"
 libc = "0.2"
 log = "0.4"
 # Version >= 0.10.10 / 0.9.33 is needed for new bindings submitted to upstream.
+# This will need to be changed once a new minor (not patch) version is released.
 openssl = "~0.10.10"
 openssl-sys = "~0.9.33"
 pcsc-sys = "1.0"

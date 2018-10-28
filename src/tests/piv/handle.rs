@@ -302,8 +302,7 @@ fn test_change_mgm_key() {
                 Some(DEFAULT_MGM_KEY),
                 Some("fedcba9876543210fedcba9876543210fedcba9876543210"),
                 false
-            )
-            .is_ok()
+            ).is_ok()
     );
     assert!(handle.get_hal().no_recordings());
 }
@@ -324,8 +323,7 @@ fn test_change_mgm_key_wrong_key() {
                 Some("fedcba9876543210fedcba9876543210fedcba9876543210"),
                 Some(DEFAULT_MGM_KEY),
                 false
-            )
-            .err()
+            ).err()
             .unwrap()
             .to_string()
     );
@@ -397,8 +395,7 @@ fn test_write_object() {
         .decode(
             "MBnU5znac5ztOc5znYNoWCEIQhCEIThCEMP1NBD/////////////////////NQgyMDMwMDEwMT4A/gA="
                 .as_bytes(),
-        )
-        .unwrap();
+        ).unwrap();
     assert!(
         handle
             .write_object(Some(DEFAULT_MGM_KEY), Object::Chuid, data)
@@ -423,8 +420,7 @@ fn test_generate_rsa() {
             Algorithm::Rsa2048,
             PinPolicy::Default,
             TouchPolicy::Default,
-        )
-        .unwrap();
+        ).unwrap();
     assert_eq!(
         GENERATE_RSA_EXPECTED_PEM,
         public_key.format(Format::Pem).unwrap().as_slice()
@@ -452,8 +448,7 @@ fn test_generate_ec() {
             Algorithm::Eccp256,
             PinPolicy::Default,
             TouchPolicy::Default,
-        )
-        .unwrap();
+        ).unwrap();
     assert_eq!(
         GENERATE_EC_EXPECTED_PEM,
         public_key.format(Format::Pem).unwrap().as_slice()
@@ -490,8 +485,7 @@ fn test_import_key_rsa() {
             None,
             PinPolicy::Default,
             TouchPolicy::Default,
-        )
-        .unwrap();
+        ).unwrap();
     assert_eq!(
         IMPORT_KEY_RSA_EXPECTED_PEM,
         public_key.format(Format::Pem).unwrap().as_slice()
@@ -524,8 +518,7 @@ fn test_import_key_ec() {
             None,
             PinPolicy::Default,
             TouchPolicy::Default,
-        )
-        .unwrap();
+        ).unwrap();
     assert_eq!(
         IMPORT_KEY_EC_EXPECTED_PEM,
         public_key.format(Format::Pem).unwrap().as_slice()

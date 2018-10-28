@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+extern crate atty;
 extern crate bdrck;
 extern crate data_encoding;
 #[macro_use]
 extern crate failure;
-extern crate isatty;
 extern crate yubirs;
 
 use bdrck::flags::*;
@@ -39,7 +39,7 @@ fn new_handle(values: &Values) -> Result<Handle<PcscHardware>> {
 
 // TODO: This function's (or callers') behavior is wrong for DER output.
 fn print_data(data: &[u8], text: bool) -> Result<()> {
-    if isatty::stdout_isatty() {
+    if atty::is(atty::Stream::Stdout) {
         if text {
             println!("{}", ::std::str::from_utf8(data)?);
         } else {
@@ -268,8 +268,7 @@ fn main() {
             .set_filters(match debug {
                 false => "warn".parse().unwrap(),
                 true => "debug".parse().unwrap(),
-            })
-            .set_panic_on_output_failure(debug)
+            }).set_panic_on_output_failure(debug)
             .set_always_flush(true)
             .build()
             .unwrap(),
