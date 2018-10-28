@@ -41,7 +41,7 @@ emerge -av libu2f-host yubikey-manager pcsc-lite pcsc-tools ccid libusb-compat
 
 # Add your user to the right group to be able to access the device. Replace
 # $MY_USER with your username.
-gpasswd -a $MY_USER plugdev
+gpasswd -a $MY_USER pcscd plugdev usb
 
 # Configure hotplugging by setting rc_hotplug="pcscd" in this file:
 vim /etc/rc.conf
@@ -49,6 +49,27 @@ vim /etc/rc.conf
 # Start pcscd, and configure it to start on boot.
 rc-update add pcscd default
 /etc/init.d/pcscd start
+```
+
+### polkit
+
+If your system is configured to use polkit (for example, if you're running KDE), then you additionally need to modify polkit's rules to allow non-root users to access PC/SC devices. In `/usr/share/polkit-1/rules.d/02-pcsc.rules`:
+
+```
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.debian.pcsc-lite.access_card" &&
+        action.lookup("reader") == 'name of reader' &&
+        subject.user == "< YOUR USER HERE >") {
+            return polkit.Result.YES;
+    }
+});
+
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.debian.pcsc-lite.access_pcsc" &&
+        subject.user == "< YOUR USER HERE >") {
+            return polkit.Result.YES;
+    }
+});
 ```
 
 ### Testing
