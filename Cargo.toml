@@ -9,7 +9,6 @@ license = "Apache-2.0"
 
 [dependencies]
 atty = "0.2"
-bdrck = "0.11"
 bincode = "1.0"
 chrono = "0.4"
 curl = "0.4"
@@ -28,3 +27,8 @@ regex = "1.0"
 rpassword = "2.0"
 serde = "1.0"
 serde_derive = "1.0"
+
+[dependencies.bdrck]
+version = "0.12"
+default_features = false
+features = ["crypto", "flags", "logging", "testing"]

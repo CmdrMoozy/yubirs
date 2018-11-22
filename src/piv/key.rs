@@ -68,8 +68,6 @@ impl<T: PcscHal> Key<T> {
 }
 
 impl<T: PcscHal> AbstractKey for Key<T> {
-    type Err = Error;
-
     fn get_digest(&self) -> Digest {
         self.digest.clone()
     }
@@ -78,11 +76,11 @@ impl<T: PcscHal> AbstractKey for Key<T> {
         &self,
         plaintext: &[u8],
         nonce: Option<Nonce>,
-    ) -> ::std::result::Result<(Option<Nonce>, Vec<u8>), Self::Err> {
+    ) -> ::std::result::Result<(Option<Nonce>, Vec<u8>), ::failure::Error> {
         if nonce.is_some() {
             return Err(Error::InvalidArgument(format_err!(
                 "Smart card hardware key encryption does not use nonces"
-            )));
+            )).into());
         }
         let ciphertext = {
             let handle = self.handle.lock().unwrap();
@@ -95,11 +93,11 @@ impl<T: PcscHal> AbstractKey for Key<T> {
         &self,
         nonce: Option<&Nonce>,
         ciphertext: &[u8],
-    ) -> ::std::result::Result<Vec<u8>, Self::Err> {
+    ) -> ::std::result::Result<Vec<u8>, ::failure::Error> {
         if nonce.is_some() {
             return Err(Error::InvalidArgument(format_err!(
                 "Smart card hardware key decryption does not use nonces"
-            )));
+            )).into());
         }
         let plaintext = {
             let mut handle = self.handle.lock().unwrap();
