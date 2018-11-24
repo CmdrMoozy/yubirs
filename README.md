@@ -58,7 +58,6 @@ If your system is configured to use polkit (for example, if you're running KDE),
 ```
 polkit.addRule(function(action, subject) {
     if (action.id == "org.debian.pcsc-lite.access_card" &&
-        action.lookup("reader") == 'name of reader' &&
         subject.user == "< YOUR USER HERE >") {
             return polkit.Result.YES;
     }
