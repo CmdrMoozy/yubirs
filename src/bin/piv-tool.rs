@@ -105,6 +105,12 @@ fn reset(values: Values) -> Result<()> {
     handle.reset()
 }
 
+fn force_reset(values: Values) -> Result<()> {
+    let mut handle = new_handle(&values)?;
+    handle.connect(Some(values.get_required("reader")))?;
+    handle.force_reset()
+}
+
 fn set_retries(values: Values) -> Result<()> {
     let pin_retries: u8 = values.get_required_parsed("pin_retries")?;
     let puk_retries: u8 = values.get_required_parsed("puk_retries")?;
@@ -396,6 +402,30 @@ fn main() {
                 ),
             ]).unwrap(),
             Box::new(reset),
+        ),
+        Command::new(
+            "force_reset",
+            concat!(
+                "The same as 'reset', but force it to happen by invalidating the PIN and PUK ",
+                "retry counters.",
+            ),
+            Specs::new(vec![
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
+                    ),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
+                ),
+            ]).unwrap(),
+            Box::new(force_reset),
         ),
         Command::new(
             "set_retries",
