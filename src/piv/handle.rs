@@ -761,6 +761,80 @@ impl<T: PcscHal> Handle<T> {
         Ok(())
     }
 
+    /// This function is similar to reset, except it first ensures that all of
+    /// the PIN and PUK retries have been exhausted first (by intentionally
+    /// exhausting them with known-bad values).
+    pub fn force_reset(&mut self) -> Result<()> {
+        // Exhaust PIN verification retries.
+        let mut bad_pin: &'static str = "111111";
+        loop {
+            match self.authenticate_pin(Some(bad_pin)) {
+                Ok(_) => if bad_pin == "111111" {
+                    bad_pin = "222222";
+                } else {
+                    return Err(Error::Internal(format_err!(
+                        "Logic error: failed to find bad PIN for force reset"
+                    )));
+                },
+                Err(e) => match e {
+                    Error::SmartCard(::piv::scarderr::SmartCardError::InvalidChv) => continue,
+                    Error::Authentication(ref ae) => {
+                        if ae.to_string().contains("no more retries") {
+                            break;
+                        } else {
+                            return Err(Error::Internal(format_err!(
+                                "Logic error: got unexpected failure during force reset: {}",
+                                e
+                            )));
+                        }
+                    }
+                    _ => {
+                        return Err(Error::Internal(format_err!(
+                            "Logic error: got unexpected failure during force reset: {}",
+                            e
+                        )))
+                    }
+                },
+            }
+        }
+
+        // Exhaust PUK verification retries.
+        let mut bad_puk: &'static str = "111111";
+        loop {
+            match self.change_puk(Some(bad_puk), Some("333333")) {
+                Ok(_) => if bad_puk == "111111" {
+                    bad_puk = "222222";
+                } else {
+                    return Err(Error::Internal(format_err!(
+                        "Logic error: failed to find bad PUK for force reset"
+                    )));
+                },
+                Err(e) => match e {
+                    Error::SmartCard(::piv::scarderr::SmartCardError::InvalidChv) => continue,
+                    Error::Authentication(ref ae) => {
+                        if ae.to_string().contains("no more retries") {
+                            break;
+                        } else {
+                            return Err(Error::Internal(format_err!(
+                                "Logic error: got unexpected failure during force reset: {}",
+                                e
+                            )));
+                        }
+                    }
+                    _ => {
+                        return Err(Error::Internal(format_err!(
+                            "Logic error: got unexpected failure during force reset: {}",
+                            e
+                        )))
+                    }
+                },
+            }
+        }
+
+        // Now, reset!
+        self.reset()
+    }
+
     /// This function sets the number of retries available for PIN or PUK
     /// verification. This also resets the PIN and PUK back to their factory
     /// default values, 123456 and 12345678, respectively.
