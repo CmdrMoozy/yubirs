@@ -8,7 +8,6 @@ repository = "https://github.com/CmdrMoozy/yubirs"
 license = "Apache-2.0"
 
 [dependencies]
-atty = "0.2"
 bincode = "1.0"
 chrono = "0.4"
 curl = "0.4"
@@ -24,11 +23,10 @@ openssl-sys = "~0.9.33"
 pcsc-sys = "1.0"
 rand = "0.6"
 regex = "1.0"
-rpassword = "2.0"
 serde = "1.0"
 serde_derive = "1.0"
 
 [dependencies.bdrck]
 version = "0.12"
 default_features = false
-features = ["crypto", "flags", "logging", "testing"]
+features = ["cli", "crypto", "flags", "logging", "testing"]
