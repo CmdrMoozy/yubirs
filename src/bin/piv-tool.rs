@@ -105,6 +105,15 @@ fn reset(values: Values) -> Result<()> {
 }
 
 fn force_reset(values: Values) -> Result<()> {
+    // This is a very destructive operation; confirm with the user first before
+    // proceeding.
+    if !bdrck::cli::continue_confirmation(
+        bdrck::cli::Stream::Stderr,
+        "This will reset all PIV device data (certificates, ...) to factory defaults. ",
+    )? {
+        return Ok(());
+    }
+
     let mut handle = new_handle(&values)?;
     handle.connect(Some(values.get_required("reader")))?;
     handle.force_reset()
