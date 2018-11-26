@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate atty;
 extern crate bdrck;
 extern crate bincode;
 extern crate chrono;
@@ -30,7 +29,6 @@ extern crate openssl_sys;
 extern crate pcsc_sys;
 extern crate rand;
 extern crate regex;
-extern crate rpassword;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;

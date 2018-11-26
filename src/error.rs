@@ -49,6 +49,8 @@ pub enum Error {
     #[fail(display = "{}", _0)]
     Authentication(::failure::Error),
     #[fail(display = "{}", _0)]
+    Bdrck(#[cause] ::bdrck::error::Error),
+    #[fail(display = "{}", _0)]
     Bincode(#[cause] ::bincode::Error),
     #[fail(display = "{}", _0)]
     HexDecode(#[cause] ::data_encoding::DecodeError),
@@ -79,6 +81,12 @@ pub enum Error {
     Unknown(::failure::Error),
     #[fail(display = "{}", _0)]
     Utf8(#[cause] Utf8Error),
+}
+
+impl From<::bdrck::error::Error> for Error {
+    fn from(e: ::bdrck::error::Error) -> Self {
+        Error::Bdrck(e)
+    }
 }
 
 impl From<::bincode::Error> for Error {

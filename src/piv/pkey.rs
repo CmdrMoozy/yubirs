@@ -22,7 +22,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::str::FromStr;
-use util::MaybePromptedString;
+use util::MaybePromptedCString;
 
 const MEGABYTE: usize = 1048576;
 const PASSPHRASE_PROMPT: &'static str = "Passphrase: ";
@@ -315,7 +315,7 @@ impl PrivateKey {
                 false => openssl::pkey::PKey::private_key_from_pem(data.as_slice())?,
                 true => {
                     let passphrase =
-                        MaybePromptedString::new(passphrase, PASSPHRASE_PROMPT, false)?;
+                        MaybePromptedCString::new(passphrase, PASSPHRASE_PROMPT, false)?;
                     openssl::pkey::PKey::private_key_from_pem_passphrase(
                         data.as_slice(),
                         passphrase.as_bytes(),

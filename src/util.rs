@@ -12,48 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use bdrck::cli;
 use error::*;
-use rpassword;
 use std::ffi::CString;
 
-// TODO: Return an error if stderr/stdin are not TTYs.
-/// This is a utility function to prompt the user for a sensitive string, e.g. a password.
-fn prompt_for_string(prompt: &str, confirm: bool) -> Result<String> {
-    loop {
-        let string = rpassword::prompt_password_stderr(prompt)?;
-        if !confirm || string == rpassword::prompt_password_stderr("Confirm: ")? {
-            return Ok(string);
-        }
-    }
-}
-
-/// MaybePromptedString is a wrapper for getting sensitive user input (e.g. passwords). The input
-/// can either be provided upon construction (e.g. via a command-line flag), or if not provided it
-/// will be automatically prompted for on stdin.
-pub struct MaybePromptedString {
+/// A wrapper around bdrck's MaybePromptedString which stores the data as a
+/// CString, for easier FFI usage.
+pub struct MaybePromptedCString {
     value: CString,
     length: usize,
     was_provided: bool,
 }
 
-impl MaybePromptedString {
+impl MaybePromptedCString {
     /// Construct a new string, either using the given value or prompting for one if it no value
     /// was provided using the given prompt string and optionally confirming the value a second
     /// time.
     pub fn new(provided: Option<&str>, prompt: &str, confirm: bool) -> Result<Self> {
-        let prompted: Option<String> = match provided {
-            None => Some(prompt_for_string(prompt, confirm)?),
-            Some(_) => None,
-        };
-        let length: usize =
-            provided.map_or_else(|| prompted.as_ref().map_or(0, |s| s.len()), |s| s.len());
+        let string =
+            cli::MaybePromptedString::new(provided, cli::Stream::Stderr, prompt, true, confirm)?;
+        let was_provided = string.was_provided();
+        let string = string.into_inner();
+        let length = string.len();
 
-        Ok(MaybePromptedString {
-            value: CString::new(
-                provided.map_or_else(|| prompted.as_ref().map_or("", |s| s.as_str()), |s| s),
-            )?,
+        Ok(MaybePromptedCString {
+            value: CString::new(string)?,
             length: length,
-            was_provided: provided.is_some(),
+            was_provided: was_provided,
         })
     }
 

@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate atty;
 extern crate bdrck;
 extern crate data_encoding;
 #[macro_use]
@@ -39,7 +38,7 @@ fn new_handle(values: &Values) -> Result<Handle<PcscHardware>> {
 
 // TODO: This function's (or callers') behavior is wrong for DER output.
 fn print_data(data: &[u8], text: bool) -> Result<()> {
-    if atty::is(atty::Stream::Stdout) {
+    if bdrck::cli::isatty(bdrck::cli::Stream::Stdout) {
         if text {
             println!("{}", ::std::str::from_utf8(data)?);
         } else {

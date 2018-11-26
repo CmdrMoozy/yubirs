@@ -25,7 +25,7 @@ use piv::pkey::{PrivateKey, PublicKey, PublicKeyCertificate};
 use piv::sw::StatusWord;
 use std::fmt;
 use std::path::Path;
-use util::MaybePromptedString;
+use util::MaybePromptedCString;
 
 const PIN_NAME: &'static str = "PIN";
 const PIN_PROMPT: &'static str = "PIN: ";
@@ -98,10 +98,10 @@ impl VerificationResult {
 /// value is, for human-readable error messages in case of failure.
 fn verification_loop<F>(name: &str, value: Option<&str>, prompt: &str, callback: F) -> Result<()>
 where
-    F: Fn(&MaybePromptedString) -> VerificationResult,
+    F: Fn(&MaybePromptedCString) -> VerificationResult,
 {
     loop {
-        let value = MaybePromptedString::new(value, prompt, false)?;
+        let value = MaybePromptedCString::new(value, prompt, false)?;
         match callback(&value) {
             VerificationResult::Success => return Ok(()),
             VerificationResult::Failure(tries, err) => {
@@ -138,10 +138,10 @@ fn verification_change_loop<F>(
     callback: F,
 ) -> Result<()>
 where
-    F: Fn(&MaybePromptedString, &MaybePromptedString) -> VerificationResult,
+    F: Fn(&MaybePromptedCString, &MaybePromptedCString) -> VerificationResult,
 {
     verification_loop(existing_name, existing, existing_prompt, |existing| {
-        let new = match MaybePromptedString::new(new.clone(), new_prompt, true) {
+        let new = match MaybePromptedCString::new(new.clone(), new_prompt, true) {
             Err(err) => return VerificationResult::OtherFailure(err),
             Ok(new) => new,
         };
@@ -423,8 +423,8 @@ fn import_private_key<T: PcscHal>(
 fn change_impl<T: PcscHal>(
     hal: &T,
     action: ChangeAction,
-    existing: &MaybePromptedString,
-    new: &MaybePromptedString,
+    existing: &MaybePromptedCString,
+    new: &MaybePromptedCString,
 ) -> VerificationResult {
     if existing.len() > 8 {
         return VerificationResult::OtherFailure(Error::InvalidArgument(format_err!(
@@ -598,7 +598,7 @@ impl<T: PcscHal> Handle<T> {
         }
 
         let mgm_key: Vec<u8> = data_encoding::HEXLOWER_PERMISSIVE
-            .decode(MaybePromptedString::new(mgm_key, MGM_KEY_PROMPT, false)?.as_bytes())?;
+            .decode(MaybePromptedCString::new(mgm_key, MGM_KEY_PROMPT, false)?.as_bytes())?;
         // For 3DES, we should have three key portions of 8 bytes each, for a total of 24 bytes.
         debug_assert!(mgm_key.len() == MGM_KEY_BYTES);
 
@@ -874,7 +874,7 @@ impl<T: PcscHal> Handle<T> {
         self.authenticate_mgm(old_mgm_key)?;
 
         let new_mgm_key: Vec<u8> = data_encoding::HEXLOWER_PERMISSIVE
-            .decode(MaybePromptedString::new(new_mgm_key, NEW_MGM_KEY_PROMPT, true)?.as_bytes())?;
+            .decode(MaybePromptedCString::new(new_mgm_key, NEW_MGM_KEY_PROMPT, true)?.as_bytes())?;
         if is_weak_mgm_key(new_mgm_key.as_slice())? {
             return Err(Error::InvalidArgument(format_err!(
                 "Refusing to set new management key because it contains weak DES keys"
