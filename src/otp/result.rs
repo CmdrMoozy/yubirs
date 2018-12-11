@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::error::*;
+use crate::otp::util;
+use crate::otp::Otp;
 use chrono::offset::Utc;
 use chrono::DateTime;
 use data_encoding;
-use error::*;
-use otp::util;
-use otp::Otp;
 use regex::Regex;
 use std::collections::HashMap;
 

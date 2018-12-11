@@ -17,7 +17,7 @@ pub mod request;
 pub mod result;
 pub mod util;
 
-use error::*;
+use crate::error::*;
 use regex::Regex;
 use std::collections::HashMap;
 use std::fmt;

@@ -6,6 +6,7 @@ description = "A YubiKey OTP validation library"
 homepage = "https://github.com/CmdrMoozy/yubirs"
 repository = "https://github.com/CmdrMoozy/yubirs"
 license = "Apache-2.0"
+edition = "2018"
 
 [dependencies]
 bincode = "1.0"

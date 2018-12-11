@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::error::*;
 use bdrck::cli;
-use error::*;
 use std::ffi::CString;
 
 /// A wrapper around bdrck's MaybePromptedString which stores the data as a

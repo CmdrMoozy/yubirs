@@ -19,7 +19,7 @@ mod result;
 #[cfg(test)]
 mod util;
 
-use otp::*;
+use crate::otp::*;
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]

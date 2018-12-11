@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use error::*;
+use crate::error::*;
 
 pub fn get_required_as<T: Clone + Copy, R: From<T>>(data: &[T], index: usize) -> Result<R> {
     Ok(match data.get(index) {

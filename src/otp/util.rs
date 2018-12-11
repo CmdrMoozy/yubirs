@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::error::*;
 use curl::easy::Easy;
 use data_encoding;
-use error::*;
 use openssl;
 
 /// URL-encode the given string. That is, replacing any characters which are not allowed to appear

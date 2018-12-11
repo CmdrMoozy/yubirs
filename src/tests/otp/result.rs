@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use otp::result::*;
-use otp::Otp;
+use crate::otp::result::*;
+use crate::otp::Otp;
 
 static TEST_API_KEY: &'static [u8] = &[
     0x7d, 0xdb, 0x1a, 0x7d, 0xfa, 0x9a, 0x7f, 0x8b, 0xeb, 0x73, 0x6a, 0xb7, 0x71, 0xdb,

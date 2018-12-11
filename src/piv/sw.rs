@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use error::*;
-use piv::scarderr::SmartCardError;
+use crate::error::*;
+use crate::piv::scarderr::SmartCardError;
 use serde::de::{Deserialize, Deserializer, Visitor};
 use serde::ser::{Serialize, Serializer};
 use std::fmt;

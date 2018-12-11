@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use error::*;
+use crate::error::*;
+use crate::piv::nid;
 use libc::{c_int, c_uchar};
-use piv::nid;
 use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;

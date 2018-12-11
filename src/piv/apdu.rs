@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use error::*;
+use crate::error::*;
 use std::fmt;
 
 /// The Application ID to send in an APDU when connecting to a Yubikey.

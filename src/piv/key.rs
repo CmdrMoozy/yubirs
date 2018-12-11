@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::error::*;
+use crate::piv::hal::PcscHal;
+use crate::piv::handle::Handle;
+use crate::piv::id;
+use crate::piv::pkey::{Format, PublicKey};
 use bdrck::crypto::key::{AbstractKey, Digest, Nonce};
-use error::*;
-use piv::hal::PcscHal;
-use piv::handle::Handle;
-use piv::id;
-use piv::pkey::{Format, PublicKey};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
