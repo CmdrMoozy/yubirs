@@ -310,13 +310,15 @@ fn sign_decipher_impl<T: PcscHal>(
                 "Failed to parse tag from signature reply: reply too short"
             )))
         }
-        Some(b) => if *b != 0x7c {
-            return Err(Error::Internal(format_err!(
-                "Failed to parse tag from signature reply: got {:02x}, expected {:02x}",
-                *b,
-                0x7c
-            )));
-        },
+        Some(b) => {
+            if *b != 0x7c {
+                return Err(Error::Internal(format_err!(
+                    "Failed to parse tag from signature reply: got {:02x}, expected {:02x}",
+                    *b,
+                    0x7c
+                )));
+            }
+        }
     }
     let (recv_slice, _) = ::piv::util::read_length(&recv[1..])?;
     // Note that we *don't* skip over len bytes here. This is intentional.
@@ -328,13 +330,15 @@ fn sign_decipher_impl<T: PcscHal>(
                 "Failed to parse tag from signature reply: reply too short"
             )))
         }
-        Some(b) => if *b != 0x82 {
-            return Err(Error::Internal(format_err!(
-                "Failed to parse tag from signature reply: got {:02x}, expected {:02x}",
-                *b,
-                0x82
-            )));
-        },
+        Some(b) => {
+            if *b != 0x82 {
+                return Err(Error::Internal(format_err!(
+                    "Failed to parse tag from signature reply: got {:02x}, expected {:02x}",
+                    *b,
+                    0x82
+                )));
+            }
+        }
     }
     let (recv_slice, len) = ::piv::util::read_length(&recv_slice[1..])?;
 
@@ -769,13 +773,15 @@ impl<T: PcscHal> Handle<T> {
         let mut bad_pin: &'static str = "111111";
         loop {
             match self.authenticate_pin(Some(bad_pin)) {
-                Ok(_) => if bad_pin == "111111" {
-                    bad_pin = "222222";
-                } else {
-                    return Err(Error::Internal(format_err!(
-                        "Logic error: failed to find bad PIN for force reset"
-                    )));
-                },
+                Ok(_) => {
+                    if bad_pin == "111111" {
+                        bad_pin = "222222";
+                    } else {
+                        return Err(Error::Internal(format_err!(
+                            "Logic error: failed to find bad PIN for force reset"
+                        )));
+                    }
+                }
                 Err(e) => match e {
                     Error::SmartCard(::piv::scarderr::SmartCardError::InvalidChv) => continue,
                     Error::Authentication(ref ae) => {
@@ -802,13 +808,15 @@ impl<T: PcscHal> Handle<T> {
         let mut bad_puk: &'static str = "111111";
         loop {
             match self.change_puk(Some(bad_puk), Some("333333")) {
-                Ok(_) => if bad_puk == "111111" {
-                    bad_puk = "222222";
-                } else {
-                    return Err(Error::Internal(format_err!(
-                        "Logic error: failed to find bad PUK for force reset"
-                    )));
-                },
+                Ok(_) => {
+                    if bad_puk == "111111" {
+                        bad_puk = "222222";
+                    } else {
+                        return Err(Error::Internal(format_err!(
+                            "Logic error: failed to find bad PUK for force reset"
+                        )));
+                    }
+                }
                 Err(e) => match e {
                     Error::SmartCard(::piv::scarderr::SmartCardError::InvalidChv) => continue,
                     Error::Authentication(ref ae) => {

@@ -282,7 +282,8 @@ fn main() {
             .set_filters(match debug {
                 false => "warn".parse().unwrap(),
                 true => "debug".parse().unwrap(),
-            }).set_panic_on_output_failure(debug)
+            })
+            .set_panic_on_output_failure(debug)
             .set_always_flush(true)
             .build()
             .unwrap(),
@@ -297,7 +298,8 @@ fn main() {
                 "output_recording",
                 "Record interactions with the hardware, and write it to this file.",
                 None,
-            )]).unwrap(),
+            )])
+            .unwrap(),
             Box::new(list_readers),
         ),
         Command::new(
@@ -318,7 +320,8 @@ fn main() {
                     "Record interactions with the hardware, and write it to this file.",
                     None,
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(get_version),
         ),
         Command::new(
@@ -339,7 +342,8 @@ fn main() {
                     "Record interactions with the hardware, and write it to this file.",
                     None,
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(change_pin),
         ),
         Command::new(
@@ -363,7 +367,8 @@ fn main() {
                     "Record interactions with the hardware, and write it to this file.",
                     None,
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(unblock_pin),
         ),
         Command::new(
@@ -384,7 +389,8 @@ fn main() {
                     "Record interactions with the hardware, and write it to this file.",
                     None,
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(change_puk),
         ),
         Command::new(
@@ -408,7 +414,8 @@ fn main() {
                     "Record interactions with the hardware, and write it to this file.",
                     None,
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(reset),
         ),
         Command::new(
@@ -432,7 +439,8 @@ fn main() {
                     "Record interactions with the hardware, and write it to this file.",
                     None,
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(force_reset),
         ),
         Command::new(
@@ -465,7 +473,8 @@ fn main() {
                     None,
                     None,
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(set_retries),
         ),
         Command::new(
@@ -486,7 +495,8 @@ fn main() {
                     "Record interactions with the hardware, and write it to this file.",
                     None,
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(change_mgm_key),
         ),
         Command::new(
@@ -507,7 +517,8 @@ fn main() {
                     "Record interactions with the hardware, and write it to this file.",
                     None,
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(set_chuid),
         ),
         Command::new(
@@ -528,7 +539,8 @@ fn main() {
                     "Record interactions with the hardware, and write it to this file.",
                     None,
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(set_ccc),
         ),
         Command::new(
@@ -555,7 +567,8 @@ fn main() {
                     Some('o'),
                     None,
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(read_object),
         ),
         Command::new(
@@ -593,7 +606,8 @@ fn main() {
                     "The input is a base64-encoded string, instead of a path.",
                     None,
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(write_object),
         ),
         Command::new(
@@ -644,7 +658,8 @@ fn main() {
                     Some('f'),
                     Some(Format::Pem.to_string().as_str()),
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(generate),
         ),
         Command::new(
@@ -700,7 +715,8 @@ fn main() {
                     Some('f'),
                     Some(Format::Pem.to_string().as_str()),
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(import_key),
         ),
         Command::new(
@@ -733,7 +749,8 @@ fn main() {
                     Some('f'),
                     Some(Format::Pem.to_string().as_str()),
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(attest),
         ),
         Command::new(
@@ -766,7 +783,8 @@ fn main() {
                     Some('f'),
                     Some(Format::Pem.to_string().as_str()),
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(read_certificate),
         ),
         Command::new(
@@ -799,7 +817,8 @@ fn main() {
                     Some('s'),
                     None,
                 ),
-            ]).unwrap(),
+            ])
+            .unwrap(),
             Box::new(test_decrypt),
         ),
     ]);

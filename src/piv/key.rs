@@ -80,7 +80,8 @@ impl<T: PcscHal> AbstractKey for Key<T> {
         if nonce.is_some() {
             return Err(Error::InvalidArgument(format_err!(
                 "Smart card hardware key encryption does not use nonces"
-            )).into());
+            ))
+            .into());
         }
         let ciphertext = {
             let handle = self.handle.lock().unwrap();
@@ -97,7 +98,8 @@ impl<T: PcscHal> AbstractKey for Key<T> {
         if nonce.is_some() {
             return Err(Error::InvalidArgument(format_err!(
                 "Smart card hardware key decryption does not use nonces"
-            )).into());
+            ))
+            .into());
         }
         let plaintext = {
             let mut handle = self.handle.lock().unwrap();

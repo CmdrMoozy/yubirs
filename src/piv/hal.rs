@@ -287,7 +287,8 @@ impl PcscHal for PcscHardware {
             .filter_map(|slice| match slice.len() {
                 0 => None,
                 _ => Some(::std::str::from_utf8(slice).map(|s| s.to_owned())),
-            }).collect();
+            })
+            .collect();
 
         Ok(ret?)
     }

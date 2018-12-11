@@ -288,11 +288,13 @@ impl SmartCardError {
     pub fn new(code: pcsc_sys::LONG) -> ::std::result::Result<(), SmartCardError> {
         match code {
             pcsc_sys::SCARD_S_SUCCESS => Ok(()),
-            _ => if let Some(e) = FROM_SCARDERR_H_MAPPING.get(&code) {
-                Err(e.clone())
-            } else {
-                Err(SmartCardError::UnknownResMng)
-            },
+            _ => {
+                if let Some(e) = FROM_SCARDERR_H_MAPPING.get(&code) {
+                    Err(e.clone())
+                } else {
+                    Err(SmartCardError::UnknownResMng)
+                }
+            }
         }
     }
 
