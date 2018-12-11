@@ -23,11 +23,11 @@ openssl = "~0.10.10"
 openssl-sys = "~0.9.33"
 pcsc-sys = "1.0"
 rand = "0.6"
-regex = "1.0"
+regex = "1.1"
 serde = "1.0"
 serde_derive = "1.0"
 
 [dependencies.bdrck]
-version = "0.12"
+version = "0.13"
 default_features = false
 features = ["cli", "crypto", "flags", "logging", "testing"]
