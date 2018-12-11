@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::error::*;
+use crate::otp::util;
+use crate::otp::Otp;
 use data_encoding;
-use error::*;
 use openssl::rand::rand_bytes;
-use otp::util;
-use otp::Otp;
 use std::fmt;
 
 /// Generate a 40 character long string with random unique data. Note that the Yubico API will only

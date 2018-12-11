@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use error::*;
+use crate::error::*;
+use crate::piv::id::Algorithm;
+use crate::piv::util::*;
+use crate::util::MaybePromptedCString;
 use openssl;
-use piv::id::Algorithm;
-use piv::util::*;
 use std::collections::HashMap;
 use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::str::FromStr;
-use util::MaybePromptedCString;
 
 const MEGABYTE: usize = 1048576;
 const PASSPHRASE_PROMPT: &'static str = "Passphrase: ";

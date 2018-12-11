@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::*;
+use crate::crypto::*;
+use crate::error::*;
+use crate::piv::apdu::Apdu;
+use crate::piv::hal::PcscHal;
+use crate::piv::id::*;
+use crate::piv::pkey::{PrivateKey, PublicKey, PublicKeyCertificate};
+use crate::piv::sw::StatusWord;
+use crate::util::MaybePromptedCString;
 use data_encoding;
-use error::*;
 use libc::c_int;
 use openssl;
 use openssl_sys;
-use piv::apdu::Apdu;
-use piv::hal::PcscHal;
-use piv::id::*;
-use piv::pkey::{PrivateKey, PublicKey, PublicKeyCertificate};
-use piv::sw::StatusWord;
 use std::fmt;
 use std::path::Path;
-use util::MaybePromptedCString;
 
 const PIN_NAME: &'static str = "PIN";
 const PIN_PROMPT: &'static str = "PIN: ";
@@ -320,7 +320,7 @@ fn sign_decipher_impl<T: PcscHal>(
             }
         }
     }
-    let (recv_slice, _) = ::piv::util::read_length(&recv[1..])?;
+    let (recv_slice, _) = crate::piv::util::read_length(&recv[1..])?;
     // Note that we *don't* skip over len bytes here. This is intentional.
 
     // Skip the 82 tag.
@@ -340,7 +340,7 @@ fn sign_decipher_impl<T: PcscHal>(
             }
         }
     }
-    let (recv_slice, len) = ::piv::util::read_length(&recv_slice[1..])?;
+    let (recv_slice, len) = crate::piv::util::read_length(&recv_slice[1..])?;
 
     Ok((&recv_slice[0..len]).into())
 }
@@ -783,7 +783,7 @@ impl<T: PcscHal> Handle<T> {
                     }
                 }
                 Err(e) => match e {
-                    Error::SmartCard(::piv::scarderr::SmartCardError::InvalidChv) => continue,
+                    Error::SmartCard(crate::piv::scarderr::SmartCardError::InvalidChv) => continue,
                     Error::Authentication(ref ae) => {
                         if ae.to_string().contains("no more retries") {
                             break;
@@ -818,7 +818,7 @@ impl<T: PcscHal> Handle<T> {
                     }
                 }
                 Err(e) => match e {
-                    Error::SmartCard(::piv::scarderr::SmartCardError::InvalidChv) => continue,
+                    Error::SmartCard(crate::piv::scarderr::SmartCardError::InvalidChv) => continue,
                     Error::Authentication(ref ae) => {
                         if ae.to_string().contains("no more retries") {
                             break;
@@ -1135,7 +1135,7 @@ impl<T: PcscHal> Handle<T> {
             )));
         }
 
-        let (der, len) = ::piv::util::read_length(&object[1..])?;
+        let (der, len) = crate::piv::util::read_length(&object[1..])?;
         Ok(PublicKeyCertificate::from_der(&der[0..len])?)
     }
 

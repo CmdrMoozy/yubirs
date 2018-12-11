@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::error::*;
+use crate::piv::apdu::Apdu;
+use crate::piv::hal::*;
+use crate::piv::recording::{Recording, RecordingEntry};
+use crate::piv::sw::StatusWord;
+use crate::piv::DEFAULT_READER;
 use bincode;
-use error::*;
-use piv::apdu::Apdu;
-use piv::hal::*;
-use piv::recording::{Recording, RecordingEntry};
-use piv::sw::StatusWord;
-use piv::DEFAULT_READER;
 use std::collections::VecDeque;
 use std::sync::Mutex;
 

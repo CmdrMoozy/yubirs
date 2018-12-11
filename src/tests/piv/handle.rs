@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::piv::handle::{Handle, Version};
+use crate::piv::id::*;
+use crate::piv::pkey::Format;
+use crate::piv::{DEFAULT_MGM_KEY, DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
+use crate::tests::piv::hal::PcscTestStub;
 use bdrck::testing::temp;
 use data_encoding;
-use piv::handle::{Handle, Version};
-use piv::id::*;
-use piv::pkey::Format;
-use piv::{DEFAULT_MGM_KEY, DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
 use std::fs::File;
 use std::io::Write;
-use tests::piv::hal::PcscTestStub;
 
 const CONNECT_RECORDING: &'static [u8] = include_bytes!("recordings/connect.dr");
 const GET_VERSION_RECORDING: &'static [u8] = include_bytes!("recordings/get_version.dr");

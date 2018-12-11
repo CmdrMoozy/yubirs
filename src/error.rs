@@ -71,7 +71,7 @@ pub enum Error {
     #[fail(display = "{}", _0)]
     ParseInt(#[cause] ::std::num::ParseIntError),
     #[fail(display = "{}", _0)]
-    SmartCard(#[cause] ::piv::scarderr::SmartCardError),
+    SmartCard(#[cause] crate::piv::scarderr::SmartCardError),
     #[fail(display = "{}", _0)]
     Ssl(#[cause] ::openssl::error::ErrorStack),
     /// An error of an unknown type occurred. Generally this comes from some
@@ -131,8 +131,8 @@ impl From<::std::num::ParseIntError> for Error {
     }
 }
 
-impl From<::piv::scarderr::SmartCardError> for Error {
-    fn from(e: ::piv::scarderr::SmartCardError) -> Self {
+impl From<crate::piv::scarderr::SmartCardError> for Error {
+    fn from(e: crate::piv::scarderr::SmartCardError) -> Self {
         Error::SmartCard(e)
     }
 }

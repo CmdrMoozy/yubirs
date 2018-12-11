@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use error::*;
+use crate::error::*;
+use crate::piv::apdu::Apdu;
+use crate::piv::recording::Recording;
+use crate::piv::scarderr::SmartCardError;
+use crate::piv::sw::StatusWord;
+use crate::piv::DEFAULT_READER;
 use libc::c_char;
 use openssl;
 use pcsc_sys;
-use piv::apdu::Apdu;
-use piv::recording::Recording;
-use piv::scarderr::SmartCardError;
-use piv::sw::StatusWord;
-use piv::DEFAULT_READER;
 use rand::distributions::Standard;
 use rand::rngs::SmallRng;
 use rand::{FromEntropy, Rng};

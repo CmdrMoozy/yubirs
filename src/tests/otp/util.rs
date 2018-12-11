@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use otp::util::*;
+use crate::otp::util::*;
 use std::iter::repeat;
 
 #[cfg_attr(rustfmt, rustfmt_skip)]

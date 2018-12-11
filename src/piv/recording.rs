@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::error::*;
+use crate::piv::apdu::Apdu;
+use crate::piv::sw::StatusWord;
 use bincode;
-use error::*;
-use piv::apdu::Apdu;
-use piv::sw::StatusWord;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::path::Path;
@@ -32,7 +32,7 @@ pub struct RecordingEntry {
 pub struct Recording(pub VecDeque<RecordingEntry>);
 
 impl Recording {
-    pub fn record(&mut self, sent: &Apdu, received: &::error::Result<(StatusWord, Vec<u8>)>) {
+    pub fn record(&mut self, sent: &Apdu, received: &crate::error::Result<(StatusWord, Vec<u8>)>) {
         self.0.push_back(RecordingEntry {
             sent: sent.raw_minimal().to_vec(),
             received: match received {
