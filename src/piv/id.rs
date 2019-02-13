@@ -62,7 +62,7 @@ impl FromStr for Algorithm {
                 return Err(Error::InvalidArgument(format_err!(
                     "Invalid algorithm '{}'",
                     s
-                )))
+                )));
             }
             Some(a) => *a,
         })
@@ -156,7 +156,7 @@ impl FromStr for Instruction {
                 return Err(Error::InvalidArgument(format_err!(
                     "Invalid instruction '{}'",
                     s
-                )))
+                )));
             }
             Some(i) => *i,
         })
@@ -353,7 +353,7 @@ impl Key {
                 return Err(Error::InvalidArgument(format_err!(
                     "Key '{}' has no associated data object",
                     self
-                )))
+                )));
             }
         })
     }
@@ -461,7 +461,7 @@ impl FromStr for Object {
                 return Err(Error::InvalidArgument(format_err!(
                     "Invalid Object '{}'",
                     s
-                )))
+                )));
             }
             Some(o) => *o,
         })
@@ -550,7 +550,7 @@ impl FromStr for PinPolicy {
                 return Err(Error::InvalidArgument(format_err!(
                     "Invalid PIN policy '{}'",
                     s
-                )))
+                )));
             }
             Some(pp) => *pp,
         })
@@ -660,7 +660,7 @@ impl FromStr for TouchPolicy {
                 return Err(Error::InvalidArgument(format_err!(
                     "Invalid touch policy '{}'",
                     s
-                )))
+                )));
             }
             Some(tp) => *tp,
         })

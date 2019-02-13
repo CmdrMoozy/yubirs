@@ -66,7 +66,7 @@ impl FromStr for Format {
                 return Err(Error::InvalidArgument(format_err!(
                     "Invalid Format '{}'",
                     s
-                )))
+                )));
             }
             Some(o) => *o,
         })
@@ -86,7 +86,7 @@ fn get_algorithm<T: openssl::pkey::HasPublic>(
                 return Err(Error::InvalidArgument(format_err!(
                     "Unsupported key algorithm RSA-{}",
                     bits
-                )))
+                )));
             }
         },
         openssl::pkey::Id::EC => match bits {
@@ -96,14 +96,14 @@ fn get_algorithm<T: openssl::pkey::HasPublic>(
                 return Err(Error::InvalidArgument(format_err!(
                     "Unsupported key algorithm {}-bit EC",
                     bits
-                )))
+                )));
             }
         },
         _ => {
             return Err(Error::InvalidArgument(format_err!(
                 "Unsupported key algorithm {:?}",
                 id
-            )))
+            )));
         }
     })
 }
@@ -187,7 +187,7 @@ impl PublicKey {
                 return Err(Error::InvalidArgument(format_err!(
                     "Unsupported algorithm {:?}",
                     algorithm
-                )))
+                )));
             }
         };
 
@@ -232,7 +232,7 @@ impl PublicKey {
                 return Err(Error::InvalidArgument(format_err!(
                     "Unsupported encryption algorithm {:?}",
                     algorithm
-                )))
+                )));
             }
         } - 11)
     }
@@ -283,7 +283,7 @@ impl PublicKey {
             Format::Ssh => {
                 return Err(Error::InvalidArgument(format_err!(
                     "SSH format is not supported for public keys"
-                )))
+                )));
             }
         })
     }
@@ -349,7 +349,7 @@ impl PrivateKey {
                     None => {
                         return Err(Error::InvalidArgument(format_err!(
                             "This RSA key has no 'p' factor"
-                        )))
+                        )));
                     }
                     Some(p) => p.to_vec(),
                 },
@@ -357,7 +357,7 @@ impl PrivateKey {
                     None => {
                         return Err(Error::InvalidArgument(format_err!(
                             "This RSA key has no 'q' factor"
-                        )))
+                        )));
                     }
                     Some(q) => q.to_vec(),
                 },
@@ -365,7 +365,7 @@ impl PrivateKey {
                     None => {
                         return Err(Error::InvalidArgument(format_err!(
                             "This RSA key has no 'dmp1' CRT exponent"
-                        )))
+                        )));
                     }
                     Some(dmp1) => dmp1.to_vec(),
                 },
@@ -373,7 +373,7 @@ impl PrivateKey {
                     None => {
                         return Err(Error::InvalidArgument(format_err!(
                             "This RSA key has no 'dmq1' CRT exponent"
-                        )))
+                        )));
                     }
                     Some(dmq1) => dmq1.to_vec(),
                 },
@@ -381,7 +381,7 @@ impl PrivateKey {
                     None => {
                         return Err(Error::InvalidArgument(format_err!(
                             "This RSA key has no 'iqmp' CRT coefficient"
-                        )))
+                        )));
                     }
                     Some(iqmp) => iqmp.to_vec(),
                 },
@@ -418,7 +418,7 @@ impl PublicKeyCertificate {
             Format::Ssh => {
                 return Err(Error::InvalidArgument(format_err!(
                     "SSH format is not supported for public key certificates"
-                )))
+                )));
             }
         })
     }
