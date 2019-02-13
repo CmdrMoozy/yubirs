@@ -308,7 +308,7 @@ fn sign_decipher_impl<T: PcscHal>(
         None => {
             return Err(Error::Internal(format_err!(
                 "Failed to parse tag from signature reply: reply too short"
-            )))
+            )));
         }
         Some(b) => {
             if *b != 0x7c {
@@ -328,7 +328,7 @@ fn sign_decipher_impl<T: PcscHal>(
         None => {
             return Err(Error::Internal(format_err!(
                 "Failed to parse tag from signature reply: reply too short"
-            )))
+            )));
         }
         Some(b) => {
             if *b != 0x82 {
@@ -798,7 +798,7 @@ impl<T: PcscHal> Handle<T> {
                         return Err(Error::Internal(format_err!(
                             "Logic error: got unexpected failure during force reset: {}",
                             e
-                        )))
+                        )));
                     }
                 },
             }
@@ -833,7 +833,7 @@ impl<T: PcscHal> Handle<T> {
                         return Err(Error::Internal(format_err!(
                             "Logic error: got unexpected failure during force reset: {}",
                             e
-                        )))
+                        )));
                     }
                 },
             }
@@ -1184,7 +1184,7 @@ impl<T: PcscHal> Handle<T> {
                         return Err(Error::InvalidArgument(format_err!(
                             "Unsupported algorithm {:?}",
                             algorithm
-                        )))
+                        )));
                     }
                 },
             )

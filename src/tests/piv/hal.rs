@@ -98,7 +98,7 @@ impl PcscHal for PcscTestStub {
                 None => {
                     return Err(Error::Internal(format_err!(
                         "Unexpected call to send_data_impl (no more mock recordings)"
-                    )))
+                    )));
                 }
                 Some(recording) => recording,
             };

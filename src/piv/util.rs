@@ -21,7 +21,7 @@ pub fn get_required_as<T: Clone + Copy, R: From<T>>(data: &[T], index: usize) ->
                 "The provided slice has only {} items, expected at least {}",
                 data.len(),
                 index + 1
-            )))
+            )));
         }
         Some(item) => (*item).into(),
     })
