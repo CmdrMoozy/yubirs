@@ -52,6 +52,9 @@ pub enum Error {
     Bdrck(#[cause] ::bdrck::error::Error),
     #[fail(display = "{}", _0)]
     Bincode(#[cause] ::bincode::Error),
+    /// An error encountered in deciphering command-line flag values.
+    #[fail(display = "{}", _0)]
+    CliFlags(::failure::Error),
     #[fail(display = "{}", _0)]
     HexDecode(#[cause] ::data_encoding::DecodeError),
     #[fail(display = "{}", _0)]
@@ -69,11 +72,17 @@ pub enum Error {
     #[fail(display = "{}", _0)]
     ParseDateTime(#[cause] ::chrono::ParseError),
     #[fail(display = "{}", _0)]
+    ParseBool(#[cause] ::std::str::ParseBoolError),
+    #[fail(display = "{}", _0)]
     ParseInt(#[cause] ::std::num::ParseIntError),
     #[fail(display = "{}", _0)]
     SmartCard(#[cause] crate::piv::scarderr::SmartCardError),
     #[fail(display = "{}", _0)]
     Ssl(#[cause] ::openssl::error::ErrorStack),
+    /// An awkward hack; this error exists to use String's FromStr impl, but
+    /// this operation won't actually ever fail.
+    #[fail(display = "{}", _0)]
+    StringParse(#[cause] ::std::string::ParseError),
     /// An error of an unknown type occurred. Generally this comes from some
     /// dependency or underlying library, in a case where it's difficult to tell
     /// exactly what kind of problem occurred.
@@ -92,6 +101,12 @@ impl From<::bdrck::error::Error> for Error {
 impl From<::bincode::Error> for Error {
     fn from(e: ::bincode::Error) -> Self {
         Error::Bincode(e)
+    }
+}
+
+impl From<::flaggy::ValueError> for Error {
+    fn from(e: ::flaggy::ValueError) -> Self {
+        Error::CliFlags(format_err!("{}", e))
     }
 }
 
@@ -125,6 +140,12 @@ impl From<::chrono::ParseError> for Error {
     }
 }
 
+impl From<::std::str::ParseBoolError> for Error {
+    fn from(e: ::std::str::ParseBoolError) -> Self {
+        Error::ParseBool(e)
+    }
+}
+
 impl From<::std::num::ParseIntError> for Error {
     fn from(e: ::std::num::ParseIntError) -> Self {
         Error::ParseInt(e)
@@ -140,6 +161,12 @@ impl From<crate::piv::scarderr::SmartCardError> for Error {
 impl From<::openssl::error::ErrorStack> for Error {
     fn from(e: ::openssl::error::ErrorStack) -> Self {
         Error::Ssl(e)
+    }
+}
+
+impl From<::std::string::ParseError> for Error {
+    fn from(e: ::std::string::ParseError) -> Self {
+        Error::StringParse(e)
     }
 }
 

@@ -12,23 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate bdrck;
-extern crate data_encoding;
-#[macro_use]
-extern crate failure;
-extern crate yubirs;
-
-use bdrck::flags::*;
+use failure::format_err;
+use flaggy::*;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 use yubirs::error::*;
-use yubirs::piv::id::{PinPolicy, TouchPolicy};
+use yubirs::piv::id::{Algorithm, Key, Object, PinPolicy, TouchPolicy};
 use yubirs::piv::pkey::Format;
 use yubirs::piv::*;
 
-fn new_handle(values: &Values) -> Result<Handle<PcscHardware>> {
-    match values.get_single("output_recording") {
+fn new_handle(output_recording: Option<PathBuf>) -> Result<Handle<PcscHardware>> {
+    match output_recording {
         None => Handle::new(),
         Some(output_recording) => Ok(Handle::new_with_hal(PcscHardware::new_with_recording(
             output_recording,
@@ -64,8 +59,9 @@ fn read_data(path: &str, is_base64: bool) -> Result<Vec<u8>> {
     })
 }
 
-fn list_readers(values: Values) -> Result<()> {
-    let handle = new_handle(&values)?;
+#[command_callback]
+fn list_readers(output_recording: Option<PathBuf>) -> Result<()> {
+    let handle = new_handle(output_recording)?;
     let readers: Vec<String> = handle.list_readers()?;
     for reader in readers {
         println!("{}", reader);
@@ -73,38 +69,44 @@ fn list_readers(values: Values) -> Result<()> {
     Ok(())
 }
 
-fn get_version(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
+#[command_callback]
+fn get_version(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
     println!("{}", handle.get_version()?);
     Ok(())
 }
 
-fn change_pin(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
+#[command_callback]
+fn change_pin(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
     handle.change_pin(None, None)
 }
 
-fn unblock_pin(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
+#[command_callback]
+fn unblock_pin(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
     handle.unblock_pin(None, None)
 }
 
-fn change_puk(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
+#[command_callback]
+fn change_puk(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
     handle.change_puk(None, None)
 }
 
-fn reset(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
+#[command_callback]
+fn reset(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
     handle.reset()
 }
 
-fn force_reset(values: Values) -> Result<()> {
+#[command_callback]
+fn force_reset(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     // This is a very destructive operation; confirm with the user first before
     // proceeding.
     if !bdrck::cli::continue_confirmation(
@@ -114,137 +116,156 @@ fn force_reset(values: Values) -> Result<()> {
         return Ok(());
     }
 
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
     handle.force_reset()
 }
 
-fn set_retries(values: Values) -> Result<()> {
-    let pin_retries: u8 = values.get_required_parsed("pin_retries")?;
-    let puk_retries: u8 = values.get_required_parsed("puk_retries")?;
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
+#[command_callback]
+fn set_retries(
+    reader: String,
+    output_recording: Option<PathBuf>,
+    pin_retries: u8,
+    puk_retries: u8,
+) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
     handle.set_retries(None, None, pin_retries, puk_retries)?;
     Ok(())
 }
 
-fn change_mgm_key(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
+#[command_callback]
+fn change_mgm_key(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
     handle.set_management_key(None, None, false)?;
     Ok(())
 }
 
-fn set_chuid(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
+#[command_callback]
+fn set_chuid(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
     handle.set_chuid(None)?;
     Ok(())
 }
 
-fn set_ccc(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
+#[command_callback]
+fn set_ccc(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
     handle.set_ccc(None)?;
     Ok(())
 }
 
-fn read_object(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
-    let data = handle.read_object(values.get_required_parsed("object_id")?)?;
+#[command_callback]
+fn read_object(reader: String, output_recording: Option<PathBuf>, object_id: Object) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
+    let data = handle.read_object(object_id)?;
     print_data(data.as_slice(), false)?;
     Ok(())
 }
 
-fn write_object(values: Values) -> Result<()> {
-    let data = read_data(values.get_required("input"), values.get_boolean("base64"))?;
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
-    handle.write_object(None, values.get_required_parsed("object_id")?, data)?;
+#[command_callback]
+fn write_object(
+    reader: String,
+    output_recording: Option<PathBuf>,
+    object_id: Object,
+    input: String,
+    base64: bool,
+) -> Result<()> {
+    let data = read_data(&input, base64)?;
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
+    handle.write_object(None, object_id, data)?;
     Ok(())
 }
 
-fn generate(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
-    let public_key = handle.generate(
-        None,
-        values.get_required_parsed("slot")?,
-        values.get_required_parsed("algorithm")?,
-        values.get_required_parsed("pin_policy")?,
-        values.get_required_parsed("touch_policy")?,
-    )?;
-    print_data(
-        public_key
-            .format(values.get_required_parsed("format")?)?
-            .as_slice(),
-        true,
-    )?;
+#[command_callback]
+fn generate(
+    reader: String,
+    output_recording: Option<PathBuf>,
+    slot: Key,
+    algorithm: Algorithm,
+    pin_policy: PinPolicy,
+    touch_policy: TouchPolicy,
+    format: Format,
+) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
+    let public_key = handle.generate(None, slot, algorithm, pin_policy, touch_policy)?;
+    print_data(public_key.format(format)?.as_slice(), true)?;
     Ok(())
 }
 
-fn import_key(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
+#[command_callback]
+fn import_key(
+    reader: String,
+    output_recording: Option<PathBuf>,
+    input_file: PathBuf,
+    slot: Key,
+    encrypted: bool,
+    pin_policy: PinPolicy,
+    touch_policy: TouchPolicy,
+    format: Format,
+) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
     let public_key = handle.import_key(
         None,
-        &values.get_required_as::<PathBuf>("input_file"),
-        values.get_required_parsed("slot")?,
-        values.get_boolean("encrypted"),
+        &input_file,
+        slot,
+        encrypted,
         None,
-        values.get_required_parsed("pin_policy")?,
-        values.get_required_parsed("touch_policy")?,
+        pin_policy,
+        touch_policy,
     )?;
-    print_data(
-        public_key
-            .format(values.get_required_parsed("format")?)?
-            .as_slice(),
-        true,
-    )?;
+    print_data(public_key.format(format)?.as_slice(), true)?;
     Ok(())
 }
 
-fn attest(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
-    let cert = handle.attest(values.get_required_parsed("slot")?)?;
-    print_data(
-        cert.format(values.get_required_parsed("foramt")?)?
-            .as_slice(),
-        true,
-    )?;
+#[command_callback]
+fn attest(
+    reader: String,
+    output_recording: Option<PathBuf>,
+    slot: Key,
+    format: Format,
+) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
+    let cert = handle.attest(slot)?;
+    print_data(cert.format(format)?.as_slice(), true)?;
     Ok(())
 }
 
-fn read_certificate(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
-    let public_key_cert = handle.read_certificate(values.get_required_parsed("slot")?)?;
-    print_data(
-        public_key_cert
-            .format(values.get_required_parsed("format")?)?
-            .as_slice(),
-        true,
-    )?;
+#[command_callback]
+fn read_certificate(
+    reader: String,
+    output_recording: Option<PathBuf>,
+    slot: Key,
+    format: Format,
+) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
+    let public_key_cert = handle.read_certificate(slot)?;
+    print_data(public_key_cert.format(format)?.as_slice(), true)?;
     Ok(())
 }
 
-fn test_decrypt(values: Values) -> Result<()> {
-    let mut handle = new_handle(&values)?;
-    handle.connect(Some(values.get_required("reader")))?;
+#[command_callback]
+fn test_decrypt(
+    reader: String,
+    output_recording: Option<PathBuf>,
+    input_file: PathBuf,
+    slot: Key,
+) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
     let mut plaintext: Vec<u8> = vec![0; 32];
     handle.get_hal().cheap_random_bytes(&mut plaintext)?;
-    let (algorithm, ciphertext) = handle.encrypt(
-        &values.get_required_as::<PathBuf>("input_file"),
-        plaintext.as_slice(),
-    )?;
-    let result_plaintext = handle.decrypt(
-        None,
-        &ciphertext,
-        values.get_required_parsed("slot")?,
-        algorithm,
-    )?;
+    let (algorithm, ciphertext) = handle.encrypt(&input_file, plaintext.as_slice())?;
+    let result_plaintext = handle.decrypt(None, &ciphertext, slot, algorithm)?;
     println!(
         "Original:  {}",
         plaintext
@@ -290,7 +311,7 @@ fn main() {
     );
     yubirs::init().unwrap();
 
-    main_impl_multiple_commands(vec![
+    main_impl(vec![
         Command::new(
             "list_readers",
             "List the available PC/SC readers",
