@@ -239,6 +239,26 @@ impl PcscHardware {
         recv_buffer.truncate(recv_length as usize - 2);
         Ok((sw, recv_buffer))
     }
+
+    fn list_readers_impl(
+        &self,
+        buffer: *mut c_char,
+        length: *mut libc::c_ulong,
+    ) -> ::std::result::Result<(), SmartCardError> {
+        match SmartCardError::new(unsafe {
+            pcsc_sys::SCardListReaders(self.context, ptr::null(), buffer, length)
+        }) {
+            Err(e) => match e {
+                // there are no readers to be listed.
+                SmartCardError::NoReadersAvailable => {
+                    unsafe { *length = 0 };
+                    Ok(())
+                }
+                _ => Err(e),
+            },
+            Ok(v) => Ok(v),
+        }
+    }
 }
 
 impl PcscHal for PcscHardware {
@@ -263,19 +283,13 @@ impl PcscHal for PcscHardware {
 
     fn list_readers(&self) -> Result<Vec<String>> {
         let mut readers_len: pcsc_sys::DWORD = 0;
-        SmartCardError::new(unsafe {
-            pcsc_sys::SCardListReaders(self.context, ptr::null(), ptr::null_mut(), &mut readers_len)
-        })?;
+        self.list_readers_impl(ptr::null_mut(), &mut readers_len)?;
+        if readers_len == 0 {
+            return Ok(Vec::new());
+        }
 
         let mut buffer: Vec<u8> = vec![0_u8; readers_len as usize];
-        SmartCardError::new(unsafe {
-            pcsc_sys::SCardListReaders(
-                self.context,
-                ptr::null(),
-                buffer.as_mut_ptr() as *mut c_char,
-                &mut readers_len,
-            )
-        })?;
+        self.list_readers_impl(buffer.as_mut_ptr() as *mut c_char, &mut readers_len)?;
         if readers_len as usize != buffer.len() {
             return Err(Error::Internal(format_err!(
                 "Failed to retrieve full reader list due to buffer size race."
