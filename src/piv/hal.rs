@@ -23,7 +23,7 @@ use openssl;
 use pcsc_sys;
 use rand::distributions::Standard;
 use rand::rngs::SmallRng;
-use rand::{FromEntropy, Rng};
+use rand::{Rng, SeedableRng};
 use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::ptr;
