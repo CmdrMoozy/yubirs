@@ -479,8 +479,11 @@ impl fmt::Debug for SmartCardError {
     fn fmt(&self, f: &mut fmt::Formatter) -> ::std::result::Result<(), fmt::Error> {
         write!(
             f,
-            "{:#x} {}",
-            TO_SCARDERR_H_MAPPING.get(self).unwrap(),
+            "{} {}",
+            TO_SCARDERR_H_MAPPING.get(self).map_or_else(
+                || "<unknown error code>".to_owned(),
+                |e| format!("{:#x}", e)
+            ),
             self
         )
     }
