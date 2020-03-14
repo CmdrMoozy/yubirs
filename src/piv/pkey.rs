@@ -16,6 +16,8 @@ use crate::error::*;
 use crate::piv::id::Algorithm;
 use crate::piv::util::*;
 use crate::util::MaybePromptedCString;
+use failure::format_err;
+use lazy_static::lazy_static;
 use openssl;
 use std::collections::HashMap;
 use std::fmt;

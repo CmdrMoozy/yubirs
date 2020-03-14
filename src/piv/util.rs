@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::error::*;
+use failure::format_err;
 
 pub fn get_required_as<T: Clone + Copy, R: From<T>>(data: &[T], index: usize) -> Result<R> {
     Ok(match data.get(index) {

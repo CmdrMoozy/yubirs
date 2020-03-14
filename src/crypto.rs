@@ -13,6 +13,8 @@
 // limitations under the License.
 
 use crate::error::*;
+use failure::format_err;
+use lazy_static::lazy_static;
 use openssl;
 use std::collections::HashSet;
 

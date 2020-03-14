@@ -18,6 +18,7 @@ use crate::piv::handle::Handle;
 use crate::piv::id;
 use crate::piv::pkey::{Format, PublicKey};
 use bdrck::crypto::key::{AbstractKey, Digest, Nonce};
+use failure::format_err;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 

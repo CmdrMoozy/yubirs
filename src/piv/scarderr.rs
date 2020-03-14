@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use lazy_static::lazy_static;
 use pcsc_sys;
 use std::collections::HashMap;
 use std::fmt;
