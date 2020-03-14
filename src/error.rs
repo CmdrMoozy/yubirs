@@ -37,14 +37,7 @@ impl ::std::fmt::Display for Utf8Error {
     }
 }
 
-impl ::std::error::Error for Utf8Error {
-    fn description(&self) -> &str {
-        match self {
-            Utf8Error::String(e) => e.description(),
-            Utf8Error::Slice(e) => e.description(),
-        }
-    }
-}
+impl ::std::error::Error for Utf8Error {}
 
 #[derive(Fail, Debug)]
 pub enum Error {

@@ -309,10 +309,8 @@ impl SmartCardError {
             _ => *TO_SCARDERR_H_MAPPING.get(self).unwrap(),
         }
     }
-}
 
-impl ::std::error::Error for SmartCardError {
-    fn description(&self) -> &str {
+    pub fn get_message(&self) -> &str {
         match self {
             SmartCardError::BadSeek => {
                 "An error occurred in setting the smart card file object pointer."
@@ -464,13 +462,12 @@ impl ::std::error::Error for SmartCardError {
 
 impl fmt::Display for SmartCardError {
     fn fmt(&self, f: &mut fmt::Formatter) -> ::std::result::Result<(), fmt::Error> {
-        use std::error::Error;
         write!(
             f,
             "{}",
             match self {
                 SmartCardError::Other(message) => message.as_str(),
-                _ => self.description(),
+                _ => self.get_message(),
             }
         )
     }
@@ -489,3 +486,5 @@ impl fmt::Debug for SmartCardError {
         )
     }
 }
+
+impl ::std::error::Error for SmartCardError {}
