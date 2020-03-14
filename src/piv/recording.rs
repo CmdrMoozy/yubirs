@@ -16,6 +16,7 @@ use crate::error::*;
 use crate::piv::apdu::Apdu;
 use crate::piv::sw::StatusWord;
 use bincode;
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::fs::File;
 use std::path::Path;

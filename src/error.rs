@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use failure::{format_err, Fail};
+
 pub enum Utf8Error {
     String(::std::string::FromUtf8Error),
     Slice(::std::str::Utf8Error),

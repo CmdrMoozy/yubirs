@@ -14,7 +14,10 @@
 
 use crate::error::*;
 use crate::piv::nid;
+use failure::format_err;
+use lazy_static::lazy_static;
 use libc::{c_int, c_uchar};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;

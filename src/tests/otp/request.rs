@@ -14,6 +14,7 @@
 
 use crate::otp::request::*;
 use crate::otp::Otp;
+use lazy_static::lazy_static;
 use regex::Regex;
 
 #[test]

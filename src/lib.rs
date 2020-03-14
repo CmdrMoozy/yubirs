@@ -12,27 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate bdrck;
-extern crate bincode;
-extern crate chrono;
-extern crate curl;
-extern crate data_encoding;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate lazy_static;
-extern crate libc;
-#[macro_use]
-extern crate log;
-extern crate openssl;
-extern crate openssl_sys;
-extern crate pcsc_sys;
-extern crate rand;
-extern crate regex;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-
 pub mod crypto;
 pub mod error;
 pub mod otp;

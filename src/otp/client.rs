@@ -19,6 +19,8 @@ use crate::otp::Otp;
 use bdrck::cli;
 use curl::easy::{Easy, List};
 use data_encoding;
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// The protocol to use to make the verification request.

@@ -19,6 +19,7 @@ use crate::piv::recording::{Recording, RecordingEntry};
 use crate::piv::sw::StatusWord;
 use crate::piv::DEFAULT_READER;
 use bincode;
+use failure::format_err;
 use std::collections::VecDeque;
 use std::sync::Mutex;
 

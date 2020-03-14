@@ -17,6 +17,7 @@ use crate::otp::util;
 use crate::otp::Otp;
 use data_encoding;
 use openssl::rand::rand_bytes;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Generate a 40 character long string with random unique data. Note that the Yubico API will only

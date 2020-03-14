@@ -18,6 +18,8 @@ use crate::otp::Otp;
 use chrono::offset::Utc;
 use chrono::DateTime;
 use data_encoding;
+use failure::format_err;
+use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::HashMap;
 

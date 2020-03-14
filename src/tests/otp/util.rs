@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::otp::util::*;
+use lazy_static::lazy_static;
 use std::iter::repeat;
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
