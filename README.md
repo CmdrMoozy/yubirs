@@ -4,6 +4,8 @@
 
 A library for interacting with YubiKeys in Rust.
 
+Currently, this library supports OTP and PIV functionality.
+
 ## Using Yubikeys on Linux
 
 Here are some helpful resources on how to use the Yubikey:
@@ -80,9 +82,13 @@ gpg --card-status
 pcsc_scan
 ```
 
-## Yubikey PIV Functionality
+## Command-line tools
 
-yubirs provides a command-line interface, piv-tool, as well as a high-level API for interacting with the Yubikey's PIV functionality. Many of the concepts used may be unfamiliar to those who don't have a lot of experience with the Yubikey. The [official upstream documentation](https://developers.yubico.com/PIV/Introduction/YubiKey_and_PIV.html) provides a good overview of the concepts involved.
+Whereas `yubirs` is a library, `yubirs-tools` provides command-line tools for working with YubiKeys. Currently, the following binaries are available:
+
+### `piv-tool`
+
+`piv-tool` is analogous to upstream's `yubico-piv-tool`, but built on top of `yubirs` instead of using upstream's C library. It has close to feature pairty with upstream's tool, but there may be some gaps. The [official upstream documentation](https://developers.yubico.com/PIV/Introduction/YubiKey_and_PIV.html) provides a good overview of the concepts involved.
 
 ## Development
 
