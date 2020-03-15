@@ -18,7 +18,6 @@ pub mod error;
 pub mod otp;
 #[cfg(feature = "piv")]
 pub mod piv;
-mod util;
 
 #[cfg(test)]
 mod tests;
