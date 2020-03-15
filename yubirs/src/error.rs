@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure::{format_err, Fail};
+use failure::Fail;
 
 pub enum Utf8Error {
     String(::std::string::FromUtf8Error),
@@ -101,13 +101,6 @@ impl From<::bdrck::error::Error> for Error {
 impl From<::bincode::Error> for Error {
     fn from(e: ::bincode::Error) -> Self {
         Error::Bincode(e)
-    }
-}
-
-#[cfg(feature = "flaggy")]
-impl From<::flaggy::ValueError> for Error {
-    fn from(e: ::flaggy::ValueError) -> Self {
-        Error::CliFlags(format_err!("{}", e))
     }
 }
 

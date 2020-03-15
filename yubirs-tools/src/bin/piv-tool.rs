@@ -14,17 +14,89 @@
 
 use failure::format_err;
 use flaggy::*;
+use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
-use yubirs::error::*;
 use yubirs::piv::id::{Algorithm, Key, Object, PinPolicy, TouchPolicy};
 use yubirs::piv::pkey::Format;
 use yubirs::piv::*;
 
+struct Error(yubirs::error::Error);
+
+impl From<yubirs::error::Error> for Error {
+    fn from(e: yubirs::error::Error) -> Self {
+        Error(e)
+    }
+}
+
+impl From<bdrck::error::Error> for Error {
+    fn from(e: bdrck::error::Error) -> Self {
+        Error(e.into())
+    }
+}
+
+impl From<data_encoding::DecodeError> for Error {
+    fn from(e: data_encoding::DecodeError) -> Self {
+        Error(e.into())
+    }
+}
+
+impl From<std::convert::Infallible> for Error {
+    fn from(e: std::convert::Infallible) -> Self {
+        Error(e.into())
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error(e.into())
+    }
+}
+
+impl From<std::num::ParseIntError> for Error {
+    fn from(e: std::num::ParseIntError) -> Self {
+        Error(e.into())
+    }
+}
+
+impl From<std::str::ParseBoolError> for Error {
+    fn from(e: std::str::ParseBoolError) -> Self {
+        Error(e.into())
+    }
+}
+
+impl From<std::str::Utf8Error> for Error {
+    fn from(e: std::str::Utf8Error) -> Self {
+        Error(e.into())
+    }
+}
+
+impl From<ValueError> for Error {
+    fn from(e: ValueError) -> Self {
+        Error(yubirs::error::Error::CliFlags(format_err!("{}", e)))
+    }
+}
+
+impl fmt::Debug for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl failure::Fail for Error {}
+
+type Result<T> = ::std::result::Result<T, Error>;
+
 fn new_handle(output_recording: Option<PathBuf>) -> Result<Handle<PcscHardware>> {
     match output_recording {
-        None => Handle::new(),
+        None => Ok(Handle::new()?),
         Some(output_recording) => Ok(Handle::new_with_hal(PcscHardware::new_with_recording(
             output_recording,
         )?)),
@@ -81,28 +153,28 @@ fn get_version(reader: String, output_recording: Option<PathBuf>) -> Result<()> 
 fn change_pin(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
-    handle.change_pin(None, None)
+    Ok(handle.change_pin(None, None)?)
 }
 
 #[command_callback]
 fn unblock_pin(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
-    handle.unblock_pin(None, None)
+    Ok(handle.unblock_pin(None, None)?)
 }
 
 #[command_callback]
 fn change_puk(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
-    handle.change_puk(None, None)
+    Ok(handle.change_puk(None, None)?)
 }
 
 #[command_callback]
 fn reset(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
-    handle.reset()
+    Ok(handle.reset()?)
 }
 
 #[command_callback]
@@ -118,7 +190,7 @@ fn force_reset(reader: String, output_recording: Option<PathBuf>) -> Result<()> 
 
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
-    handle.force_reset()
+    Ok(handle.force_reset()?)
 }
 
 #[command_callback]
@@ -288,9 +360,10 @@ fn test_decrypt(
             .collect::<String>()
     );
     if plaintext != result_plaintext {
-        return Err(Error::Internal(format_err!(
+        return Err(yubirs::error::Error::Internal(format_err!(
             "Decryption test failed; decrypted result did not match original plaintext"
-        )));
+        ))
+        .into());
     }
     println!("Success!");
     Ok(())

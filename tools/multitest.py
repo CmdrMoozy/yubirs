@@ -1,1 +1,0 @@
-../template/tools/multitest.py
