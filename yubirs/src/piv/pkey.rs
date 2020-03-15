@@ -15,12 +15,13 @@
 use crate::error::*;
 use crate::piv::id::Algorithm;
 use crate::piv::util::*;
+use bdrck::io::read_at_most;
 use failure::format_err;
 use lazy_static::lazy_static;
 use openssl;
 use std::collections::HashMap;
 use std::fmt;
-use std::fs::File;
+use std::fs;
 use std::io::Read;
 use std::path::Path;
 use std::str::FromStr;
@@ -116,21 +117,16 @@ pub struct PublicKey {
 }
 
 impl PublicKey {
-    pub fn from_pem<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mut data: Vec<u8> = Vec::new();
-        {
-            let mut f = File::open(path)?;
-            if f.metadata()?.len() > MEGABYTE as u64 {
-                return Err(Error::InvalidArgument(format_err!(
-                    "The provided input certificate exceeded 1 MiB in size"
-                )));
-            }
-            f.read_to_end(&mut data)?;
-        }
-
+    pub fn from_pem<R: Read>(mut r: R) -> Result<Self> {
+        let data = read_at_most(&mut r, MEGABYTE)?;
         Ok(PublicKey {
             inner: openssl::pkey::PKey::public_key_from_pem(data.as_slice())?,
         })
+    }
+
+    pub fn from_pem_file<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let f = fs::File::open(path)?;
+        Self::from_pem(f)
     }
 
     /// Construct a PublicKey from the raw RSA structure returned from the
@@ -302,7 +298,7 @@ impl PrivateKey {
     ) -> Result<Self> {
         let mut data: Vec<u8> = Vec::new();
         {
-            let mut f = File::open(path)?;
+            let mut f = fs::File::open(path)?;
             if f.metadata()?.len() > MEGABYTE as u64 {
                 return Err(Error::InvalidArgument(format_err!(
                     "The provided input certificate exceeded 1 MiB in size"

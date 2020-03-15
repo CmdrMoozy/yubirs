@@ -14,7 +14,7 @@ otp = ["bdrck/cli", "chrono", "curl", "regex"]
 # "testing" is only used by unit tests, but stable Rust doesn't support
 # different dev-dependencies and dependencies features. This hsa been fixed
 # in nightly: https://github.com/rust-lang/cargo/issues/1796
-piv = ["bdrck/cli", "bdrck/crypto", "bdrck/testing", "bincode", "libc", "log", "pcsc-sys"]
+piv = ["bdrck/cli", "bdrck/crypto", "bdrck/io", "bdrck/testing", "bincode", "libc", "log", "pcsc-sys"]
 
 [dependencies]
 bincode = { version = "1.2", optional = true }
