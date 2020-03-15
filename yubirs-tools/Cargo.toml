@@ -19,7 +19,7 @@ default_features = false
 features = ["cli", "logging"]
 
 [dependencies.yubirs]
-version = "0.6"
+version = "0.7"
 path = "../yubirs"
 default_features = false
 features = ["piv"]
