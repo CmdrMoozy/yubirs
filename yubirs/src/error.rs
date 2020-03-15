@@ -43,6 +43,7 @@ impl ::std::error::Error for Utf8Error {}
 pub enum Error {
     #[fail(display = "{}", _0)]
     Authentication(::failure::Error),
+    #[cfg(feature = "bdrck")]
     #[fail(display = "{}", _0)]
     Bdrck(#[cause] ::bdrck::error::Error),
     #[cfg(feature = "bincode")]
@@ -91,6 +92,7 @@ pub enum Error {
     Utf8(#[cause] Utf8Error),
 }
 
+#[cfg(feature = "bdrck")]
 impl From<::bdrck::error::Error> for Error {
     fn from(e: ::bdrck::error::Error) -> Self {
         Error::Bdrck(e)

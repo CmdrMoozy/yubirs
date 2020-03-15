@@ -10,8 +10,11 @@ edition = "2018"
 
 [features]
 default = ["otp", "piv"]
-otp = ["chrono", "curl", "regex"]
-piv = ["bincode", "libc", "log"]
+otp = ["bdrck/cli", "chrono", "curl", "regex"]
+# "testing" is only used by unit tests, but stable Rust doesn't support
+# different dev-dependencies and dependencies features. This hsa been fixed
+# in nightly: https://github.com/rust-lang/cargo/issues/1796
+piv = ["bdrck/cli", "bdrck/crypto", "bdrck/testing", "bincode", "libc", "log"]
 
 [dependencies]
 bincode = { version = "1.2", optional = true }
@@ -33,8 +36,5 @@ serde = { version = "1.0", features = ["derive"] }
 
 [dependencies.bdrck]
 version = "0.15"
+optional = true
 default_features = false
-# "testing" is only used by unit tests, but stable Rust doesn't support
-# different dev-dependencies and dependencies features. This hsa been fixed
-# in nightly: https://github.com/rust-lang/cargo/issues/1796
-features = ["cli", "crypto", "testing"]
