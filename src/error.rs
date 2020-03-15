@@ -45,6 +45,7 @@ pub enum Error {
     Authentication(::failure::Error),
     #[fail(display = "{}", _0)]
     Bdrck(#[cause] ::bdrck::error::Error),
+    #[cfg(feature = "bincode")]
     #[fail(display = "{}", _0)]
     Bincode(#[cause] ::bincode::Error),
     /// An error encountered in deciphering command-line flag values.
@@ -52,6 +53,7 @@ pub enum Error {
     CliFlags(::failure::Error),
     #[fail(display = "{}", _0)]
     HexDecode(#[cause] ::data_encoding::DecodeError),
+    #[cfg(feature = "curl")]
     #[fail(display = "{}", _0)]
     Http(#[cause] ::curl::Error),
     /// An internal unrecoverable error, usually due to some underlying library.
@@ -64,12 +66,14 @@ pub enum Error {
     Io(#[cause] ::std::io::Error),
     #[fail(display = "{}", _0)]
     Nul(#[cause] ::std::ffi::NulError),
+    #[cfg(feature = "chrono")]
     #[fail(display = "{}", _0)]
     ParseDateTime(#[cause] ::chrono::ParseError),
     #[fail(display = "{}", _0)]
     ParseBool(#[cause] ::std::str::ParseBoolError),
     #[fail(display = "{}", _0)]
     ParseInt(#[cause] ::std::num::ParseIntError),
+    #[cfg(feature = "piv")]
     #[fail(display = "{}", _0)]
     SmartCard(#[cause] crate::piv::scarderr::SmartCardError),
     #[fail(display = "{}", _0)]
@@ -93,12 +97,14 @@ impl From<::bdrck::error::Error> for Error {
     }
 }
 
+#[cfg(feature = "bincode")]
 impl From<::bincode::Error> for Error {
     fn from(e: ::bincode::Error) -> Self {
         Error::Bincode(e)
     }
 }
 
+#[cfg(feature = "flaggy")]
 impl From<::flaggy::ValueError> for Error {
     fn from(e: ::flaggy::ValueError) -> Self {
         Error::CliFlags(format_err!("{}", e))
@@ -111,6 +117,7 @@ impl From<::data_encoding::DecodeError> for Error {
     }
 }
 
+#[cfg(feature = "curl")]
 impl From<::curl::Error> for Error {
     fn from(e: ::curl::Error) -> Self {
         Error::Http(e)
@@ -129,6 +136,7 @@ impl From<::std::ffi::NulError> for Error {
     }
 }
 
+#[cfg(feature = "chrono")]
 impl From<::chrono::ParseError> for Error {
     fn from(e: ::chrono::ParseError) -> Self {
         Error::ParseDateTime(e)
@@ -147,6 +155,7 @@ impl From<::std::num::ParseIntError> for Error {
     }
 }
 
+#[cfg(feature = "piv")]
 impl From<crate::piv::scarderr::SmartCardError> for Error {
     fn from(e: crate::piv::scarderr::SmartCardError) -> Self {
         Error::SmartCard(e)

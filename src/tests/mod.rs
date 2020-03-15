@@ -14,7 +14,9 @@
 
 #[cfg(test)]
 mod crypto;
+#[cfg(feature = "otp")]
 #[cfg(test)]
 mod otp;
+#[cfg(feature = "piv")]
 #[cfg(test)]
 mod piv;

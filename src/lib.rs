@@ -14,17 +14,30 @@
 
 pub mod crypto;
 pub mod error;
+#[cfg(feature = "otp")]
 pub mod otp;
+#[cfg(feature = "piv")]
 pub mod piv;
 mod util;
 
 #[cfg(test)]
 mod tests;
 
+#[cfg(not(feature = "curl"))]
+fn init_curl() -> error::Result<()> {
+    Ok(())
+}
+
+#[cfg(feature = "curl")]
+fn init_curl() -> error::Result<()> {
+    curl::init();
+    Ok(())
+}
+
 /// Initializes Yubirs and any other underlying libraries. It is recommended to call this function
 /// as soon as the program starts.
 pub fn init() -> error::Result<()> {
     openssl::init();
-    curl::init();
+    init_curl()?;
     Ok(())
 }
