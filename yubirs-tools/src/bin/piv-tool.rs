@@ -19,7 +19,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 use yubirs::piv::id::{Algorithm, Key, Object, PinPolicy, TouchPolicy};
-use yubirs::piv::pkey::Format;
+use yubirs::piv::pkey::{Format, PublicKey};
 use yubirs::piv::*;
 
 struct Error(yubirs::error::Error);
@@ -336,7 +336,8 @@ fn test_decrypt(
     handle.connect(Some(&reader))?;
     let mut plaintext: Vec<u8> = vec![0; 32];
     handle.get_hal().cheap_random_bytes(&mut plaintext)?;
-    let (algorithm, ciphertext) = handle.encrypt(&input_file, plaintext.as_slice())?;
+    let public_key = PublicKey::from_pem_file(&input_file)?;
+    let (algorithm, ciphertext) = handle.encrypt(&public_key, plaintext.as_slice())?;
     let result_plaintext = handle.decrypt(None, &ciphertext, slot, algorithm)?;
     println!(
         "Original:  {}",

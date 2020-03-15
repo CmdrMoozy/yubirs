@@ -19,7 +19,9 @@ use crate::piv::id;
 use crate::piv::pkey::{Format, PublicKey};
 use bdrck::crypto::key::{AbstractKey, Digest, Nonce};
 use failure::format_err;
-use std::path::{Path, PathBuf};
+use std::fs;
+use std::io::Read;
+use std::path::Path;
 use std::sync::Mutex;
 
 /// Key is an AbstractKey structure using a public/private key pair stored on a
@@ -30,7 +32,6 @@ pub struct Key<T: PcscHal> {
     handle: Mutex<Handle<T>>,
     pin: Option<String>,
     slot: id::Key,
-    public_key_path: PathBuf,
     public_key: PublicKey,
     digest: Digest,
 }
@@ -45,26 +46,39 @@ impl<T: PcscHal> Key<T> {
     /// Encryption is done using the given public key file (in PEM format), and
     /// decryption is done using the private key stored in the given slot on the
     /// hardware device.
-    pub fn new<P: AsRef<Path>>(
+    pub fn new<R: Read>(
         reader: Option<&str>,
         pin: Option<&str>,
         slot: id::Key,
-        public_key: P,
+        public_key: R,
     ) -> Result<Self> {
         let mut handle: Handle<T> = Handle::new()?;
         handle.connect(reader)?;
 
-        let pk = PublicKey::from_pem(public_key.as_ref())?;
+        let pk = PublicKey::from_pem(public_key)?;
         let data = pk.format(Format::Pem)?;
 
         Ok(Key {
             handle: Mutex::new(handle),
             pin: pin.map(|p| p.to_owned()),
             slot: slot,
-            public_key_path: public_key.as_ref().to_path_buf(),
             public_key: pk,
             digest: Digest::from_bytes(data.as_slice()),
         })
+    }
+
+    /// Construct a new Key instance.
+    ///
+    /// This is equivalent to `new`, except the public key is read from a
+    /// regular file.
+    pub fn new_from_file<P: AsRef<Path>>(
+        reader: Option<&str>,
+        pin: Option<&str>,
+        slot: id::Key,
+        public_key: P,
+    ) -> Result<Self> {
+        let f = fs::File::open(public_key)?;
+        Self::new(reader, pin, slot, f)
     }
 }
 
@@ -86,7 +100,7 @@ impl<T: PcscHal> AbstractKey for Key<T> {
         }
         let ciphertext = {
             let handle = self.handle.lock().unwrap();
-            handle.encrypt(self.public_key_path.as_path(), plaintext)?.1
+            handle.encrypt(&self.public_key, plaintext)?.1
         };
         Ok((None, ciphertext))
     }

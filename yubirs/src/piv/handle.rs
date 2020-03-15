@@ -1149,12 +1149,11 @@ impl<T: PcscHal> Handle<T> {
     /// Note that the given input key must be an RSA key in PEM format.
     ///
     /// Refer to `piv::pkey::PublicKey::encrypt` for more details.
-    pub fn encrypt<P: AsRef<Path>>(
+    pub fn encrypt(
         &self,
-        input_public_key: P,
+        public_key: &PublicKey,
         plaintext: &[u8],
     ) -> Result<(Algorithm, Vec<u8>)> {
-        let public_key = PublicKey::from_pem(input_public_key)?;
         let algorithm = public_key.get_algorithm()?;
         Ok((algorithm, public_key.encrypt(plaintext)?))
     }
