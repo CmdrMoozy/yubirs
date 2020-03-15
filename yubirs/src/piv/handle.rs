@@ -19,7 +19,7 @@ use crate::piv::hal::PcscHal;
 use crate::piv::id::*;
 use crate::piv::pkey::{PrivateKey, PublicKey, PublicKeyCertificate};
 use crate::piv::sw::StatusWord;
-use crate::util::MaybePromptedCString;
+use crate::piv::util::MaybePromptedCString;
 use data_encoding;
 use failure::format_err;
 use libc::c_int;
