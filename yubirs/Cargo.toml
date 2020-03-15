@@ -34,4 +34,7 @@ serde = { version = "1.0", features = ["derive"] }
 [dependencies.bdrck]
 version = "0.15"
 default_features = false
+# "testing" is only used by unit tests, but stable Rust doesn't support
+# different dev-dependencies and dependencies features. This hsa been fixed
+# in nightly: https://github.com/rust-lang/cargo/issues/1796
 features = ["cli", "crypto", "testing"]
