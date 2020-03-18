@@ -312,7 +312,7 @@ impl PcscHal for PcscHardware {
     fn connect_impl(&mut self, reader: &str) -> Result<()> {
         let reader = CString::new(reader)?;
         let mut active_protocol: pcsc_sys::DWORD = pcsc_sys::SCARD_PROTOCOL_UNDEFINED;
-        SmartCardError::new(unsafe {
+        let mut ret = SmartCardError::new(unsafe {
             pcsc_sys::SCardConnect(
                 self.context,
                 reader.as_ptr(),
@@ -321,7 +321,21 @@ impl PcscHal for PcscHardware {
                 &mut self.card,
                 &mut active_protocol,
             )
-        })?;
+        });
+
+        if matches!(ret, Err(SmartCardError::ResetCard)) {
+            ret = SmartCardError::new(unsafe {
+                pcsc_sys::SCardReconnect(
+                    self.card,
+                    pcsc_sys::SCARD_SHARE_SHARED,
+                    pcsc_sys::SCARD_PROTOCOL_T1,
+                    pcsc_sys::SCARD_RESET_CARD,
+                    &mut active_protocol,
+                )
+            });
+        }
+
+        ret?;
         Ok(())
     }
 
