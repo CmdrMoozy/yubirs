@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub mod apdu;
+mod connection;
 mod context;
 pub mod hal;
 pub mod handle;
