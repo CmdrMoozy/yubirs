@@ -14,6 +14,7 @@
 
 use crate::error::*;
 use crate::piv::apdu::Apdu;
+use crate::piv::context::PcscHardwareContext;
 use crate::piv::recording::Recording;
 use crate::piv::scarderr::SmartCardError;
 use crate::piv::sw::StatusWord;
@@ -29,6 +30,7 @@ use rand::{Rng, SeedableRng};
 use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::ptr;
+use std::rc::Rc;
 use std::sync::Mutex;
 
 pub trait PcscHal {
@@ -166,7 +168,7 @@ pub trait PcscHal {
 
 /// An implementation of PcscHal which actually talks to real hardware using the PC/SC library.
 pub struct PcscHardware {
-    context: pcsc_sys::SCARDCONTEXT,
+    context: Rc<PcscHardwareContext>,
     card: pcsc_sys::SCARDHANDLE,
     recording: Option<Mutex<Recording>>,
     output_recording: Option<PathBuf>,
@@ -177,18 +179,8 @@ impl PcscHardware {
         recording: Option<Mutex<Recording>>,
         output_recording: Option<PathBuf>,
     ) -> Result<Self> {
-        let mut context: pcsc_sys::SCARDCONTEXT = pcsc_sys::SCARD_E_INVALID_HANDLE;
-        SmartCardError::new(unsafe {
-            pcsc_sys::SCardEstablishContext(
-                pcsc_sys::SCARD_SCOPE_SYSTEM,
-                ptr::null(),
-                ptr::null(),
-                &mut context,
-            )
-        })?;
-
         Ok(PcscHardware {
-            context: context,
+            context: PcscHardwareContext::establish()?,
             card: 0,
             recording: recording,
             output_recording: output_recording,
@@ -248,7 +240,7 @@ impl PcscHardware {
         length: *mut libc::c_ulong,
     ) -> ::std::result::Result<(), SmartCardError> {
         match SmartCardError::new(unsafe {
-            pcsc_sys::SCardListReaders(self.context, ptr::null(), buffer, length)
+            pcsc_sys::SCardListReaders(self.context.get(), ptr::null(), buffer, length)
         }) {
             Err(e) => match e {
                 // there are no readers to be listed.
@@ -314,7 +306,7 @@ impl PcscHal for PcscHardware {
         let mut active_protocol: pcsc_sys::DWORD = pcsc_sys::SCARD_PROTOCOL_UNDEFINED;
         let mut ret = SmartCardError::new(unsafe {
             pcsc_sys::SCardConnect(
-                self.context,
+                self.context.get(),
                 reader.as_ptr(),
                 pcsc_sys::SCARD_SHARE_SHARED,
                 pcsc_sys::SCARD_PROTOCOL_T1,
@@ -345,11 +337,6 @@ impl PcscHal for PcscHardware {
                 pcsc_sys::SCardDisconnect(self.card, pcsc_sys::SCARD_RESET_CARD);
             }
             self.card = 0;
-        }
-
-        if unsafe { pcsc_sys::SCardIsValidContext(self.context) } == pcsc_sys::SCARD_S_SUCCESS {
-            unsafe { pcsc_sys::SCardReleaseContext(self.context) };
-            self.context = pcsc_sys::SCARD_E_INVALID_HANDLE;
         }
     }
 

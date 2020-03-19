@@ -49,6 +49,10 @@ pub enum Error {
     #[cfg(feature = "bincode")]
     #[fail(display = "{}", _0)]
     Bincode(#[cause] ::bincode::Error),
+    /// An internal error; we tried to mutably borrow a shared resource which
+    /// was already borrowed elsewhere.
+    #[fail(display = "{}", _0)]
+    BorrowMut(#[cause] ::std::cell::BorrowMutError),
     /// An error encountered in deciphering command-line flag values.
     #[fail(display = "{}", _0)]
     CliFlags(::failure::Error),
@@ -83,6 +87,10 @@ pub enum Error {
     /// this operation won't actually ever fail.
     #[fail(display = "{}", _0)]
     StringParse(#[cause] ::std::string::ParseError),
+    /// We tried to access some thread-local storage which was already
+    /// destructed.
+    #[fail(display = "{}", _0)]
+    ThreadLocalAccess(#[cause] ::std::thread::AccessError),
     /// An error of an unknown type occurred. Generally this comes from some
     /// dependency or underlying library, in a case where it's difficult to tell
     /// exactly what kind of problem occurred.
@@ -103,6 +111,12 @@ impl From<::bdrck::error::Error> for Error {
 impl From<::bincode::Error> for Error {
     fn from(e: ::bincode::Error) -> Self {
         Error::Bincode(e)
+    }
+}
+
+impl From<::std::cell::BorrowMutError> for Error {
+    fn from(e: ::std::cell::BorrowMutError) -> Self {
+        Error::BorrowMut(e)
     }
 }
 
@@ -166,6 +180,12 @@ impl From<::openssl::error::ErrorStack> for Error {
 impl From<::std::string::ParseError> for Error {
     fn from(e: ::std::string::ParseError) -> Self {
         Error::StringParse(e)
+    }
+}
+
+impl From<::std::thread::AccessError> for Error {
+    fn from(e: ::std::thread::AccessError) -> Self {
+        Error::ThreadLocalAccess(e)
     }
 }
 
