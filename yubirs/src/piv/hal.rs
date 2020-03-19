@@ -14,6 +14,7 @@
 
 use crate::error::*;
 use crate::piv::apdu::Apdu;
+use crate::piv::connection::PcscHardwareConnection;
 use crate::piv::context::PcscHardwareContext;
 use crate::piv::recording::Recording;
 use crate::piv::scarderr::SmartCardError;
@@ -27,7 +28,6 @@ use pcsc_sys;
 use rand::distributions::Standard;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
-use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::rc::Rc;
@@ -169,7 +169,7 @@ pub trait PcscHal {
 /// An implementation of PcscHal which actually talks to real hardware using the PC/SC library.
 pub struct PcscHardware {
     context: Rc<PcscHardwareContext>,
-    card: pcsc_sys::SCARDHANDLE,
+    card: Option<PcscHardwareConnection>,
     recording: Option<Mutex<Recording>>,
     output_recording: Option<PathBuf>,
 }
@@ -181,7 +181,7 @@ impl PcscHardware {
     ) -> Result<Self> {
         Ok(PcscHardware {
             context: PcscHardwareContext::establish()?,
-            card: 0,
+            card: None,
             recording: recording,
             output_recording: output_recording,
         })
@@ -192,6 +192,15 @@ impl PcscHardware {
             Some(Mutex::new(Recording::default())),
             Some(output.as_ref().to_path_buf()),
         )
+    }
+
+    fn get_card(&self) -> Result<pcsc_sys::SCARDHANDLE> {
+        match self.card.as_ref() {
+            None => Err(Error::InvalidArgument(format_err!(
+                "You must connect to a device first"
+            ))),
+            Some(c) => Ok(c.get()),
+        }
     }
 
     fn send_data_impl_impl(&self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)> {
@@ -210,7 +219,7 @@ impl PcscHardware {
         let mut recv_length = recv_buffer.len() as pcsc_sys::DWORD;
         SmartCardError::new(unsafe {
             pcsc_sys::SCardTransmit(
-                self.card,
+                self.get_card()?,
                 &pcsc_sys::g_rgSCardT1Pci,
                 apdu.as_ptr(),
                 send_len,
@@ -302,42 +311,13 @@ impl PcscHal for PcscHardware {
     }
 
     fn connect_impl(&mut self, reader: &str) -> Result<()> {
-        let reader = CString::new(reader)?;
-        let mut active_protocol: pcsc_sys::DWORD = pcsc_sys::SCARD_PROTOCOL_UNDEFINED;
-        let mut ret = SmartCardError::new(unsafe {
-            pcsc_sys::SCardConnect(
-                self.context.get(),
-                reader.as_ptr(),
-                pcsc_sys::SCARD_SHARE_SHARED,
-                pcsc_sys::SCARD_PROTOCOL_T1,
-                &mut self.card,
-                &mut active_protocol,
-            )
-        });
-
-        if matches!(ret, Err(SmartCardError::ResetCard)) {
-            ret = SmartCardError::new(unsafe {
-                pcsc_sys::SCardReconnect(
-                    self.card,
-                    pcsc_sys::SCARD_SHARE_SHARED,
-                    pcsc_sys::SCARD_PROTOCOL_T1,
-                    pcsc_sys::SCARD_RESET_CARD,
-                    &mut active_protocol,
-                )
-            });
-        }
-
-        ret?;
+        self.card
+            .replace(PcscHardwareConnection::establish(&self.context, reader)?);
         Ok(())
     }
 
     fn disconnect(&mut self) {
-        if self.card != 0 {
-            unsafe {
-                pcsc_sys::SCardDisconnect(self.card, pcsc_sys::SCARD_RESET_CARD);
-            }
-            self.card = 0;
-        }
+        self.card.take();
     }
 
     fn send_data_impl(&self, apdu: &Apdu) -> Result<(StatusWord, Vec<u8>)> {
@@ -352,13 +332,13 @@ impl PcscHal for PcscHardware {
     }
 
     fn begin_transaction(&self) -> Result<()> {
-        SmartCardError::new(unsafe { pcsc_sys::SCardBeginTransaction(self.card) })?;
+        SmartCardError::new(unsafe { pcsc_sys::SCardBeginTransaction(self.get_card()?) })?;
         Ok(())
     }
 
     fn end_transaction(&self) -> Result<()> {
         SmartCardError::new(unsafe {
-            pcsc_sys::SCardEndTransaction(self.card, pcsc_sys::SCARD_LEAVE_CARD)
+            pcsc_sys::SCardEndTransaction(self.get_card()?, pcsc_sys::SCARD_LEAVE_CARD)
         })?;
         Ok(())
     }
