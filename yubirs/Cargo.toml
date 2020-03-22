@@ -21,7 +21,7 @@ bincode = { version = "1.2", optional = true }
 chrono = { version = "0.4", optional = true }
 curl = { version = "0.4", optional = true }
 data-encoding = "2.2"
-failure = "0.1"
+failure = { version = "0.1", features = ["backtrace"] }
 lazy_static = "1.4"
 libc = { version = "0.2", optional = true }
 log = { version = "0.4", optional = true }
