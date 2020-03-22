@@ -18,6 +18,7 @@ use crate::piv::apdu::Apdu;
 use crate::piv::hal::PcscHal;
 use crate::piv::id::*;
 use crate::piv::pkey::{PrivateKey, PublicKey, PublicKeyCertificate};
+use crate::piv::scarderr::SmartCardErrorCode;
 use crate::piv::sw::StatusWord;
 use crate::piv::util::MaybePromptedCString;
 use data_encoding;
@@ -785,7 +786,16 @@ impl<T: PcscHal> Handle<T> {
                     }
                 }
                 Err(e) => match e {
-                    Error::SmartCard(crate::piv::scarderr::SmartCardError::InvalidChv) => continue,
+                    Error::SmartCard(ref sce) => {
+                        if *sce.get_code() == SmartCardErrorCode::InvalidChv {
+                            continue;
+                        } else {
+                            return Err(Error::Internal(format_err!(
+                                "Logic error: got unexpected failure during force reset: {}",
+                                e
+                            )));
+                        }
+                    }
                     Error::Authentication(ref ae) => {
                         if ae.to_string().contains("no more retries") {
                             break;
@@ -820,7 +830,16 @@ impl<T: PcscHal> Handle<T> {
                     }
                 }
                 Err(e) => match e {
-                    Error::SmartCard(crate::piv::scarderr::SmartCardError::InvalidChv) => continue,
+                    Error::SmartCard(ref sce) => {
+                        if *sce.get_code() == SmartCardErrorCode::InvalidChv {
+                            continue;
+                        } else {
+                            return Err(Error::Internal(format_err!(
+                                "Logic error: got unexpected failure during force reset: {}",
+                                e
+                            )));
+                        }
+                    }
                     Error::Authentication(ref ae) => {
                         if ae.to_string().contains("no more retries") {
                             break;

@@ -14,7 +14,7 @@
 
 use crate::error::*;
 use crate::piv::context::PcscHardwareContext;
-use crate::piv::scarderr::SmartCardError;
+use crate::piv::scarderr::{SmartCardError, SmartCardErrorCode};
 use lazy_static::lazy_static;
 use log::warn;
 use std::collections::HashMap;
@@ -52,7 +52,12 @@ impl PcscHardwareConnection {
             )
         });
 
-        if matches!(ret, Err(SmartCardError::ResetCard)) {
+        if ret
+            .as_ref()
+            .err()
+            .map(|e| *e.get_code() == SmartCardErrorCode::ResetCard)
+            .unwrap_or(false)
+        {
             warn!("Card '{}' was unexpectedly reset; reconnecting", reader);
             ret = SmartCardError::new(unsafe {
                 pcsc_sys::SCardReconnect(
