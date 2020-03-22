@@ -40,31 +40,44 @@ impl<T: PcscHal> Key<T> {
     /// Construct a new Key instance.
     ///
     /// This requires instantiating a new PIV handle, with the given reader (if
-    /// any), and using the given pin (if not specified, it will be prompted for
+    /// any), and using the given PIN (if not specified, it will be prompted for
     /// instead) for authentication.
     ///
-    /// Encryption is done using the given public key file (in PEM format), and
-    /// decryption is done using the private key stored in the given slot on the
-    /// hardware device.
-    pub fn new<R: Read>(
+    /// Encryption is done using the given public key instance, and descryption
+    /// is done using the private key stored in the given slot on the hardware
+    /// device.
+    pub fn new(
         reader: Option<&str>,
         pin: Option<&str>,
         slot: id::Key,
-        public_key: R,
+        public_key: PublicKey,
     ) -> Result<Self> {
         let mut handle: Handle<T> = Handle::new()?;
         handle.connect(reader)?;
 
-        let pk = PublicKey::from_pem(public_key)?;
-        let data = pk.format(Format::Pem)?;
+        let public_key_data = public_key.format(Format::Pem)?;
 
         Ok(Key {
             handle: Mutex::new(handle),
             pin: pin.map(|p| p.to_owned()),
             slot: slot,
-            public_key: pk,
-            digest: Digest::from_bytes(data.as_slice()),
+            public_key: public_key,
+            digest: Digest::from_bytes(public_key_data.as_slice()),
         })
+    }
+
+    /// Construct a new Key instance.
+    ///
+    /// This is equivalent to `new`, except the public key is read from the
+    /// given arbitary `Read` instance.
+    pub fn new_from_read<R: Read>(
+        reader: Option<&str>,
+        pin: Option<&str>,
+        slot: id::Key,
+        public_key: R,
+    ) -> Result<Self> {
+        let public_key = PublicKey::from_pem(public_key)?;
+        Self::new(reader, pin, slot, public_key)
     }
 
     /// Construct a new Key instance.
@@ -78,7 +91,7 @@ impl<T: PcscHal> Key<T> {
         public_key: P,
     ) -> Result<Self> {
         let f = fs::File::open(public_key)?;
-        Self::new(reader, pin, slot, f)
+        Self::new_from_read(reader, pin, slot, f)
     }
 }
 
