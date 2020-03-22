@@ -94,9 +94,11 @@ pub const YKPIV_INS_PUT_DATA: u8 = 0xdb;
 pub const YKPIV_INS_SET_MGMKEY: u8 = 0xff;
 pub const YKPIV_INS_IMPORT_KEY: u8 = 0xfe;
 pub const YKPIV_INS_GET_VERSION: u8 = 0xfd;
+pub const YKPIV_INS_GET_SERIAL: u8 = 0xf8;
 pub const YKPIV_INS_RESET: u8 = 0xfb;
 pub const YKPIV_INS_SET_PIN_RETRIES: u8 = 0xfa;
 pub const YKPIV_INS_ATTEST: u8 = 0xf9;
+pub const YKPIV_INS_SELECT_APPLICATION: u8 = 0xa4;
 
 pub const YKPIV_PINPOLICY_TAG: u8 = 0xaa;
 pub const YKPIV_PINPOLICY_DEFAULT: u8 = 0;
