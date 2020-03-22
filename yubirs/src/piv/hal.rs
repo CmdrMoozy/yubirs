@@ -17,7 +17,7 @@ use crate::piv::apdu::Apdu;
 use crate::piv::connection::PcscHardwareConnection;
 use crate::piv::context::PcscHardwareContext;
 use crate::piv::recording::Recording;
-use crate::piv::scarderr::SmartCardError;
+use crate::piv::scarderr::{SmartCardError, SmartCardErrorCode};
 use crate::piv::sw::StatusWord;
 use crate::piv::DEFAULT_READER;
 use failure::format_err;
@@ -251,14 +251,14 @@ impl PcscHardware {
         match SmartCardError::new(unsafe {
             pcsc_sys::SCardListReaders(self.context.get(), ptr::null(), buffer, length)
         }) {
-            Err(e) => match e {
-                // there are no readers to be listed.
-                SmartCardError::NoReadersAvailable => {
+            Err(e) => {
+                if *e.get_code() == SmartCardErrorCode::NoReadersAvailable {
                     unsafe { *length = 0 };
                     Ok(())
+                } else {
+                    Err(e)
                 }
-                _ => Err(e),
-            },
+            }
             Ok(v) => Ok(v),
         }
     }
