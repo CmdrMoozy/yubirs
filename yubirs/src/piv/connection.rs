@@ -113,13 +113,13 @@ impl Drop for PcscHardwareConnection {
                 // If we are the last connection, reset the card when we disconnect.
                 // Also, remove this entry from the
                 disposition = pcsc_sys::SCARD_RESET_CARD;
+
+                // Clean up our entry in the refcount map. It's safe to unwrap() here,
+                // because we know the reader is valid UTF-8 - it was a `&str` when it
+                // was given to us in the first place.
+                ref_counts.remove(self.reader.to_str().unwrap());
             }
         } // Drop the refcount instance.
-
-        // Clean up our entry in the refcount map. It's safe to unwrap() here,
-        // because we know the reader is valid UTF-8 - it was a `&str` when it
-        // was given to us in the first place.
-        ref_counts.remove(self.reader.to_str().unwrap());
 
         // Finally, disconnect.
         unsafe {
