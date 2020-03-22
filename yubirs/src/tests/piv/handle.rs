@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::piv::handle::{Handle, Version};
+use crate::piv::handle::{Handle, Serial, Version};
 use crate::piv::id::*;
 use crate::piv::pkey::Format;
 use crate::piv::{DEFAULT_MGM_KEY, DEFAULT_PIN, DEFAULT_PUK, DEFAULT_READER};
@@ -24,6 +24,7 @@ use std::io::Write;
 
 const CONNECT_RECORDING: &'static [u8] = include_bytes!("recordings/connect.dr");
 const GET_VERSION_RECORDING: &'static [u8] = include_bytes!("recordings/get_version.dr");
+const GET_SERIAL_RECORDING: &'static [u8] = include_bytes!("recordings/get_serial.dr");
 const CHANGE_PIN_RECORDING: &'static [u8] = include_bytes!("recordings/change_pin.dr");
 const CHANGE_PIN_WRONG_RECORDING: &'static [u8] = include_bytes!("recordings/change_pin_wrong.dr");
 const UNBLOCK_PIN_RECORDING: &'static [u8] = include_bytes!("recordings/unblock_pin.dr");
@@ -92,6 +93,20 @@ fn test_get_version() {
     handle.connect(None).unwrap();
     assert_eq!("1.0.4", expected.to_string().as_str());
     assert_eq!(expected, handle.get_version().unwrap());
+    assert!(handle.get_hal().no_recordings());
+}
+
+#[test]
+fn test_get_serial() {
+    let mut handle = new_test_handle();
+    handle
+        .get_hal()
+        .push_recording(GET_SERIAL_RECORDING)
+        .unwrap();
+
+    let expected = Serial(5312783);
+    handle.connect(None).unwrap();
+    assert_eq!(expected, handle.get_serial().unwrap());
     assert!(handle.get_hal().no_recordings());
 }
 
