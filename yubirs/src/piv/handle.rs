@@ -14,7 +14,7 @@
 
 use crate::crypto::*;
 use crate::error::*;
-use crate::piv::apdu::Apdu;
+use crate::piv::apdu::{self, Apdu};
 use crate::piv::hal::PcscHal;
 use crate::piv::id::*;
 use crate::piv::pkey::{PrivateKey, PublicKey, PublicKeyCertificate};
@@ -490,13 +490,23 @@ fn change_impl<T: PcscHal>(
 pub struct Version(pub u8, pub u8, pub u8);
 
 impl Version {
-    pub fn new(data: &[u8]) -> Result<Version> {
+    pub fn new(data: &[u8]) -> Result<Self> {
         if data.len() < 3 {
             return Err(Error::InvalidArgument(format_err!(
                 "Version data must be three bytes long."
             )));
         }
         Ok(Version(data[0], data[1], data[2]))
+    }
+
+    pub fn major(&self) -> u8 {
+        self.0
+    }
+    pub fn minor(&self) -> u8 {
+        self.1
+    }
+    pub fn patch(&self) -> u8 {
+        self.2
     }
 }
 
@@ -508,6 +518,19 @@ impl fmt::Display for Version {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Serial(pub u32);
+
+impl Serial {
+    pub fn new(data: &[u8]) -> Result<Self> {
+        if data.len() < 4 {
+            return Err(Error::InvalidArgument(format_err!(
+                "Serial number data must be four bytes long."
+            )));
+        }
+        Ok(Serial(u32::from_be_bytes([
+            data[0], data[1], data[2], data[3],
+        ])))
+    }
+}
 
 impl fmt::Display for Serial {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -708,7 +731,55 @@ impl<T: PcscHal> Handle<T> {
     /// same model. Note that connect() must be called before this function, or
     /// an error will be returned.
     pub fn get_serial(&self) -> Result<Serial> {
-        Ok(Serial(0))
+        self.hal.begin_transaction()?;
+
+        let version = self.get_version()?;
+
+        let ret = if version.major() < 5 {
+            // For NEO and YK4 devices, we have to get the serial number from
+            // the OTP applet.
+
+            let (sw, _) = self.hal.send_data(
+                &[
+                    0,
+                    Instruction::SelectApplication.to_value(),
+                    0x04,
+                    0,
+                    apdu::YK_AID.len() as u8,
+                ],
+                &apdu::YK_AID,
+            )?;
+            sw.error?;
+
+            let (sw, serial_buffer) = self.hal.send_data(&[0, 0x01, 0x10, 0, 0], &[])?;
+            sw.error?;
+
+            let (sw, _) = self.hal.send_data(
+                &[
+                    0,
+                    Instruction::SelectApplication.to_value(),
+                    0x04,
+                    0,
+                    apdu::PIV_AID.len() as u8,
+                ],
+                &apdu::PIV_AID,
+            )?;
+            sw.error?;
+
+            Ok(Serial::new(serial_buffer.as_slice())?)
+        } else {
+            // For YK5 and newer devices, get the serial number with the F8
+            // command.
+
+            let (sw, buffer) = self
+                .hal
+                .send_data(&[0, Instruction::GetSerial.to_value(), 0, 0, 0], &[])?;
+            sw.error?;
+            Ok(Serial::new(buffer.as_slice())?)
+        };
+
+        self.hal.end_transaction()?;
+        ret
     }
 
     /// This function allows the user to change the Yubikey's PIN, given that

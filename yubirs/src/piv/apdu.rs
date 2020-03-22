@@ -17,7 +17,8 @@ use failure::format_err;
 use std::fmt;
 
 /// The Application ID to send in an APDU when connecting to a Yubikey.
-const APDU_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
+pub const PIV_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
+pub const YK_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x20, 0x01, 0x01];
 
 /// The total number of bytes in a single APDU.
 const APDU_BYTES: usize = 260;
@@ -79,7 +80,7 @@ impl Apdu {
     /// Construct a new Application ID APDU, which should be sent to the
     /// underlying hardware when we connect to it.
     pub fn new_aid() -> Result<Self> {
-        Self::from_pieces(0, 0xa4, 0x04, 0, APDU_AID.len() as u8, &APDU_AID)
+        Self::from_pieces(0, 0xa4, 0x04, 0, PIV_AID.len() as u8, &PIV_AID)
     }
 
     /// Return this APDU's raw data, including the various properties which are

@@ -108,6 +108,7 @@ pub enum Instruction {
     GenerateAsymmetric,
     GetData,
     GetVersion,
+    GetSerial,
     ImportKey,
     PutData,
     Reset,
@@ -115,6 +116,7 @@ pub enum Instruction {
     SetManagementKey,
     SetPinRetries,
     Verify,
+    SelectApplication,
 }
 
 lazy_static! {
@@ -126,6 +128,7 @@ lazy_static! {
         m.insert(Instruction::GenerateAsymmetric, "GenerateAsymmetric");
         m.insert(Instruction::GetData, "GetData");
         m.insert(Instruction::GetVersion, "GetVersion");
+        m.insert(Instruction::GetSerial, "GetSerial");
         m.insert(Instruction::ImportKey, "ImportKey");
         m.insert(Instruction::PutData, "PutData");
         m.insert(Instruction::Reset, "Reset");
@@ -133,6 +136,7 @@ lazy_static! {
         m.insert(Instruction::SetManagementKey, "SetManagementKey");
         m.insert(Instruction::SetPinRetries, "SetPinRetries");
         m.insert(Instruction::Verify, "Verify");
+        m.insert(Instruction::SelectApplication, "SelectApplication");
         m
     };
     static ref STRING_INSTRUCTIONS: HashMap<String, Instruction> = {
@@ -175,6 +179,7 @@ impl Instruction {
             Instruction::GenerateAsymmetric => nid::YKPIV_INS_GENERATE_ASYMMETRIC,
             Instruction::GetData => nid::YKPIV_INS_GET_DATA,
             Instruction::GetVersion => nid::YKPIV_INS_GET_VERSION,
+            Instruction::GetSerial => nid::YKPIV_INS_GET_SERIAL,
             Instruction::ImportKey => nid::YKPIV_INS_IMPORT_KEY,
             Instruction::PutData => nid::YKPIV_INS_PUT_DATA,
             Instruction::Reset => nid::YKPIV_INS_RESET,
@@ -182,6 +187,7 @@ impl Instruction {
             Instruction::SetManagementKey => nid::YKPIV_INS_SET_MGMKEY,
             Instruction::SetPinRetries => nid::YKPIV_INS_SET_PIN_RETRIES,
             Instruction::Verify => nid::YKPIV_INS_VERIFY,
+            Instruction::SelectApplication => nid::YKPIV_INS_SELECT_APPLICATION,
         }
     }
 }
