@@ -10,7 +10,7 @@ edition = "2018"
 
 [dependencies]
 data-encoding = "2.2"
-failure = "0.1"
+failure = { version = "0.1", features = ["backtrace"] }
 flaggy = { version = "0.1" }
 
 [dependencies.bdrck]
