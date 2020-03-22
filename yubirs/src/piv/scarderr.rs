@@ -521,6 +521,7 @@ impl fmt::Debug for SmartCardErrorCode {
     }
 }
 
+#[derive(Debug)]
 pub struct SmartCardError {
     code: SmartCardErrorCode,
     backtrace: Backtrace,
@@ -569,12 +570,6 @@ impl From<SmartCardErrorCode> for SmartCardError {
 impl fmt::Display for SmartCardError {
     fn fmt(&self, f: &mut fmt::Formatter) -> ::std::result::Result<(), fmt::Error> {
         write!(f, "{}", self.code)
-    }
-}
-
-impl fmt::Debug for SmartCardError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> ::std::result::Result<(), fmt::Error> {
-        write!(f, "{:?}", self.code)
     }
 }
 
