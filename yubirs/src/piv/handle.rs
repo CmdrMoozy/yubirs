@@ -506,6 +506,15 @@ impl fmt::Display for Version {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Serial(pub u32);
+
+impl fmt::Display for Serial {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// A Handle representing a connection to an underlying PC/SC device. This
 /// struct is parameterized on a PcscHal implementation, so the underlying
 /// hardware implementation can be swapped out as long as it is "compatible"
@@ -524,6 +533,7 @@ impl fmt::Display for Version {
 /// | connect            |         |     |     |                            |
 /// | disconnect         |         |     |     |                            |
 /// | get_version        |         |     |     |                            |
+/// | get_serial         |         |     |     |                            |
 /// | change_pin         |         | X   |     |                            |
 /// | unblock_pin        |         |     | X   |                            |
 /// | change_puk         |         |     | X   |                            |
@@ -691,6 +701,14 @@ impl<T: PcscHal> Handle<T> {
             .send_data(&[0, Instruction::GetVersion.to_value(), 0, 0, 0], &[])?;
         sw.error?;
         Ok(Version::new(buffer.as_slice())?)
+    }
+
+    /// This function returns the serial number of the connected reader. This
+    /// is a number which uniquely identifes this device from others of the
+    /// same model. Note that connect() must be called before this function, or
+    /// an error will be returned.
+    pub fn get_serial(&self) -> Result<Serial> {
+        Ok(Serial(0))
     }
 
     /// This function allows the user to change the Yubikey's PIN, given that

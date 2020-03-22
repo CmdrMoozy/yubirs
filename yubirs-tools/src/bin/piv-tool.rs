@@ -150,6 +150,14 @@ fn get_version(reader: String, output_recording: Option<PathBuf>) -> Result<()> 
 }
 
 #[command_callback]
+fn get_serial(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
+    let mut handle = new_handle(output_recording)?;
+    handle.connect(Some(&reader))?;
+    println!("{}", handle.get_serial()?);
+    Ok(())
+}
+
+#[command_callback]
 fn change_pin(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
@@ -418,6 +426,28 @@ fn main() {
             ])
             .unwrap(),
             Box::new(get_version),
+        ),
+        Command::new(
+            "get_serial",
+            "Retrieve the serial number from the Yubikey",
+            Specs::new(vec![
+                Spec::required(
+                    "reader",
+                    concat!(
+                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
+                        "reader with the value given here as a substring is used.",
+                    ),
+                    Some('r'),
+                    Some(DEFAULT_READER),
+                ),
+                Spec::optional(
+                    "output_recording",
+                    "Record interactions with the hardware, and write it to this file.",
+                    None,
+                ),
+            ])
+            .unwrap(),
+            Box::new(get_serial),
         ),
         Command::new(
             "change_pin",
