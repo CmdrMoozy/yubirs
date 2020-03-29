@@ -155,7 +155,13 @@ impl Client {
         timeout: Option<u64>,
     ) -> Result<VerificationResult> {
         self.verify(
-            cli::prompt_for_string(cli::Stream::Stderr, TOUCH_YUBIKEY_PROMPT, true)?.as_str(),
+            cli::prompt_for_string(
+                cli::Stream::Stdin,
+                cli::Stream::Stderr,
+                TOUCH_YUBIKEY_PROMPT,
+                true,
+            )?
+            .as_str(),
             timestamp,
             success_percentage,
             timeout,
