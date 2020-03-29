@@ -105,7 +105,9 @@ fn new_handle(output_recording: Option<PathBuf>) -> Result<Handle<PcscHardware>>
 
 // TODO: This function's (or callers') behavior is wrong for DER output.
 fn print_data(data: &[u8], text: bool) -> Result<()> {
-    if bdrck::cli::isatty(bdrck::cli::Stream::Stdout) {
+    use bdrck::cli::AbstractStream;
+
+    if bdrck::cli::Stream::Stdout.isatty() {
         if text {
             println!("{}", ::std::str::from_utf8(data)?);
         } else {
@@ -190,6 +192,7 @@ fn force_reset(reader: String, output_recording: Option<PathBuf>) -> Result<()> 
     // This is a very destructive operation; confirm with the user first before
     // proceeding.
     if !bdrck::cli::continue_confirmation(
+        bdrck::cli::Stream::Stdin,
         bdrck::cli::Stream::Stderr,
         "This will reset all PIV device data (certificates, ...) to factory defaults. ",
     )? {

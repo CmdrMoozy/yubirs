@@ -30,8 +30,14 @@ impl MaybePromptedCString {
     /// was provided using the given prompt string and optionally confirming the value a second
     /// time.
     pub fn new(provided: Option<&str>, prompt: &str, confirm: bool) -> Result<Self> {
-        let string =
-            cli::MaybePromptedString::new(provided, cli::Stream::Stderr, prompt, true, confirm)?;
+        let string = cli::MaybePromptedString::new(
+            provided,
+            cli::Stream::Stdin,
+            cli::Stream::Stderr,
+            prompt,
+            true,
+            confirm,
+        )?;
         let was_provided = string.was_provided();
         let string = string.into_inner();
         let length = string.len();
