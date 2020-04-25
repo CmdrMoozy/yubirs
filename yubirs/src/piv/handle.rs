@@ -345,6 +345,8 @@ fn sign_decipher_impl<T: PcscHal>(
     Ok((&recv_slice[0..len]).into())
 }
 
+// TODO: Actually make use of this function. :)
+#[allow(dead_code)]
 fn ykpiv_sign_data<T: PcscHal>(
     hal: &T,
     data: &[u8],
