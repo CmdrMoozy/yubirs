@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure::{Backtrace, Fail};
+use backtrace::Backtrace;
 use lazy_static::lazy_static;
 use pcsc_sys;
 use std::collections::HashMap;
@@ -573,8 +573,8 @@ impl fmt::Display for SmartCardError {
     }
 }
 
-impl Fail for SmartCardError {
-    fn backtrace(&self) -> Option<&Backtrace> {
-        Some(&self.backtrace)
+impl std::error::Error for SmartCardError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
     }
 }

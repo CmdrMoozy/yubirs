@@ -14,7 +14,6 @@
 
 use crate::error::*;
 use bdrck::cli;
-use failure::format_err;
 use std::ffi::CString;
 
 /// A wrapper around bdrck's MaybePromptedString which stores the data as a
@@ -69,8 +68,8 @@ impl MaybePromptedCString {
 pub fn get_required_as<T: Clone + Copy, R: From<T>>(data: &[T], index: usize) -> Result<R> {
     Ok(match data.get(index) {
         None => {
-            return Err(Error::InvalidArgument(format_err!(
-                "The provided slice has only {} items, expected at least {}",
+            return Err(Error::InvalidArgument(format!(
+                "the provided slice has only {} items, expected at least {}",
                 data.len(),
                 index + 1
             )));
@@ -99,8 +98,8 @@ pub fn read_length<'a>(data: &'a [u8]) -> Result<(&'a [u8], usize)> {
         let length = get_required_as::<u8, usize>(data, 0)?;
         let data = &data[1..];
         if data.len() < length {
-            return Err(Error::InvalidArgument(format_err!(
-                "Parsed length says there should be at least {} more bytes, but found only {}",
+            return Err(Error::InvalidArgument(format!(
+                "parsed length says there should be at least {} more bytes, but found only {}",
                 length,
                 data.len()
             )));
@@ -110,8 +109,8 @@ pub fn read_length<'a>(data: &'a [u8]) -> Result<(&'a [u8], usize)> {
         let length = get_required_as::<u8, usize>(data, 1)?;
         let data = &data[2..];
         if data.len() < length {
-            return Err(Error::InvalidArgument(format_err!(
-                "Parsed length says there should be at least {} more bytes, but found only {}",
+            return Err(Error::InvalidArgument(format!(
+                "parsed length says there should be at least {} more bytes, but found only {}",
                 length,
                 data.len()
             )));
@@ -122,8 +121,8 @@ pub fn read_length<'a>(data: &'a [u8]) -> Result<(&'a [u8], usize)> {
             (get_required_as::<u8, usize>(data, 1)? << 8) + get_required_as::<u8, usize>(data, 2)?;
         let data = &data[3..];
         if data.len() < length {
-            return Err(Error::InvalidArgument(format_err!(
-                "Parsed length says there should be at least {} more bytes, but found only {}",
+            return Err(Error::InvalidArgument(format!(
+                "parsed length says there should be at least {} more bytes, but found only {}",
                 length,
                 data.len()
             )));
@@ -131,7 +130,7 @@ pub fn read_length<'a>(data: &'a [u8]) -> Result<(&'a [u8], usize)> {
         return Ok((data, length));
     }
 
-    Err(Error::InvalidArgument(format_err!(
-        "Failed to parse length from the given slice"
+    Err(Error::InvalidArgument(format!(
+        "failed to parse length from the given slice"
     )))
 }

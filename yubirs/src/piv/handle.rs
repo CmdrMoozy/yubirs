@@ -22,7 +22,6 @@ use crate::piv::scarderr::SmartCardErrorCode;
 use crate::piv::sw::StatusWord;
 use crate::piv::util::MaybePromptedCString;
 use data_encoding;
-use failure::format_err;
 use libc::c_int;
 use log::debug;
 use openssl;
@@ -118,8 +117,8 @@ where
             }
             VerificationResult::PermanentFailure(err) => {
                 debug!("Incorrect {}, 0 tries remaining: {}", name, err);
-                return Err(Error::Authentication(format_err!(
-                    "Verifying {} failed: no more retries",
+                return Err(Error::Authentication(format!(
+                    "verifying {} failed: no more retries",
                     name
                 )));
             }
@@ -219,8 +218,8 @@ fn sign_decipher_impl<T: PcscHal>(
     decipher: bool,
 ) -> Result<Vec<u8>> {
     if !algorithm.is_rsa() && !algorithm.is_ecc() {
-        return Err(Error::InvalidArgument(format_err!(
-            "Data signing / deciphering only supports RSA or EC algorithms"
+        return Err(Error::InvalidArgument(format!(
+            "data signing / deciphering only supports RSA or EC algorithms"
         )));
     }
 
@@ -233,19 +232,19 @@ fn sign_decipher_impl<T: PcscHal>(
     };
 
     if algorithm.is_rsa() && data.len() != key_len {
-        return Err(Error::InvalidArgument(format_err!(
-            "Invalid input data; expected exactly {} bytes",
+        return Err(Error::InvalidArgument(format!(
+            "invalid input data; expected exactly {} bytes",
             key_len
         )));
     } else if algorithm.is_ecc() {
         if !decipher && data.len() > key_len {
-            return Err(Error::InvalidArgument(format_err!(
-                "Invalid input data; expected at most {} bytes",
+            return Err(Error::InvalidArgument(format!(
+                "invalid input data; expected at most {} bytes",
                 key_len
             )));
         } else if decipher && data.len() != (key_len * 2) + 1 {
-            return Err(Error::InvalidArgument(format_err!(
-                "Invalid input data; expected exactly {} bytes",
+            return Err(Error::InvalidArgument(format!(
+                "invalid input data; expected exactly {} bytes",
                 (key_len * 2) + 1
             )));
         }
@@ -309,16 +308,15 @@ fn sign_decipher_impl<T: PcscHal>(
     // Skip the first 7c tag.
     match recv.get(0) {
         None => {
-            return Err(Error::Internal(format_err!(
-                "Failed to parse tag from signature reply: reply too short"
+            return Err(Error::Internal(format!(
+                "failed to parse tag from signature reply: reply too short"
             )));
         }
         Some(b) => {
             if *b != 0x7c {
-                return Err(Error::Internal(format_err!(
-                    "Failed to parse tag from signature reply: got {:02x}, expected {:02x}",
-                    *b,
-                    0x7c
+                return Err(Error::Internal(format!(
+                    "failed to parse tag from signature reply: got {:02x}, expected {:02x}",
+                    *b, 0x7c
                 )));
             }
         }
@@ -329,16 +327,15 @@ fn sign_decipher_impl<T: PcscHal>(
     // Skip the 82 tag.
     match recv_slice.get(0) {
         None => {
-            return Err(Error::Internal(format_err!(
-                "Failed to parse tag from signature reply: reply too short"
+            return Err(Error::Internal(format!(
+                "failed to parse tag from signature reply: reply too short"
             )));
         }
         Some(b) => {
             if *b != 0x82 {
-                return Err(Error::Internal(format_err!(
-                    "Failed to parse tag from signature reply: got {:02x}, expected {:02x}",
-                    *b,
-                    0x82
+                return Err(Error::Internal(format!(
+                    "failed to parse tag from signature reply: got {:02x}, expected {:02x}",
+                    *b, 0x82
                 )));
             }
         }
@@ -434,8 +431,8 @@ fn change_impl<T: PcscHal>(
     new: &MaybePromptedCString,
 ) -> VerificationResult {
     if existing.len() > 8 {
-        return VerificationResult::OtherFailure(Error::InvalidArgument(format_err!(
-            "Invalid existing {}; it exceeds 8 characters",
+        return VerificationResult::OtherFailure(Error::InvalidArgument(format!(
+            "invalid existing {}; it exceeds 8 characters",
             match action {
                 ChangeAction::ChangePin => PIN_NAME,
                 ChangeAction::UnblockPin => PIN_NAME,
@@ -444,8 +441,8 @@ fn change_impl<T: PcscHal>(
         )));
     }
     if new.len() > 8 {
-        return VerificationResult::OtherFailure(Error::InvalidArgument(format_err!(
-            "Invalid new {}; it exceeds 8 characters",
+        return VerificationResult::OtherFailure(Error::InvalidArgument(format!(
+            "invalid new {}; it exceeds 8 characters",
             match action {
                 ChangeAction::ChangePin => PIN_NAME,
                 ChangeAction::UnblockPin => PIN_NAME,
@@ -492,8 +489,8 @@ pub struct Version(pub u8, pub u8, pub u8);
 impl Version {
     pub fn new(data: &[u8]) -> Result<Self> {
         if data.len() < 3 {
-            return Err(Error::InvalidArgument(format_err!(
-                "Version data must be three bytes long."
+            return Err(Error::InvalidArgument(format!(
+                "version data must be three bytes long."
             )));
         }
         Ok(Version(data[0], data[1], data[2]))
@@ -522,8 +519,8 @@ pub struct Serial(pub u32);
 impl Serial {
     pub fn new(data: &[u8]) -> Result<Self> {
         if data.len() < 4 {
-            return Err(Error::InvalidArgument(format_err!(
-                "Serial number data must be four bytes long."
+            return Err(Error::InvalidArgument(format!(
+                "serial number data must be four bytes long."
             )));
         }
         Ok(Serial(u32::from_be_bytes([
@@ -611,8 +608,8 @@ impl<T: PcscHal> Handle<T> {
 
         verification_loop(PIN_NAME, pin, PIN_PROMPT, |pin| {
             if pin.len() > 8 {
-                return VerificationResult::OtherFailure(Error::InvalidArgument(format_err!(
-                    "Invalid PIN; it exceeds 8 characters"
+                return VerificationResult::OtherFailure(Error::InvalidArgument(format!(
+                    "invalid PIN; it exceeds 8 characters"
                 )));
             }
 
@@ -687,8 +684,8 @@ impl<T: PcscHal> Handle<T> {
         let expected_card_reply =
             encrypt_des_challenge(mgm_key.as_slice(), expected_card_reply.as_slice())?;
         if expected_card_reply.as_slice() != &response[4..12] {
-            return Err(Error::Authentication(format_err!(
-                "Management key authentication failed"
+            return Err(Error::Authentication(format!(
+                "management key authentication failed"
             )));
         }
 
@@ -869,8 +866,8 @@ impl<T: PcscHal> Handle<T> {
                     if bad_pin == "111111" {
                         bad_pin = "222222";
                     } else {
-                        return Err(Error::Internal(format_err!(
-                            "Logic error: failed to find bad PIN for force reset"
+                        return Err(Error::Internal(format!(
+                            "logic error: failed to find bad PIN for force reset"
                         )));
                     }
                 }
@@ -879,8 +876,8 @@ impl<T: PcscHal> Handle<T> {
                         if *sce.get_code() == SmartCardErrorCode::InvalidChv {
                             continue;
                         } else {
-                            return Err(Error::Internal(format_err!(
-                                "Logic error: got unexpected failure during force reset: {}",
+                            return Err(Error::Internal(format!(
+                                "logic error: got unexpected failure during force reset: {}",
                                 e
                             )));
                         }
@@ -889,15 +886,15 @@ impl<T: PcscHal> Handle<T> {
                         if ae.to_string().contains("no more retries") {
                             break;
                         } else {
-                            return Err(Error::Internal(format_err!(
-                                "Logic error: got unexpected failure during force reset: {}",
+                            return Err(Error::Internal(format!(
+                                "logic error: got unexpected failure during force reset: {}",
                                 e
                             )));
                         }
                     }
                     _ => {
-                        return Err(Error::Internal(format_err!(
-                            "Logic error: got unexpected failure during force reset: {}",
+                        return Err(Error::Internal(format!(
+                            "logic error: got unexpected failure during force reset: {}",
                             e
                         )));
                     }
@@ -913,8 +910,8 @@ impl<T: PcscHal> Handle<T> {
                     if bad_puk == "111111" {
                         bad_puk = "222222";
                     } else {
-                        return Err(Error::Internal(format_err!(
-                            "Logic error: failed to find bad PUK for force reset"
+                        return Err(Error::Internal(format!(
+                            "logic error: failed to find bad PUK for force reset"
                         )));
                     }
                 }
@@ -923,8 +920,8 @@ impl<T: PcscHal> Handle<T> {
                         if *sce.get_code() == SmartCardErrorCode::InvalidChv {
                             continue;
                         } else {
-                            return Err(Error::Internal(format_err!(
-                                "Logic error: got unexpected failure during force reset: {}",
+                            return Err(Error::Internal(format!(
+                                "logic error: got unexpected failure during force reset: {}",
                                 e
                             )));
                         }
@@ -933,15 +930,15 @@ impl<T: PcscHal> Handle<T> {
                         if ae.to_string().contains("no more retries") {
                             break;
                         } else {
-                            return Err(Error::Internal(format_err!(
-                                "Logic error: got unexpected failure during force reset: {}",
+                            return Err(Error::Internal(format!(
+                                "logic error: got unexpected failure during force reset: {}",
                                 e
                             )));
                         }
                     }
                     _ => {
-                        return Err(Error::Internal(format_err!(
-                            "Logic error: got unexpected failure during force reset: {}",
+                        return Err(Error::Internal(format!(
+                            "logic error: got unexpected failure during force reset: {}",
                             e
                         )));
                     }
@@ -994,8 +991,8 @@ impl<T: PcscHal> Handle<T> {
         let new_mgm_key: Vec<u8> = data_encoding::HEXLOWER_PERMISSIVE
             .decode(MaybePromptedCString::new(new_mgm_key, NEW_MGM_KEY_PROMPT, true)?.as_bytes())?;
         if is_weak_mgm_key(new_mgm_key.as_slice())? {
-            return Err(Error::InvalidArgument(format_err!(
-                "Refusing to set new management key because it contains weak DES keys"
+            return Err(Error::InvalidArgument(format!(
+                "refusing to set new management key because it contains weak DES keys"
             )));
         }
 
@@ -1091,8 +1088,8 @@ impl<T: PcscHal> Handle<T> {
             recv.remove(0);
             recv.truncate(length);
         } else {
-            return Err(Error::Internal(format_err!(
-                "Failed to determine size of returned data object"
+            return Err(Error::Internal(format!(
+                "failed to determine size of returned data object"
             )));
         }
 
@@ -1125,14 +1122,14 @@ impl<T: PcscHal> Handle<T> {
         touch_policy: TouchPolicy,
     ) -> Result<PublicKey> {
         if !(algorithm.is_rsa() || algorithm.is_ecc()) {
-            return Err(Error::InvalidArgument(format_err!(
-                "Only RSA and ECC algorithms are supported by this function"
+            return Err(Error::InvalidArgument(format!(
+                "only RSA and ECC algorithms are supported by this function"
             )));
         }
 
         // As per https://developers.yubico.com/yubico-piv-tool/YKCS11_release_notes.html
         if algorithm == Algorithm::Eccp384 {
-            return Err(Error::InvalidArgument(format_err!(
+            return Err(Error::InvalidArgument(format!(
                 "384-bit EC key generation is not supported"
             )));
         }
@@ -1140,7 +1137,7 @@ impl<T: PcscHal> Handle<T> {
         if algorithm.is_rsa() {
             let version = self.get_version()?;
             if version >= Version(4, 2, 6) && version <= Version(4, 3, 4) {
-                return Err(Error::InvalidArgument(format_err!("This device is affected by https://yubi.co/ysa201701/, so RSA key generation is disabled")));
+                return Err(Error::InvalidArgument(format!("this device is affected by https://yubi.co/ysa201701/, so RSA key generation is disabled")));
             }
         }
 
@@ -1212,8 +1209,8 @@ impl<T: PcscHal> Handle<T> {
         sw.error?;
 
         if *recv.get(0).unwrap_or(&0) != 0x30 {
-            return Err(Error::Internal(format_err!(
-                "Failed to attest key; got invalid response from device"
+            return Err(Error::Internal(format!(
+                "failed to attest key; got invalid response from device"
             )));
         }
 
@@ -1229,8 +1226,8 @@ impl<T: PcscHal> Handle<T> {
         // function to write X509 certificates is implemented + tested.
         let object = self.read_object(slot.to_object()?)?;
         if object.len() < 2 {
-            return Err(Error::Internal(format_err!(
-                "Expected at least two bytes in the stored object, got {}",
+            return Err(Error::Internal(format!(
+                "expected at least two bytes in the stored object, got {}",
                 object.len()
             )));
         }
@@ -1240,8 +1237,8 @@ impl<T: PcscHal> Handle<T> {
             Some(byte) => *byte == 0x70,
         };
         if !has_tag {
-            return Err(Error::Internal(format_err!(
-                "The object stored on the device lacks the expected tag"
+            return Err(Error::Internal(format!(
+                "the object stored on the device lacks the expected tag"
             )));
         }
 
@@ -1290,8 +1287,8 @@ impl<T: PcscHal> Handle<T> {
                     Algorithm::Rsa1024 => 1024 / 8,
                     Algorithm::Rsa2048 => 2048 / 8,
                     _ => {
-                        return Err(Error::InvalidArgument(format_err!(
-                            "Unsupported algorithm {:?}",
+                        return Err(Error::InvalidArgument(format!(
+                            "unsupported algorithm {:?}",
                             algorithm
                         )));
                     }
@@ -1302,7 +1299,7 @@ impl<T: PcscHal> Handle<T> {
             let errors = openssl::error::ErrorStack::get();
             let has_errors = errors.errors().is_empty();
             return Err(match has_errors {
-                false => Error::Unknown(format_err!("Unknown error")),
+                false => Error::Unknown(format!("unknown error")),
                 true => errors.into(),
             });
         }

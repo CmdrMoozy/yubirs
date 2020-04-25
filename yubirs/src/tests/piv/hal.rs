@@ -19,7 +19,6 @@ use crate::piv::recording::{Recording, RecordingEntry};
 use crate::piv::sw::StatusWord;
 use crate::piv::DEFAULT_READER;
 use bincode;
-use failure::format_err;
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
@@ -85,8 +84,8 @@ impl PcscHal for PcscTestStub {
 
     fn send_data_impl(&self, apdu: &Apdu) -> Result<(StatusWord, Vec<u8>)> {
         if !self.connected {
-            return Err(Error::Internal(format_err!(
-                "Can't send data without first being connected"
+            return Err(Error::Internal(format!(
+                "can't send data without first being connected"
             )));
         }
 
@@ -97,8 +96,8 @@ impl PcscHal for PcscTestStub {
         {
             let recording = match recordings.front_mut() {
                 None => {
-                    return Err(Error::Internal(format_err!(
-                        "Unexpected call to send_data_impl (no more mock recordings)"
+                    return Err(Error::Internal(format!(
+                        "unexpected call to send_data_impl (no more mock recordings)"
                     )));
                 }
                 Some(recording) => recording,
@@ -121,14 +120,14 @@ impl PcscHal for PcscTestStub {
 
         Ok(match entry.received {
             Ok(v) => v,
-            Err(msg) => return Err(Error::Internal(format_err!("{}", msg))),
+            Err(msg) => return Err(Error::Internal(format!("{}", msg))),
         })
     }
 
     fn begin_transaction(&self) -> Result<()> {
         if !self.connected {
-            return Err(Error::Internal(format_err!(
-                "Can't begin transaction without first being connected."
+            return Err(Error::Internal(format!(
+                "can't begin transaction without first being connected."
             )));
         }
         Ok(())
@@ -136,8 +135,8 @@ impl PcscHal for PcscTestStub {
 
     fn end_transaction(&self) -> Result<()> {
         if !self.connected {
-            return Err(Error::Internal(format_err!(
-                "Can't end transaction without first being connected."
+            return Err(Error::Internal(format!(
+                "can't end transaction without first being connected."
             )));
         }
         Ok(())

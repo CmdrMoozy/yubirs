@@ -18,7 +18,6 @@ use crate::piv::handle::Handle;
 use crate::piv::id;
 use crate::piv::pkey::{Format, PublicKey};
 use bdrck::crypto::key::{AbstractKey, Digest, Nonce};
-use failure::format_err;
 use std::fs;
 use std::io::Read;
 use std::path::Path;
@@ -96,6 +95,8 @@ impl<T: PcscHal> Key<T> {
 }
 
 impl<T: PcscHal> AbstractKey for Key<T> {
+    type Error = Error;
+
     fn get_digest(&self) -> Digest {
         self.digest.clone()
     }
@@ -104,10 +105,10 @@ impl<T: PcscHal> AbstractKey for Key<T> {
         &self,
         plaintext: &[u8],
         nonce: Option<Nonce>,
-    ) -> ::std::result::Result<(Option<Nonce>, Vec<u8>), ::failure::Error> {
+    ) -> std::result::Result<(Option<Nonce>, Vec<u8>), Self::Error> {
         if nonce.is_some() {
-            return Err(Error::InvalidArgument(format_err!(
-                "Smart card hardware key encryption does not use nonces"
+            return Err(Error::InvalidArgument(format!(
+                "smart card hardware key encryption does not use nonces"
             ))
             .into());
         }
@@ -122,10 +123,10 @@ impl<T: PcscHal> AbstractKey for Key<T> {
         &self,
         nonce: Option<&Nonce>,
         ciphertext: &[u8],
-    ) -> ::std::result::Result<Vec<u8>, ::failure::Error> {
+    ) -> std::result::Result<Vec<u8>, Self::Error> {
         if nonce.is_some() {
-            return Err(Error::InvalidArgument(format_err!(
-                "Smart card hardware key decryption does not use nonces"
+            return Err(Error::InvalidArgument(format!(
+                "smart card hardware key decryption does not use nonces"
             ))
             .into());
         }

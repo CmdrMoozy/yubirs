@@ -20,7 +20,6 @@ use crate::piv::recording::Recording;
 use crate::piv::scarderr::{SmartCardError, SmartCardErrorCode};
 use crate::piv::sw::StatusWord;
 use crate::piv::DEFAULT_READER;
-use failure::format_err;
 use libc::c_char;
 use log::{debug, info};
 use openssl;
@@ -196,8 +195,8 @@ impl PcscHardware {
 
     fn get_card(&self) -> Result<pcsc_sys::SCARDHANDLE> {
         match self.card.as_ref() {
-            None => Err(Error::InvalidArgument(format_err!(
-                "You must connect to a device first"
+            None => Err(Error::InvalidArgument(format!(
+                "you must connect to a device first"
             ))),
             Some(c) => Ok(c.get()),
         }
@@ -294,8 +293,8 @@ impl PcscHal for PcscHardware {
         let mut buffer: Vec<u8> = vec![0_u8; readers_len as usize];
         self.list_readers_impl(buffer.as_mut_ptr() as *mut c_char, &mut readers_len)?;
         if readers_len as usize != buffer.len() {
-            return Err(Error::Internal(format_err!(
-                "Failed to retrieve full reader list due to buffer size race."
+            return Err(Error::Internal(format!(
+                "failed to retrieve full reader list due to buffer size race."
             )));
         }
 

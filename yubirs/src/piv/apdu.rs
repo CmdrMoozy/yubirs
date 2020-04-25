@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use crate::error::*;
-use failure::format_err;
 use std::fmt;
 
 /// The Application ID to send in an APDU when connecting to a Yubikey.
@@ -40,8 +39,8 @@ pub struct Apdu {
 impl Apdu {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > APDU_BYTES {
-            return Err(Error::InvalidArgument(format_err!(
-                "Invalid APDU data; expected at most {} bytes, got {}",
+            return Err(Error::InvalidArgument(format!(
+                "invalid APDU data; expected at most {} bytes, got {}",
                 APDU_BYTES,
                 bytes.len()
             )));
@@ -57,8 +56,8 @@ impl Apdu {
 
     pub fn from_pieces(cla: u8, ins: u8, p1: u8, p2: u8, lc: u8, data: &[u8]) -> Result<Self> {
         if data.len() > APDU_DATA_BYTES {
-            return Err(Error::InvalidArgument(format_err!(
-                "Invalid APDU data; expected at most {} bytes, got {}",
+            return Err(Error::InvalidArgument(format!(
+                "invalid APDU data; expected at most {} bytes, got {}",
                 APDU_DATA_BYTES,
                 data.len()
             )));

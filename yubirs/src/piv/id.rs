@@ -14,7 +14,6 @@
 
 use crate::error::*;
 use crate::piv::nid;
-use failure::format_err;
 use lazy_static::lazy_static;
 use libc::{c_int, c_uchar};
 use serde::{Deserialize, Serialize};
@@ -62,10 +61,7 @@ impl FromStr for Algorithm {
         let s = s.to_uppercase();
         Ok(match STRING_ALGORITHMS.get(&s) {
             None => {
-                return Err(Error::InvalidArgument(format_err!(
-                    "Invalid algorithm '{}'",
-                    s
-                )));
+                return Err(Error::InvalidArgument(format!("invalid algorithm '{}'", s)));
             }
             Some(a) => *a,
         })
@@ -160,8 +156,8 @@ impl FromStr for Instruction {
         let s = s.to_uppercase();
         Ok(match STRING_INSTRUCTIONS.get(&s) {
             None => {
-                return Err(Error::InvalidArgument(format_err!(
-                    "Invalid instruction '{}'",
+                return Err(Error::InvalidArgument(format!(
+                    "invalid instruction '{}'",
                     s
                 )));
             }
@@ -288,7 +284,7 @@ impl FromStr for Key {
     fn from_str(s: &str) -> Result<Self> {
         let s = s.to_uppercase();
         Ok(match STRING_KEYS.get(&s) {
-            None => return Err(Error::InvalidArgument(format_err!("Invalid Key '{}'", s))),
+            None => return Err(Error::InvalidArgument(format!("invalid Key '{}'", s))),
             Some(o) => *o,
         })
     }
@@ -359,8 +355,8 @@ impl Key {
             Key::Retired20 => Object::Retired20,
             Key::Attestation => Object::Attestation,
             _ => {
-                return Err(Error::InvalidArgument(format_err!(
-                    "Key '{}' has no associated data object",
+                return Err(Error::InvalidArgument(format!(
+                    "key '{}' has no associated data object",
                     self
                 )));
             }
@@ -467,10 +463,7 @@ impl FromStr for Object {
         let s = s.to_uppercase();
         Ok(match STRING_OBJECTS.get(&s) {
             None => {
-                return Err(Error::InvalidArgument(format_err!(
-                    "Invalid Object '{}'",
-                    s
-                )));
+                return Err(Error::InvalidArgument(format!("invalid Object '{}'", s)));
             }
             Some(o) => *o,
         })
@@ -556,8 +549,8 @@ impl FromStr for PinPolicy {
         let s = s.to_uppercase();
         Ok(match STRING_PIN_POLICIES.get(&s) {
             None => {
-                return Err(Error::InvalidArgument(format_err!(
-                    "Invalid PIN policy '{}'",
+                return Err(Error::InvalidArgument(format!(
+                    "invalid PIN policy '{}'",
                     s
                 )));
             }
@@ -612,7 +605,7 @@ impl FromStr for Tag {
     fn from_str(s: &str) -> Result<Self> {
         let s = s.to_uppercase();
         Ok(match STRING_TAGS.get(&s) {
-            None => return Err(Error::InvalidArgument(format_err!("Invalid tag '{}'", s))),
+            None => return Err(Error::InvalidArgument(format!("invalid tag '{}'", s))),
             Some(t) => *t,
         })
     }
@@ -666,8 +659,8 @@ impl FromStr for TouchPolicy {
         let s = s.to_uppercase();
         Ok(match STRING_TOUCH_POLICIES.get(&s) {
             None => {
-                return Err(Error::InvalidArgument(format_err!(
-                    "Invalid touch policy '{}'",
+                return Err(Error::InvalidArgument(format!(
+                    "invalid touch policy '{}'",
                     s
                 )));
             }

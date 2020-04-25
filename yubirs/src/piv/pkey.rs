@@ -16,7 +16,6 @@ use crate::error::*;
 use crate::piv::id::Algorithm;
 use crate::piv::util::*;
 use bdrck::io::read_at_most;
-use failure::format_err;
 use lazy_static::lazy_static;
 use openssl;
 use std::collections::HashMap;
@@ -65,10 +64,7 @@ impl FromStr for Format {
         let s = s.to_uppercase();
         Ok(match STRING_FORMATS.get(&s) {
             None => {
-                return Err(Error::InvalidArgument(format_err!(
-                    "Invalid Format '{}'",
-                    s
-                )));
+                return Err(Error::InvalidArgument(format!("invalid Format '{}'", s)));
             }
             Some(o) => *o,
         })
@@ -85,8 +81,8 @@ fn get_algorithm<T: openssl::pkey::HasPublic>(
             1024 => Algorithm::Rsa1024,
             2048 => Algorithm::Rsa2048,
             _ => {
-                return Err(Error::InvalidArgument(format_err!(
-                    "Unsupported key algorithm RSA-{}",
+                return Err(Error::InvalidArgument(format!(
+                    "unsupported key algorithm RSA-{}",
                     bits
                 )));
             }
@@ -95,15 +91,15 @@ fn get_algorithm<T: openssl::pkey::HasPublic>(
             256 => Algorithm::Eccp256,
             384 => Algorithm::Eccp384,
             _ => {
-                return Err(Error::InvalidArgument(format_err!(
-                    "Unsupported key algorithm {}-bit EC",
+                return Err(Error::InvalidArgument(format!(
+                    "unsupported key algorithm {}-bit EC",
                     bits
                 )));
             }
         },
         _ => {
-            return Err(Error::InvalidArgument(format_err!(
-                "Unsupported key algorithm {:?}",
+            return Err(Error::InvalidArgument(format!(
+                "unsupported key algorithm {:?}",
                 id
             )));
         }
@@ -135,16 +131,16 @@ impl PublicKey {
     pub fn from_rsa_structure(data: &[u8]) -> Result<Self> {
         // The first 5 bytes are not part of the RSA structure.
         if data.len() < 5 {
-            return Err(Error::InvalidArgument(format_err!(
-                "Invalid RSA data structure (too short)"
+            return Err(Error::InvalidArgument(format!(
+                "invalid RSA data structure (too short)"
             )));
         }
         let data = &data[5..];
 
         // Parse the first BigNum out of the data.
         if get_required(data, 0)? != 0x81 {
-            return Err(Error::InvalidArgument(format_err!(
-                "Failed to parse RSA data structure (invalid tag)"
+            return Err(Error::InvalidArgument(format!(
+                "failed to parse RSA data structure (invalid tag)"
             )));
         }
         let (data, len) = read_length(&data[1..])?;
@@ -153,8 +149,8 @@ impl PublicKey {
 
         // Parse the second BigNum out of the data.
         if get_required(data, 0)? != 0x82 {
-            return Err(Error::InvalidArgument(format_err!(
-                "Failed to parse RSA data structure (invalid tag)"
+            return Err(Error::InvalidArgument(format!(
+                "failed to parse RSA data structure (invalid tag)"
             )));
         }
         let (data, len) = read_length(&data[1..])?;
@@ -171,8 +167,8 @@ impl PublicKey {
     pub fn from_ec_structure(algorithm: Algorithm, data: &[u8]) -> Result<Self> {
         // The first 3 bytes are not part of the EC structure.
         if data.len() < 3 {
-            return Err(Error::InvalidArgument(format_err!(
-                "Invalid EC data structure (too short)"
+            return Err(Error::InvalidArgument(format!(
+                "invalid EC data structure (too short)"
             )));
         }
         let data = &data[3..];
@@ -181,8 +177,8 @@ impl PublicKey {
             Algorithm::Eccp256 => (openssl::nid::Nid::X9_62_PRIME256V1, 65),
             Algorithm::Eccp384 => (openssl::nid::Nid::SECP384R1, 97),
             _ => {
-                return Err(Error::InvalidArgument(format_err!(
-                    "Unsupported algorithm {:?}",
+                return Err(Error::InvalidArgument(format!(
+                    "unsupported algorithm {:?}",
                     algorithm
                 )));
             }
@@ -192,14 +188,14 @@ impl PublicKey {
         group.set_asn1_flag(openssl::ec::Asn1Flag::NAMED_CURVE);
 
         if get_required(data, 0)? != 0x86 {
-            return Err(Error::InvalidArgument(format_err!(
-                "Failed to parse EC data structure (invalid tag)"
+            return Err(Error::InvalidArgument(format!(
+                "failed to parse EC data structure (invalid tag)"
             )));
         }
         let (data, len) = read_length(&data[1..])?;
         if expected_length != len {
-            return Err(Error::InvalidArgument(format_err!(
-                "Failed to parse EC data structure (invalid length)"
+            return Err(Error::InvalidArgument(format!(
+                "failed to parse EC data structure (invalid length)"
             )));
         }
         let mut ctx = openssl::bn::BigNumContext::new()?;
@@ -226,8 +222,8 @@ impl PublicKey {
             Algorithm::Rsa1024 => 1024 / 8,
             Algorithm::Rsa2048 => 2048 / 8,
             _ => {
-                return Err(Error::InvalidArgument(format_err!(
-                    "Unsupported encryption algorithm {:?}",
+                return Err(Error::InvalidArgument(format!(
+                    "unsupported encryption algorithm {:?}",
                     algorithm
                 )));
             }
@@ -254,8 +250,8 @@ impl PublicKey {
         if algorithm.is_rsa() {
             let rsa = self.inner.rsa()?;
             if plaintext.len() + 11 > rsa.size() as usize {
-                return Err(Error::InvalidArgument(format_err!(
-                    "Invalid input data; this function can only encrypt at most {} bytes",
+                return Err(Error::InvalidArgument(format!(
+                    "invalid input data; this function can only encrypt at most {} bytes",
                     rsa.size() - 11
                 )));
             }
@@ -266,8 +262,8 @@ impl PublicKey {
             ciphertext.truncate(len);
             Ok(ciphertext)
         } else {
-            return Err(Error::InvalidArgument(format_err!(
-                "Unsupported public key encryption algorithm {:?}",
+            return Err(Error::InvalidArgument(format!(
+                "unsupported public key encryption algorithm {:?}",
                 algorithm
             )));
         }
@@ -278,7 +274,7 @@ impl PublicKey {
             Format::Pem => self.inner.public_key_to_pem()?,
             Format::Der => self.inner.public_key_to_der()?,
             Format::Ssh => {
-                return Err(Error::InvalidArgument(format_err!(
+                return Err(Error::InvalidArgument(format!(
                     "SSH format is not supported for public keys"
                 )));
             }
@@ -300,8 +296,8 @@ impl PrivateKey {
         {
             let mut f = fs::File::open(path)?;
             if f.metadata()?.len() > MEGABYTE as u64 {
-                return Err(Error::InvalidArgument(format_err!(
-                    "The provided input certificate exceeded 1 MiB in size"
+                return Err(Error::InvalidArgument(format!(
+                    "the provided input certificate exceeded 1 MiB in size"
                 )));
             }
             f.read_to_end(&mut data)?;
@@ -344,40 +340,40 @@ impl PrivateKey {
             vec![
                 match rsa.p() {
                     None => {
-                        return Err(Error::InvalidArgument(format_err!(
-                            "This RSA key has no 'p' factor"
+                        return Err(Error::InvalidArgument(format!(
+                            "this RSA key has no 'p' factor"
                         )));
                     }
                     Some(p) => p.to_vec(),
                 },
                 match rsa.q() {
                     None => {
-                        return Err(Error::InvalidArgument(format_err!(
-                            "This RSA key has no 'q' factor"
+                        return Err(Error::InvalidArgument(format!(
+                            "this RSA key has no 'q' factor"
                         )));
                     }
                     Some(q) => q.to_vec(),
                 },
                 match rsa.dmp1() {
                     None => {
-                        return Err(Error::InvalidArgument(format_err!(
-                            "This RSA key has no 'dmp1' CRT exponent"
+                        return Err(Error::InvalidArgument(format!(
+                            "this RSA key has no 'dmp1' CRT exponent"
                         )));
                     }
                     Some(dmp1) => dmp1.to_vec(),
                 },
                 match rsa.dmq1() {
                     None => {
-                        return Err(Error::InvalidArgument(format_err!(
-                            "This RSA key has no 'dmq1' CRT exponent"
+                        return Err(Error::InvalidArgument(format!(
+                            "this RSA key has no 'dmq1' CRT exponent"
                         )));
                     }
                     Some(dmq1) => dmq1.to_vec(),
                 },
                 match rsa.iqmp() {
                     None => {
-                        return Err(Error::InvalidArgument(format_err!(
-                            "This RSA key has no 'iqmp' CRT coefficient"
+                        return Err(Error::InvalidArgument(format!(
+                            "this RSA key has no 'iqmp' CRT coefficient"
                         )));
                     }
                     Some(iqmp) => iqmp.to_vec(),
@@ -386,8 +382,8 @@ impl PrivateKey {
         } else if algorithm.is_ecc() {
             vec![self.inner.ec_key()?.private_key().to_vec()]
         } else {
-            return Err(Error::InvalidArgument(format_err!(
-                "Unsupported algorithm {:?}",
+            return Err(Error::InvalidArgument(format!(
+                "unsupported algorithm {:?}",
                 algorithm
             )));
         })
@@ -413,7 +409,7 @@ impl PublicKeyCertificate {
             Format::Pem => self.inner.to_pem()?,
             Format::Der => self.inner.to_der()?,
             Format::Ssh => {
-                return Err(Error::InvalidArgument(format_err!(
+                return Err(Error::InvalidArgument(format!(
                     "SSH format is not supported for public key certificates"
                 )));
             }

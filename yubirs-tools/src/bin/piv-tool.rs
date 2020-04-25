@@ -12,87 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure::format_err;
+use anyhow::Result;
 use flaggy::*;
-use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 use yubirs::piv::id::{Algorithm, Key, Object, PinPolicy, TouchPolicy};
 use yubirs::piv::pkey::{Format, PublicKey};
 use yubirs::piv::*;
-
-struct Error(yubirs::error::Error);
-
-impl From<yubirs::error::Error> for Error {
-    fn from(e: yubirs::error::Error) -> Self {
-        Error(e)
-    }
-}
-
-impl From<bdrck::error::Error> for Error {
-    fn from(e: bdrck::error::Error) -> Self {
-        Error(e.into())
-    }
-}
-
-impl From<data_encoding::DecodeError> for Error {
-    fn from(e: data_encoding::DecodeError) -> Self {
-        Error(e.into())
-    }
-}
-
-impl From<std::convert::Infallible> for Error {
-    fn from(e: std::convert::Infallible) -> Self {
-        Error(e.into())
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Error(e.into())
-    }
-}
-
-impl From<std::num::ParseIntError> for Error {
-    fn from(e: std::num::ParseIntError) -> Self {
-        Error(e.into())
-    }
-}
-
-impl From<std::str::ParseBoolError> for Error {
-    fn from(e: std::str::ParseBoolError) -> Self {
-        Error(e.into())
-    }
-}
-
-impl From<std::str::Utf8Error> for Error {
-    fn from(e: std::str::Utf8Error) -> Self {
-        Error(e.into())
-    }
-}
-
-impl From<ValueError> for Error {
-    fn from(e: ValueError) -> Self {
-        Error(yubirs::error::Error::CliFlags(format_err!("{}", e)))
-    }
-}
-
-impl fmt::Debug for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.0)
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl failure::Fail for Error {}
-
-type Result<T> = ::std::result::Result<T, Error>;
 
 fn new_handle(output_recording: Option<PathBuf>) -> Result<Handle<PcscHardware>> {
     match output_recording {
@@ -372,8 +299,8 @@ fn test_decrypt(
             .collect::<String>()
     );
     if plaintext != result_plaintext {
-        return Err(yubirs::error::Error::Internal(format_err!(
-            "Decryption test failed; decrypted result did not match original plaintext"
+        return Err(yubirs::error::Error::Internal(format!(
+            "decryption test failed; decrypted result did not match original plaintext"
         ))
         .into());
     }

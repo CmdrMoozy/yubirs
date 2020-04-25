@@ -149,7 +149,7 @@ fn test_change_pin_wrong_pin() {
             .to_string()
     );
     assert_eq!(
-        "Verifying PIN failed: no more retries",
+        "authentication failure: verifying PIN failed: no more retries",
         handle
             .change_pin(Some("123"), Some("111111"))
             .err()
@@ -166,7 +166,7 @@ fn test_change_pin_invalid_parameters() {
 
     handle.connect(None).unwrap();
     assert_eq!(
-        "Invalid existing PIN; it exceeds 8 characters".to_owned(),
+        "invalid argument: invalid existing PIN; it exceeds 8 characters".to_owned(),
         handle
             .change_pin(Some("123456789"), Some("123456"))
             .err()
@@ -174,7 +174,7 @@ fn test_change_pin_invalid_parameters() {
             .to_string()
     );
     assert_eq!(
-        "Invalid new PIN; it exceeds 8 characters".to_owned(),
+        "invalid argument: invalid new PIN; it exceeds 8 characters".to_owned(),
         handle
             .change_pin(Some("123456"), Some("123456789"))
             .err()
@@ -206,7 +206,7 @@ fn test_change_puk_invalid_parameters() {
 
     handle.connect(None).unwrap();
     assert_eq!(
-        "Invalid existing PUK; it exceeds 8 characters".to_owned(),
+        "invalid argument: invalid existing PUK; it exceeds 8 characters".to_owned(),
         handle
             .change_puk(Some("123456789"), Some("123456"))
             .err()
@@ -214,7 +214,7 @@ fn test_change_puk_invalid_parameters() {
             .to_string()
     );
     assert_eq!(
-        "Invalid new PUK; it exceeds 8 characters".to_owned(),
+        "invalid argument: invalid new PUK; it exceeds 8 characters".to_owned(),
         handle
             .change_puk(Some("123456"), Some("123456789"))
             .err()
@@ -263,7 +263,7 @@ fn test_change_puk_wrong_puk() {
             .to_string()
     );
     assert_eq!(
-        "Verifying PUK failed: no more retries",
+        "authentication failure: verifying PUK failed: no more retries",
         handle
             .change_puk(Some("123"), Some("111111"))
             .err()

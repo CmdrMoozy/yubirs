@@ -12,193 +12,83 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure::Fail;
+use thiserror::Error;
 
+#[derive(Debug, Error)]
 pub enum Utf8Error {
-    String(::std::string::FromUtf8Error),
-    Slice(::std::str::Utf8Error),
+    #[error("{0}")]
+    String(#[from] std::string::FromUtf8Error),
+    #[error("{0}")]
+    Slice(#[from] std::str::Utf8Error),
 }
 
-impl ::std::fmt::Debug for Utf8Error {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
-        match self {
-            Utf8Error::String(e) => write!(f, "{:?}", e),
-            Utf8Error::Slice(e) => write!(f, "{:?}", e),
-        }
-    }
-}
-
-impl ::std::fmt::Display for Utf8Error {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
-        match self {
-            Utf8Error::String(e) => write!(f, "{}", e),
-            Utf8Error::Slice(e) => write!(f, "{}", e),
-        }
-    }
-}
-
-impl ::std::error::Error for Utf8Error {}
-
-#[derive(Fail, Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
-    #[fail(display = "{}", _0)]
-    Authentication(::failure::Error),
+    #[error("authentication failure: {0}")]
+    Authentication(String),
     #[cfg(feature = "bdrck")]
-    #[fail(display = "{}", _0)]
-    Bdrck(#[cause] ::bdrck::error::Error),
+    #[error("{0}")]
+    Bdrck(#[from] bdrck::error::Error),
     #[cfg(feature = "bincode")]
-    #[fail(display = "{}", _0)]
-    Bincode(#[cause] ::bincode::Error),
+    #[error("{0}")]
+    Bincode(#[from] bincode::Error),
     /// An internal error; we tried to mutably borrow a shared resource which
     /// was already borrowed elsewhere.
-    #[fail(display = "{}", _0)]
-    BorrowMut(#[cause] ::std::cell::BorrowMutError),
-    /// An error encountered in deciphering command-line flag values.
-    #[fail(display = "{}", _0)]
-    CliFlags(::failure::Error),
-    #[fail(display = "{}", _0)]
-    HexDecode(#[cause] ::data_encoding::DecodeError),
+    #[error("{0}")]
+    BorrowMut(#[from] std::cell::BorrowMutError),
+    #[error("{0}")]
+    HexDecode(#[from] data_encoding::DecodeError),
     #[cfg(feature = "curl")]
-    #[fail(display = "{}", _0)]
-    Http(#[cause] ::curl::Error),
+    #[error("{0}")]
+    Http(#[from] curl::Error),
     /// An internal unrecoverable error, usually due to some underlying library.
-    #[fail(display = "{}", _0)]
-    Internal(::failure::Error),
+    #[error("internal error: {0}")]
+    Internal(String),
     /// Errors akin to EINVAL.
-    #[fail(display = "{}", _0)]
-    InvalidArgument(::failure::Error),
-    #[fail(display = "{}", _0)]
-    Io(#[cause] ::std::io::Error),
-    #[fail(display = "{}", _0)]
-    Nul(#[cause] ::std::ffi::NulError),
+    #[error("invalid argument: {0}")]
+    InvalidArgument(String),
+    #[error("{0}")]
+    Io(#[from] std::io::Error),
+    #[error("{0}")]
+    Nul(#[from] std::ffi::NulError),
     #[cfg(feature = "chrono")]
-    #[fail(display = "{}", _0)]
-    ParseDateTime(#[cause] ::chrono::ParseError),
-    #[fail(display = "{}", _0)]
-    ParseBool(#[cause] ::std::str::ParseBoolError),
-    #[fail(display = "{}", _0)]
-    ParseInt(#[cause] ::std::num::ParseIntError),
+    #[error("{0}")]
+    ParseDateTime(#[from] chrono::ParseError),
+    #[error("{0}")]
+    ParseBool(#[from] std::str::ParseBoolError),
+    #[error("{0}")]
+    ParseInt(#[from] std::num::ParseIntError),
     #[cfg(feature = "piv")]
-    #[fail(display = "{}", _0)]
-    SmartCard(#[cause] crate::piv::scarderr::SmartCardError),
-    #[fail(display = "{}", _0)]
-    Ssl(#[cause] ::openssl::error::ErrorStack),
+    #[error("{0}")]
+    SmartCard(#[from] crate::piv::scarderr::SmartCardError),
+    #[error("{0}")]
+    Ssl(#[from] openssl::error::ErrorStack),
     /// An awkward hack; this error exists to use String's FromStr impl, but
     /// this operation won't actually ever fail.
-    #[fail(display = "{}", _0)]
-    StringParse(#[cause] ::std::string::ParseError),
+    #[error("{0}")]
+    StringParse(#[from] std::string::ParseError),
     /// We tried to access some thread-local storage which was already
     /// destructed.
-    #[fail(display = "{}", _0)]
-    ThreadLocalAccess(#[cause] ::std::thread::AccessError),
-    /// An error of an unknown type occurred. Generally this comes from some
-    /// dependency or underlying library, in a case where it's difficult to tell
-    /// exactly what kind of problem occurred.
-    #[fail(display = "{}", _0)]
-    Unknown(::failure::Error),
-    #[fail(display = "{}", _0)]
-    Utf8(#[cause] Utf8Error),
+    #[error("{0}")]
+    ThreadLocalAccess(#[from] std::thread::AccessError),
+    /// An unknown error. Generally, this is an error reported by an underlying library, which
+    /// doesn't provide us with enough information to give a clear "error type".
+    #[error("unknown error: {0}")]
+    Unknown(String),
+    #[error("{0}")]
+    Utf8(Utf8Error),
 }
 
-#[cfg(feature = "bdrck")]
-impl From<::bdrck::error::Error> for Error {
-    fn from(e: ::bdrck::error::Error) -> Self {
-        Error::Bdrck(e)
+// This is a shim to allow us to convert from an underlying error to an Error, *via* a Utf8Error as
+// an intermediate type. The compiler doesn't notice that this is possible without us providing
+// this implementation explicitly.
+impl<E> From<E> for Error
+where
+    E: Into<Utf8Error>,
+{
+    fn from(e: E) -> Self {
+        Error::Utf8(e.into())
     }
 }
 
-#[cfg(feature = "bincode")]
-impl From<::bincode::Error> for Error {
-    fn from(e: ::bincode::Error) -> Self {
-        Error::Bincode(e)
-    }
-}
-
-impl From<::std::cell::BorrowMutError> for Error {
-    fn from(e: ::std::cell::BorrowMutError) -> Self {
-        Error::BorrowMut(e)
-    }
-}
-
-impl From<::data_encoding::DecodeError> for Error {
-    fn from(e: ::data_encoding::DecodeError) -> Self {
-        Error::HexDecode(e)
-    }
-}
-
-#[cfg(feature = "curl")]
-impl From<::curl::Error> for Error {
-    fn from(e: ::curl::Error) -> Self {
-        Error::Http(e)
-    }
-}
-
-impl From<::std::io::Error> for Error {
-    fn from(e: ::std::io::Error) -> Self {
-        Error::Io(e)
-    }
-}
-
-impl From<::std::ffi::NulError> for Error {
-    fn from(e: ::std::ffi::NulError) -> Self {
-        Error::Nul(e)
-    }
-}
-
-#[cfg(feature = "chrono")]
-impl From<::chrono::ParseError> for Error {
-    fn from(e: ::chrono::ParseError) -> Self {
-        Error::ParseDateTime(e)
-    }
-}
-
-impl From<::std::str::ParseBoolError> for Error {
-    fn from(e: ::std::str::ParseBoolError) -> Self {
-        Error::ParseBool(e)
-    }
-}
-
-impl From<::std::num::ParseIntError> for Error {
-    fn from(e: ::std::num::ParseIntError) -> Self {
-        Error::ParseInt(e)
-    }
-}
-
-#[cfg(feature = "piv")]
-impl From<crate::piv::scarderr::SmartCardError> for Error {
-    fn from(e: crate::piv::scarderr::SmartCardError) -> Self {
-        Error::SmartCard(e)
-    }
-}
-
-impl From<::openssl::error::ErrorStack> for Error {
-    fn from(e: ::openssl::error::ErrorStack) -> Self {
-        Error::Ssl(e)
-    }
-}
-
-impl From<::std::string::ParseError> for Error {
-    fn from(e: ::std::string::ParseError) -> Self {
-        Error::StringParse(e)
-    }
-}
-
-impl From<::std::thread::AccessError> for Error {
-    fn from(e: ::std::thread::AccessError) -> Self {
-        Error::ThreadLocalAccess(e)
-    }
-}
-
-impl From<::std::string::FromUtf8Error> for Error {
-    fn from(e: ::std::string::FromUtf8Error) -> Self {
-        Error::Utf8(Utf8Error::String(e))
-    }
-}
-
-impl From<::std::str::Utf8Error> for Error {
-    fn from(e: ::std::str::Utf8Error) -> Self {
-        Error::Utf8(Utf8Error::Slice(e))
-    }
-}
-
-pub type Result<T> = ::std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
