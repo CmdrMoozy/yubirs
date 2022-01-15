@@ -6,7 +6,7 @@ description = "A library for interacting with YubiKeys (OTP and PIV functionalit
 homepage = "https://github.com/CmdrMoozy/yubirs"
 repository = "https://github.com/CmdrMoozy/yubirs"
 license = "Apache-2.0"
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["otp", "piv"]

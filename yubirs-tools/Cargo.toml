@@ -6,7 +6,7 @@ description = "Command line tools for interacting with YubiKeys, based upon yubi
 homepage = "https://github.com/CmdrMoozy/yubirs"
 repository = "https://github.com/CmdrMoozy/yubirs"
 license = "Apache-2.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
