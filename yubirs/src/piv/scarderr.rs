@@ -524,7 +524,7 @@ impl fmt::Debug for SmartCardErrorCode {
 #[derive(Debug)]
 pub struct SmartCardError {
     code: SmartCardErrorCode,
-    backtrace: Backtrace,
+    _backtrace: Backtrace,
 }
 
 impl SmartCardError {
@@ -533,7 +533,7 @@ impl SmartCardError {
             Ok(_) => Ok(()),
             Err(c) => Err(SmartCardError {
                 code: c,
-                backtrace: Backtrace::new(),
+                _backtrace: Backtrace::new(),
             }),
         }
     }
@@ -541,7 +541,7 @@ impl SmartCardError {
     pub fn new_other(s: &str) -> Self {
         SmartCardError {
             code: SmartCardErrorCode::Other(s.to_owned()),
-            backtrace: Backtrace::new(),
+            _backtrace: Backtrace::new(),
         }
     }
 
@@ -562,7 +562,7 @@ impl From<SmartCardErrorCode> for SmartCardError {
     fn from(code: SmartCardErrorCode) -> Self {
         SmartCardError {
             code: code,
-            backtrace: Backtrace::new(),
+            _backtrace: Backtrace::new(),
         }
     }
 }
