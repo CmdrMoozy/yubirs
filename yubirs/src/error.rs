@@ -60,6 +60,12 @@ pub enum Error {
     ParseInt(#[from] std::num::ParseIntError),
     #[cfg(feature = "piv")]
     #[error("{0}")]
+    RmpDecode(#[from] rmp_serde::decode::Error),
+    #[cfg(feature = "piv")]
+    #[error("{0}")]
+    RmpEncode(#[from] rmp_serde::encode::Error),
+    #[cfg(feature = "piv")]
+    #[error("{0}")]
     SmartCard(#[from] crate::piv::scarderr::SmartCardError),
     #[error("{0}")]
     Ssl(#[from] openssl::error::ErrorStack),
