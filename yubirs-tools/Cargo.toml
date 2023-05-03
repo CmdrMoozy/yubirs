@@ -1,6 +1,6 @@
 [package]
 name = "yubirs-tools"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Axel Rasmussen <axel.rasmussen1@gmail.com>"]
 description = "Command line tools for interacting with YubiKeys, based upon yubirs"
 homepage = "https://github.com/CmdrMoozy/yubirs"
@@ -10,13 +10,15 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
+clap = { version = "4.2", features = ["derive"] }
 data-encoding = "2.3"
-flaggy = { version = "0.2" }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dependencies.bdrck]
-version = "0.19"
+version = "0.20"
 default_features = false
-features = ["cli", "logging"]
+features = ["cli"]
 
 [dependencies.yubirs]
 version = "0.9"

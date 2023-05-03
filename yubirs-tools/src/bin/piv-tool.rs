@@ -13,10 +13,11 @@
 // limitations under the License.
 
 use anyhow::Result;
-use flaggy::*;
+use clap::{Args, Parser, Subcommand};
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
+use tracing_subscriber::{filter::LevelFilter, prelude::*, EnvFilter};
 use yubirs::piv::id::{Algorithm, Key, Object, PinPolicy, TouchPolicy};
 use yubirs::piv::pkey::{Format, PublicKey};
 use yubirs::piv::*;
@@ -60,7 +61,6 @@ fn read_data(path: &str, is_base64: bool) -> Result<Vec<u8>> {
     })
 }
 
-#[command_callback]
 fn list_readers(output_recording: Option<PathBuf>) -> Result<()> {
     let handle = new_handle(output_recording)?;
     let readers: Vec<String> = handle.list_readers()?;
@@ -70,7 +70,6 @@ fn list_readers(output_recording: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-#[command_callback]
 fn get_version(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
@@ -78,7 +77,6 @@ fn get_version(reader: String, output_recording: Option<PathBuf>) -> Result<()> 
     Ok(())
 }
 
-#[command_callback]
 fn get_serial(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
@@ -86,35 +84,30 @@ fn get_serial(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-#[command_callback]
 fn change_pin(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
     Ok(handle.change_pin(None, None)?)
 }
 
-#[command_callback]
 fn unblock_pin(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
     Ok(handle.unblock_pin(None, None)?)
 }
 
-#[command_callback]
 fn change_puk(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
     Ok(handle.change_puk(None, None)?)
 }
 
-#[command_callback]
 fn reset(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
     Ok(handle.reset()?)
 }
 
-#[command_callback]
 fn force_reset(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     // This is a very destructive operation; confirm with the user first before
     // proceeding.
@@ -131,7 +124,6 @@ fn force_reset(reader: String, output_recording: Option<PathBuf>) -> Result<()> 
     Ok(handle.force_reset()?)
 }
 
-#[command_callback]
 fn set_retries(
     reader: String,
     output_recording: Option<PathBuf>,
@@ -144,7 +136,6 @@ fn set_retries(
     Ok(())
 }
 
-#[command_callback]
 fn change_mgm_key(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
@@ -152,7 +143,6 @@ fn change_mgm_key(reader: String, output_recording: Option<PathBuf>) -> Result<(
     Ok(())
 }
 
-#[command_callback]
 fn set_chuid(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
@@ -160,7 +150,6 @@ fn set_chuid(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-#[command_callback]
 fn set_ccc(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
@@ -168,7 +157,6 @@ fn set_ccc(reader: String, output_recording: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-#[command_callback]
 fn read_object(reader: String, output_recording: Option<PathBuf>, object_id: Object) -> Result<()> {
     let mut handle = new_handle(output_recording)?;
     handle.connect(Some(&reader))?;
@@ -177,7 +165,6 @@ fn read_object(reader: String, output_recording: Option<PathBuf>, object_id: Obj
     Ok(())
 }
 
-#[command_callback]
 fn write_object(
     reader: String,
     output_recording: Option<PathBuf>,
@@ -192,7 +179,6 @@ fn write_object(
     Ok(())
 }
 
-#[command_callback]
 fn generate(
     reader: String,
     output_recording: Option<PathBuf>,
@@ -209,7 +195,6 @@ fn generate(
     Ok(())
 }
 
-#[command_callback]
 fn import_key(
     reader: String,
     output_recording: Option<PathBuf>,
@@ -235,7 +220,6 @@ fn import_key(
     Ok(())
 }
 
-#[command_callback]
 fn attest(
     reader: String,
     output_recording: Option<PathBuf>,
@@ -249,7 +233,6 @@ fn attest(
     Ok(())
 }
 
-#[command_callback]
 fn read_certificate(
     reader: String,
     output_recording: Option<PathBuf>,
@@ -263,7 +246,6 @@ fn read_certificate(
     Ok(())
 }
 
-#[command_callback]
 fn test_decrypt(
     reader: String,
     output_recording: Option<PathBuf>,
@@ -308,573 +290,420 @@ fn test_decrypt(
     Ok(())
 }
 
-fn main() {
-    let debug: bool = cfg!(debug_assertions);
-    bdrck::logging::init(
-        bdrck::logging::OptionsBuilder::new()
-            .set_filters(match debug {
-                false => "warn".parse().unwrap(),
-                true => "debug".parse().unwrap(),
-            })
-            .set_panic_on_output_failure(debug)
-            .set_always_flush(true)
-            .build()
-            .unwrap(),
-    );
-    yubirs::init().unwrap();
+#[derive(Args)]
+// Arguments common to all commands.
+struct CommonArgs {
+    #[arg(long)]
+    /// Record interactions with the hardware, and write it to this file.
+    output_recording: Option<PathBuf>,
+}
 
-    main_impl(vec![
-        Command::new(
-            "list_readers",
-            "List the available PC/SC readers",
-            Specs::new(vec![Spec::optional(
-                "output_recording",
-                "Record interactions with the hardware, and write it to this file.",
-                None,
-            )])
-            .unwrap(),
-            Box::new(list_readers),
+#[derive(Args)]
+// Arguments to select which PC/SC reader to use.
+struct ReaderArgs {
+    #[arg(short = 'r', long, default_value_t = DEFAULT_READER.to_string())]
+    /// The PC/SC reader to use. Try list_readers for possible values. The first reader with
+    /// the value given here as a substring is used.
+    reader: String,
+}
+
+#[derive(Args)]
+struct ObjectArgs {
+    #[arg(short = 'o', long)]
+    /// The human-readable ID of the object to read.
+    object_id: Object,
+}
+
+#[derive(Args)]
+struct SlotArgs {
+    #[arg(short = 's', long)]
+    /// The private key slot to operate on.
+    slot: Key,
+}
+
+#[derive(Args)]
+struct FormatArgs {
+    #[arg(short = 'f', long, default_value_t = Format::Pem)]
+    /// The format for the X.509 public key certificate written to stdout.
+    format: Format,
+}
+
+#[derive(Args)]
+struct PolicyArgs {
+    #[arg(short = 'p', long, default_value_t = PinPolicy::Default)]
+    /// The PIN verification policy to enforce on future key access.
+    pin_policy: PinPolicy,
+
+    #[arg(short = 't', long, default_value_t = TouchPolicy::Default)]
+    /// The touch verification policy to enforce on future key access.
+    touch_policy: TouchPolicy,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// List the available PC/SC readers.
+    ListReaders {
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Retrieve the version number from the Yubikey.
+    GetVersion {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Retrieve the serial number from the Yubikey.
+    GetSerial {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Change the Yubikey's PIN, using the existing PIN.
+    ChangePin {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Unblock the Yubikey's PIN using the PUK, after exhausting the tries allotted to enter a
+    /// valid PIN.
+    UnblockPin {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Change the Yubikey's PUK, using the existing PUK.
+    ChangePuk {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Reset the Yubikey's PIN, PUK, and management key to unblock the PIN and PUK retry counters.
+    Reset {
+        #[command(flatten)]
+        reader: ReaderArgs,
+
+        #[arg(short = 'f', long)]
+        /// Force the reset, by automatically invalidating the PIN and PUK retry counters.
+        force: bool,
+
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Set the PIN and PUK retry counters, and reset the PIN and PUK back to defaults.
+    SetRetries {
+        #[command(flatten)]
+        reader: ReaderArgs,
+
+        #[arg(long)]
+        /// The number of retries to allow for the PIN.
+        pin_retries: u8,
+
+        #[arg(long)]
+        /// The number of retries to allow for the PUK.
+        puk_retries: u8,
+
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Change the Yubikey's management key.
+    ChangeMgmtKey {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Write a new Card Holder Unique Identifier (CHUID) to the Yubikey.
+    SetChuid {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Write a new Card Capability Container (CCC) to the Yubikey.
+    SetCcc {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Read the contents of a data object from the Yubikey.
+    ReadObject {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        object: ObjectArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Write a data object to the Yubikey.
+    WriteObject {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        object: ObjectArgs,
+
+        #[arg(short = 'i', long)]
+        /// The path to an input file, or a base64-encoded data string.
+        input: String,
+
+        #[arg(long)]
+        /// The input is a base64-encoded string, instead of a path.
+        base64: bool,
+
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Generate a private key, store it on the device, and return the public key.
+    Generate {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        slot: SlotArgs,
+        #[command(flatten)]
+        format: FormatArgs,
+
+        #[arg(short = 'a', long)]
+        /// The algorithm to use for key generation.
+        algorithm: Algorithm,
+
+        #[command(flatten)]
+        policy: PolicyArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Import an existing private key, store it on the device, and return the public key.
+    ImportKey {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        slot: SlotArgs,
+        #[command(flatten)]
+        format: FormatArgs,
+
+        #[arg(short = 'i', long)]
+        /// The input file containing the private key, in PEM format.
+        input_file: PathBuf,
+
+        #[arg(short = 'e', long)]
+        /// The input key is encrypted and requires a passphrase to import.
+        encrypted: bool,
+
+        #[command(flatten)]
+        policy: PolicyArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Attest that a given private key was generated by the hardware device.
+    Attest {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        slot: SlotArgs,
+        #[command(flatten)]
+        format: FormatArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Read a public key certificate from the device.
+    ReadCertificate {
+        #[command(flatten)]
+        reader: ReaderArgs,
+        #[command(flatten)]
+        slot: SlotArgs,
+        #[command(flatten)]
+        format: FormatArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+
+    /// Test encrypt / decrypt functionality with a keypair on the device.
+    TestDecrypt {
+        #[command(flatten)]
+        reader: ReaderArgs,
+
+        #[arg(short = 'i', long)]
+        /// The input file containing the public key, in PEM format.
+        input_file: PathBuf,
+
+        #[command(flatten)]
+        slot: SlotArgs,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+}
+
+#[derive(Parser)]
+pub struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+fn main() -> Result<()> {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(
+            EnvFilter::builder()
+                .with_default_directive(
+                    if cfg!(debug_assertions) {
+                        LevelFilter::DEBUG
+                    } else {
+                        LevelFilter::WARN
+                    }
+                    .into(),
+                )
+                .from_env()
+                .unwrap(),
+        )
+        .init();
+
+    yubirs::init()?;
+
+    match Cli::parse().command {
+        Commands::ListReaders { common } => list_readers(common.output_recording),
+        Commands::GetVersion { reader, common } => {
+            get_version(reader.reader, common.output_recording)
+        }
+        Commands::GetSerial { reader, common } => {
+            get_serial(reader.reader, common.output_recording)
+        }
+        Commands::ChangePin { reader, common } => {
+            change_pin(reader.reader, common.output_recording)
+        }
+        Commands::UnblockPin { reader, common } => {
+            unblock_pin(reader.reader, common.output_recording)
+        }
+        Commands::ChangePuk { reader, common } => {
+            change_puk(reader.reader, common.output_recording)
+        }
+        Commands::Reset {
+            reader,
+            force,
+            common,
+        } => match force {
+            false => reset(reader.reader, common.output_recording),
+            true => force_reset(reader.reader, common.output_recording),
+        },
+        Commands::SetRetries {
+            reader,
+            pin_retries,
+            puk_retries,
+            common,
+        } => set_retries(
+            reader.reader,
+            common.output_recording,
+            pin_retries,
+            puk_retries,
         ),
-        Command::new(
-            "get_version",
-            "Retrieve the version number from the Yubikey",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(get_version),
+        Commands::ChangeMgmtKey { reader, common } => {
+            change_mgm_key(reader.reader, common.output_recording)
+        }
+        Commands::SetChuid { reader, common } => set_chuid(reader.reader, common.output_recording),
+        Commands::SetCcc { reader, common } => set_ccc(reader.reader, common.output_recording),
+        Commands::ReadObject {
+            reader,
+            object,
+            common,
+        } => read_object(reader.reader, common.output_recording, object.object_id),
+        Commands::WriteObject {
+            reader,
+            object,
+            input,
+            base64,
+            common,
+        } => write_object(
+            reader.reader,
+            common.output_recording,
+            object.object_id,
+            input,
+            base64,
         ),
-        Command::new(
-            "get_serial",
-            "Retrieve the serial number from the Yubikey",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(get_serial),
+        Commands::Generate {
+            reader,
+            slot,
+            format,
+            algorithm,
+            policy,
+            common,
+        } => generate(
+            reader.reader,
+            common.output_recording,
+            slot.slot,
+            algorithm,
+            policy.pin_policy,
+            policy.touch_policy,
+            format.format,
         ),
-        Command::new(
-            "change_pin",
-            "Change the Yubikey's PIN, using the existing PIN",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(change_pin),
+        Commands::ImportKey {
+            reader,
+            slot,
+            format,
+            input_file,
+            encrypted,
+            policy,
+            common,
+        } => import_key(
+            reader.reader,
+            common.output_recording,
+            input_file,
+            slot.slot,
+            encrypted,
+            policy.pin_policy,
+            policy.touch_policy,
+            format.format,
         ),
-        Command::new(
-            "unblock_pin",
-            concat!(
-                "Unblock the Yubikey's PIN using the PUK, after exhausting the tries allotted to ",
-                "enter a valid PIN",
-            ),
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(unblock_pin),
+        Commands::Attest {
+            reader,
+            slot,
+            format,
+            common,
+        } => attest(
+            reader.reader,
+            common.output_recording,
+            slot.slot,
+            format.format,
         ),
-        Command::new(
-            "change_puk",
-            "Change the Yubikey's PUK, using the existing PUK",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(change_puk),
+        Commands::ReadCertificate {
+            reader,
+            slot,
+            format,
+            common,
+        } => read_certificate(
+            reader.reader,
+            common.output_recording,
+            slot.slot,
+            format.format,
         ),
-        Command::new(
-            "reset",
-            concat!(
-                "Reset the Yubikey's PIN, PUK, and management key to unblock the PIN and PUK ",
-                "retry counters",
-            ),
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(reset),
+        Commands::TestDecrypt {
+            reader,
+            input_file,
+            slot,
+            common,
+        } => test_decrypt(
+            reader.reader,
+            common.output_recording,
+            input_file,
+            slot.slot,
         ),
-        Command::new(
-            "force_reset",
-            concat!(
-                "The same as 'reset', but force it to happen by invalidating the PIN and PUK ",
-                "retry counters.",
-            ),
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(force_reset),
-        ),
-        Command::new(
-            "set_retries",
-            "Set the PIN and PUK retry counters, and reset the PIN and PUK back to defaults",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-                Spec::required(
-                    "pin_retries",
-                    "The number of retries to allow for the PIN.",
-                    None,
-                    None,
-                ),
-                Spec::required(
-                    "puk_retries",
-                    "The number of retries to allow for the PUK.",
-                    None,
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(set_retries),
-        ),
-        Command::new(
-            "change_mgm_key",
-            "Change the Yubikey's management key",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(change_mgm_key),
-        ),
-        Command::new(
-            "set_chuid",
-            "Write a new Card Holder Unique Identifier (CHUID) to the Yubikey",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(set_chuid),
-        ),
-        Command::new(
-            "set_ccc",
-            "Write a new Card Capability Container (CCC) to the Yubikey",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(set_ccc),
-        ),
-        Command::new(
-            "read_object",
-            "Read the contents of a data object from the Yubikey",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-                Spec::required(
-                    "object_id",
-                    "The human-readable ID of the object to read.",
-                    Some('o'),
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(read_object),
-        ),
-        Command::new(
-            "write_object",
-            "Write a data object to the Yubikey",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-                Spec::required(
-                    "object_id",
-                    "The human-readable ID of the object to write.",
-                    Some('o'),
-                    None,
-                ),
-                Spec::required(
-                    "input",
-                    "The path to an input file, or a base64-encoded string.",
-                    Some('i'),
-                    None,
-                ),
-                Spec::boolean(
-                    "base64",
-                    "The input is a base64-encoded string, instead of a path.",
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(write_object),
-        ),
-        Command::new(
-            "generate",
-            "Generate a private key, store it on the device, and return the public key",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-                Spec::required(
-                    "slot",
-                    "The key slot to write the generated key to.",
-                    Some('s'),
-                    None,
-                ),
-                Spec::required(
-                    "algorithm",
-                    "The algorithm to use for key generation.",
-                    Some('a'),
-                    None,
-                ),
-                Spec::required(
-                    "pin_policy",
-                    "The PIN verification policy to enforce on future key access.",
-                    Some('p'),
-                    Some(PinPolicy::Default.to_string().as_str()),
-                ),
-                Spec::required(
-                    "touch_policy",
-                    "The touch verification policy to enforce on future key access.",
-                    Some('t'),
-                    Some(TouchPolicy::Default.to_string().as_str()),
-                ),
-                Spec::required(
-                    "format",
-                    "The format for the public key written to stdout.",
-                    Some('f'),
-                    Some(Format::Pem.to_string().as_str()),
-                ),
-            ])
-            .unwrap(),
-            Box::new(generate),
-        ),
-        Command::new(
-            "import_key",
-            "Import an existing private key, store it on the device, and return the public key",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-                Spec::required(
-                    "input_file",
-                    "The input file containing the private key, in PEM format.",
-                    Some('i'),
-                    None,
-                ),
-                Spec::required(
-                    "slot",
-                    "The key slot to write the imported key to.",
-                    Some('s'),
-                    None,
-                ),
-                Spec::boolean(
-                    "encrypted",
-                    "The input key is encrypted and requires a passphrase to import.",
-                    Some('e'),
-                ),
-                Spec::required(
-                    "pin_policy",
-                    "The PIN verification policy to enforce on future key access.",
-                    Some('p'),
-                    Some(PinPolicy::Default.to_string().as_str()),
-                ),
-                Spec::required(
-                    "touch_policy",
-                    "The touch verification policy to enforce on future key access.",
-                    Some('t'),
-                    Some(TouchPolicy::Default.to_string().as_str()),
-                ),
-                Spec::required(
-                    "format",
-                    "The format for the public key written to stdout.",
-                    Some('f'),
-                    Some(Format::Pem.to_string().as_str()),
-                ),
-            ])
-            .unwrap(),
-            Box::new(import_key),
-        ),
-        Command::new(
-            "attest",
-            "Attest that a given private key was generated by the hardware device",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-                Spec::required(
-                    "slot",
-                    "The slot which contains the private key to attest.",
-                    Some('s'),
-                    None,
-                ),
-                Spec::required(
-                    "format",
-                    "The format for the X.509 public key certificate written to stdout.",
-                    Some('f'),
-                    Some(Format::Pem.to_string().as_str()),
-                ),
-            ])
-            .unwrap(),
-            Box::new(attest),
-        ),
-        Command::new(
-            "read_certificate",
-            "Read a public key certificate from the device",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-                Spec::required(
-                    "slot",
-                    "The key slot to read the public key certificate from.",
-                    Some('s'),
-                    None,
-                ),
-                Spec::required(
-                    "format",
-                    "The format for the public key certificate written to stdout.",
-                    Some('f'),
-                    Some(Format::Pem.to_string().as_str()),
-                ),
-            ])
-            .unwrap(),
-            Box::new(read_certificate),
-        ),
-        Command::new(
-            "test_decrypt",
-            "Test encrypt / decrypt functionality with a keypair on the device",
-            Specs::new(vec![
-                Spec::required(
-                    "reader",
-                    concat!(
-                        "The PC/SC reader to use. Try list_readers for possible values. The first ",
-                        "reader with the value given here as a substring is used.",
-                    ),
-                    Some('r'),
-                    Some(DEFAULT_READER),
-                ),
-                Spec::optional(
-                    "output_recording",
-                    "Record interactions with the hardware, and write it to this file.",
-                    None,
-                ),
-                Spec::required(
-                    "input_file",
-                    "The input file containing the public key, in PEM format.",
-                    Some('i'),
-                    None,
-                ),
-                Spec::required(
-                    "slot",
-                    "The slot which contains the private key to use for decryption.",
-                    Some('s'),
-                    None,
-                ),
-            ])
-            .unwrap(),
-            Box::new(test_decrypt),
-        ),
-    ]);
+    }
 }

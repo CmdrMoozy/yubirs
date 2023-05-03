@@ -1,6 +1,6 @@
 [package]
 name = "yubirs"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["Axel Rasmussen <axel.rasmussen1@gmail.com>"]
 description = "A library for interacting with YubiKeys (OTP and PIV functionality)"
 homepage = "https://github.com/CmdrMoozy/yubirs"
@@ -22,21 +22,21 @@ bincode = { version = "1.3", optional = true }
 chrono = { version = "0.4", optional = true }
 curl = { version = "0.4", optional = true }
 data-encoding = "2.3"
-lazy_static = "1.4"
 libc = { version = "0.2", optional = true }
 log = { version = "0.4", optional = true }
+once_cell = "1.17"
 # Version >= 0.10.10 / 0.9.33 is needed for new bindings submitted to upstream.
 # This will need to be changed once a new minor (not patch) version is released.
 openssl = "~0.10.10"
 openssl-sys = "~0.9.33"
 pcsc-sys = { version = "1.2", optional = true }
 rand = { version = "0.8", features = ["small_rng", "std"] }
-regex = { version = "1.5", optional = true }
+regex = { version = "1.8", optional = true }
 rmp-serde = { version = "1.1", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
 
 [dependencies.bdrck]
-version = "0.19"
+version = "0.20"
 optional = true
 default_features = false

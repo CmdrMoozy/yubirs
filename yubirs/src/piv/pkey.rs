@@ -16,7 +16,7 @@ use crate::error::*;
 use crate::piv::id::Algorithm;
 use crate::piv::util::*;
 use bdrck::io::read_at_most;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use openssl;
 use std::collections::HashMap;
 use std::fmt;
@@ -35,21 +35,20 @@ pub enum Format {
     Ssh,
 }
 
-lazy_static! {
-    static ref FORMAT_STRINGS: HashMap<Format, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert(Format::Pem, "PEM");
-        m.insert(Format::Der, "DER");
-        m.insert(Format::Ssh, "SSH");
-        m
-    };
-    static ref STRING_FORMATS: HashMap<String, Format> = {
-        FORMAT_STRINGS
-            .iter()
-            .map(|pair| (pair.1.to_uppercase(), *pair.0))
-            .collect()
-    };
-}
+static FORMAT_STRINGS: Lazy<HashMap<Format, &'static str>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert(Format::Pem, "PEM");
+    m.insert(Format::Der, "DER");
+    m.insert(Format::Ssh, "SSH");
+    m
+});
+
+static STRING_FORMATS: Lazy<HashMap<String, Format>> = Lazy::new(|| {
+    FORMAT_STRINGS
+        .iter()
+        .map(|pair| (pair.1.to_uppercase(), *pair.0))
+        .collect()
+});
 
 impl fmt::Display for Format {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

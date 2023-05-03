@@ -19,7 +19,7 @@ use crate::otp::Otp;
 use bdrck::cli;
 use curl::easy::{Easy, List};
 use data_encoding;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -34,15 +34,13 @@ pub enum Protocol {
     Https,
 }
 
-lazy_static! {
-    static ref PROTOCOL_PREFIXES: HashMap<Protocol, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert(Protocol::Http, "http://");
-        m.insert(Protocol::HttpsWithoutVerification, "https://");
-        m.insert(Protocol::Https, "https://");
-        m
-    };
-}
+static PROTOCOL_PREFIXES: Lazy<HashMap<Protocol, &'static str>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert(Protocol::Http, "http://");
+    m.insert(Protocol::HttpsWithoutVerification, "https://");
+    m.insert(Protocol::Https, "https://");
+    m
+});
 
 fn build_url(protocol: Protocol, api_server: &str, request: &Request) -> String {
     format!(

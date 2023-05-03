@@ -14,7 +14,7 @@
 
 use crate::otp::request::*;
 use crate::otp::Otp;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::Regex;
 
 #[test]
@@ -34,9 +34,7 @@ fn test_success_percentage_display() {
 
 static TEST_NONCE: &'static str = "gPjfNhJFeeHZgfC9kKifggiWmIApziQ8XA4Vye1e";
 
-lazy_static! {
-    static ref VALID_NONCE_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9]{16,40}$").unwrap();
-}
+static VALID_NONCE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-9]{16,40}$").unwrap());
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]

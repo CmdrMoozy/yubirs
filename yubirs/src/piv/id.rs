@@ -14,8 +14,8 @@
 
 use crate::error::*;
 use crate::piv::nid;
-use lazy_static::lazy_static;
 use libc::{c_int, c_uchar};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -30,23 +30,22 @@ pub enum Algorithm {
     Eccp384,
 }
 
-lazy_static! {
-    static ref ALGORITHM_STRINGS: HashMap<Algorithm, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert(Algorithm::Des, "3DES");
-        m.insert(Algorithm::Rsa1024, "RSA1024");
-        m.insert(Algorithm::Rsa2048, "RSA2048");
-        m.insert(Algorithm::Eccp256, "ECCP256");
-        m.insert(Algorithm::Eccp384, "ECCP384");
-        m
-    };
-    static ref STRING_ALGORITHMS: HashMap<String, Algorithm> = {
-        ALGORITHM_STRINGS
-            .iter()
-            .map(|pair| (pair.1.to_uppercase(), *pair.0))
-            .collect()
-    };
-}
+static ALGORITHM_STRINGS: Lazy<HashMap<Algorithm, &'static str>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert(Algorithm::Des, "3DES");
+    m.insert(Algorithm::Rsa1024, "RSA1024");
+    m.insert(Algorithm::Rsa2048, "RSA2048");
+    m.insert(Algorithm::Eccp256, "ECCP256");
+    m.insert(Algorithm::Eccp384, "ECCP384");
+    m
+});
+
+static STRING_ALGORITHMS: Lazy<HashMap<String, Algorithm>> = Lazy::new(|| {
+    ALGORITHM_STRINGS
+        .iter()
+        .map(|pair| (pair.1.to_uppercase(), *pair.0))
+        .collect()
+});
 
 impl fmt::Display for Algorithm {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -115,33 +114,32 @@ pub enum Instruction {
     SelectApplication,
 }
 
-lazy_static! {
-    static ref INSTRUCTION_STRINGS: HashMap<Instruction, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert(Instruction::Attest, "Attest");
-        m.insert(Instruction::Authenticate, "Authenticate");
-        m.insert(Instruction::ChangeReference, "ChangeReference");
-        m.insert(Instruction::GenerateAsymmetric, "GenerateAsymmetric");
-        m.insert(Instruction::GetData, "GetData");
-        m.insert(Instruction::GetVersion, "GetVersion");
-        m.insert(Instruction::GetSerial, "GetSerial");
-        m.insert(Instruction::ImportKey, "ImportKey");
-        m.insert(Instruction::PutData, "PutData");
-        m.insert(Instruction::Reset, "Reset");
-        m.insert(Instruction::ResetRetry, "ResetRetry");
-        m.insert(Instruction::SetManagementKey, "SetManagementKey");
-        m.insert(Instruction::SetPinRetries, "SetPinRetries");
-        m.insert(Instruction::Verify, "Verify");
-        m.insert(Instruction::SelectApplication, "SelectApplication");
-        m
-    };
-    static ref STRING_INSTRUCTIONS: HashMap<String, Instruction> = {
-        INSTRUCTION_STRINGS
-            .iter()
-            .map(|pair| (pair.1.to_uppercase(), *pair.0))
-            .collect()
-    };
-}
+static INSTRUCTION_STRINGS: Lazy<HashMap<Instruction, &'static str>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert(Instruction::Attest, "Attest");
+    m.insert(Instruction::Authenticate, "Authenticate");
+    m.insert(Instruction::ChangeReference, "ChangeReference");
+    m.insert(Instruction::GenerateAsymmetric, "GenerateAsymmetric");
+    m.insert(Instruction::GetData, "GetData");
+    m.insert(Instruction::GetVersion, "GetVersion");
+    m.insert(Instruction::GetSerial, "GetSerial");
+    m.insert(Instruction::ImportKey, "ImportKey");
+    m.insert(Instruction::PutData, "PutData");
+    m.insert(Instruction::Reset, "Reset");
+    m.insert(Instruction::ResetRetry, "ResetRetry");
+    m.insert(Instruction::SetManagementKey, "SetManagementKey");
+    m.insert(Instruction::SetPinRetries, "SetPinRetries");
+    m.insert(Instruction::Verify, "Verify");
+    m.insert(Instruction::SelectApplication, "SelectApplication");
+    m
+});
+
+static STRING_INSTRUCTIONS: Lazy<HashMap<String, Instruction>> = Lazy::new(|| {
+    INSTRUCTION_STRINGS
+        .iter()
+        .map(|pair| (pair.1.to_uppercase(), *pair.0))
+        .collect()
+});
 
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -233,44 +231,43 @@ pub enum Key {
     Attestation,
 }
 
-lazy_static! {
-    static ref KEY_STRINGS: HashMap<Key, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert(Key::Authentication, "Authentication");
-        m.insert(Key::CardManagement, "CardManagement");
-        m.insert(Key::Signature, "Signature");
-        m.insert(Key::KeyManagement, "KeyManagement");
-        m.insert(Key::CardAuthentication, "CardAuthentication");
-        m.insert(Key::Retired1, "Retired1");
-        m.insert(Key::Retired2, "Retired2");
-        m.insert(Key::Retired3, "Retired3");
-        m.insert(Key::Retired4, "Retired4");
-        m.insert(Key::Retired5, "Retired5");
-        m.insert(Key::Retired6, "Retired6");
-        m.insert(Key::Retired7, "Retired7");
-        m.insert(Key::Retired8, "Retired8");
-        m.insert(Key::Retired9, "Retired9");
-        m.insert(Key::Retired10, "Retired10");
-        m.insert(Key::Retired11, "Retired11");
-        m.insert(Key::Retired12, "Retired12");
-        m.insert(Key::Retired13, "Retired13");
-        m.insert(Key::Retired14, "Retired14");
-        m.insert(Key::Retired15, "Retired15");
-        m.insert(Key::Retired16, "Retired16");
-        m.insert(Key::Retired17, "Retired17");
-        m.insert(Key::Retired18, "Retired18");
-        m.insert(Key::Retired19, "Retired19");
-        m.insert(Key::Retired20, "Retired20");
-        m.insert(Key::Attestation, "Attestation");
-        m
-    };
-    static ref STRING_KEYS: HashMap<String, Key> = {
-        KEY_STRINGS
-            .iter()
-            .map(|pair| (pair.1.to_uppercase(), *pair.0))
-            .collect()
-    };
-}
+static KEY_STRINGS: Lazy<HashMap<Key, &'static str>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert(Key::Authentication, "Authentication");
+    m.insert(Key::CardManagement, "CardManagement");
+    m.insert(Key::Signature, "Signature");
+    m.insert(Key::KeyManagement, "KeyManagement");
+    m.insert(Key::CardAuthentication, "CardAuthentication");
+    m.insert(Key::Retired1, "Retired1");
+    m.insert(Key::Retired2, "Retired2");
+    m.insert(Key::Retired3, "Retired3");
+    m.insert(Key::Retired4, "Retired4");
+    m.insert(Key::Retired5, "Retired5");
+    m.insert(Key::Retired6, "Retired6");
+    m.insert(Key::Retired7, "Retired7");
+    m.insert(Key::Retired8, "Retired8");
+    m.insert(Key::Retired9, "Retired9");
+    m.insert(Key::Retired10, "Retired10");
+    m.insert(Key::Retired11, "Retired11");
+    m.insert(Key::Retired12, "Retired12");
+    m.insert(Key::Retired13, "Retired13");
+    m.insert(Key::Retired14, "Retired14");
+    m.insert(Key::Retired15, "Retired15");
+    m.insert(Key::Retired16, "Retired16");
+    m.insert(Key::Retired17, "Retired17");
+    m.insert(Key::Retired18, "Retired18");
+    m.insert(Key::Retired19, "Retired19");
+    m.insert(Key::Retired20, "Retired20");
+    m.insert(Key::Attestation, "Attestation");
+    m
+});
+
+static STRING_KEYS: Lazy<HashMap<String, Key>> = Lazy::new(|| {
+    KEY_STRINGS
+        .iter()
+        .map(|pair| (pair.1.to_uppercase(), *pair.0))
+        .collect()
+});
 
 impl fmt::Display for Key {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -403,52 +400,51 @@ pub enum Object {
     Attestation,
 }
 
-lazy_static! {
-    static ref OBJECT_STRINGS: HashMap<Object, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert(Object::Capability, "Capability");
-        m.insert(Object::Chuid, "Chuid");
-        m.insert(Object::Authentication, "Authentication");
-        m.insert(Object::Fingerprints, "Fingerprints");
-        m.insert(Object::Security, "Security");
-        m.insert(Object::Facial, "Facial");
-        m.insert(Object::Printed, "Printed");
-        m.insert(Object::Signature, "Signature");
-        m.insert(Object::KeyManagement, "KeyManagement");
-        m.insert(Object::CardAuthentication, "CardAuthentication");
-        m.insert(Object::Discovery, "Discovery");
-        m.insert(Object::KeyHistory, "KeyHistory");
-        m.insert(Object::Iris, "Iris");
-        m.insert(Object::Retired1, "Retired1");
-        m.insert(Object::Retired2, "Retired2");
-        m.insert(Object::Retired3, "Retired3");
-        m.insert(Object::Retired4, "Retired4");
-        m.insert(Object::Retired5, "Retired5");
-        m.insert(Object::Retired6, "Retired6");
-        m.insert(Object::Retired7, "Retired7");
-        m.insert(Object::Retired8, "Retired8");
-        m.insert(Object::Retired9, "Retired9");
-        m.insert(Object::Retired10, "Retired10");
-        m.insert(Object::Retired11, "Retired11");
-        m.insert(Object::Retired12, "Retired12");
-        m.insert(Object::Retired13, "Retired13");
-        m.insert(Object::Retired14, "Retired14");
-        m.insert(Object::Retired15, "Retired15");
-        m.insert(Object::Retired16, "Retired16");
-        m.insert(Object::Retired17, "Retired17");
-        m.insert(Object::Retired18, "Retired18");
-        m.insert(Object::Retired19, "Retired19");
-        m.insert(Object::Retired20, "Retired20");
-        m.insert(Object::Attestation, "Attestation");
-        m
-    };
-    static ref STRING_OBJECTS: HashMap<String, Object> = {
-        OBJECT_STRINGS
-            .iter()
-            .map(|pair| (pair.1.to_uppercase(), *pair.0))
-            .collect()
-    };
-}
+static OBJECT_STRINGS: Lazy<HashMap<Object, &'static str>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert(Object::Capability, "Capability");
+    m.insert(Object::Chuid, "Chuid");
+    m.insert(Object::Authentication, "Authentication");
+    m.insert(Object::Fingerprints, "Fingerprints");
+    m.insert(Object::Security, "Security");
+    m.insert(Object::Facial, "Facial");
+    m.insert(Object::Printed, "Printed");
+    m.insert(Object::Signature, "Signature");
+    m.insert(Object::KeyManagement, "KeyManagement");
+    m.insert(Object::CardAuthentication, "CardAuthentication");
+    m.insert(Object::Discovery, "Discovery");
+    m.insert(Object::KeyHistory, "KeyHistory");
+    m.insert(Object::Iris, "Iris");
+    m.insert(Object::Retired1, "Retired1");
+    m.insert(Object::Retired2, "Retired2");
+    m.insert(Object::Retired3, "Retired3");
+    m.insert(Object::Retired4, "Retired4");
+    m.insert(Object::Retired5, "Retired5");
+    m.insert(Object::Retired6, "Retired6");
+    m.insert(Object::Retired7, "Retired7");
+    m.insert(Object::Retired8, "Retired8");
+    m.insert(Object::Retired9, "Retired9");
+    m.insert(Object::Retired10, "Retired10");
+    m.insert(Object::Retired11, "Retired11");
+    m.insert(Object::Retired12, "Retired12");
+    m.insert(Object::Retired13, "Retired13");
+    m.insert(Object::Retired14, "Retired14");
+    m.insert(Object::Retired15, "Retired15");
+    m.insert(Object::Retired16, "Retired16");
+    m.insert(Object::Retired17, "Retired17");
+    m.insert(Object::Retired18, "Retired18");
+    m.insert(Object::Retired19, "Retired19");
+    m.insert(Object::Retired20, "Retired20");
+    m.insert(Object::Attestation, "Attestation");
+    m
+});
+
+static STRING_OBJECTS: Lazy<HashMap<String, Object>> = Lazy::new(|| {
+    OBJECT_STRINGS
+        .iter()
+        .map(|pair| (pair.1.to_uppercase(), *pair.0))
+        .collect()
+});
 
 impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -519,22 +515,21 @@ pub enum PinPolicy {
     Always,
 }
 
-lazy_static! {
-    static ref PIN_POLICY_STRINGS: HashMap<PinPolicy, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert(PinPolicy::Default, "Default");
-        m.insert(PinPolicy::Never, "Never");
-        m.insert(PinPolicy::Once, "Once");
-        m.insert(PinPolicy::Always, "Always");
-        m
-    };
-    static ref STRING_PIN_POLICIES: HashMap<String, PinPolicy> = {
-        PIN_POLICY_STRINGS
-            .iter()
-            .map(|pair| (pair.1.to_uppercase(), *pair.0))
-            .collect()
-    };
-}
+static PIN_POLICY_STRINGS: Lazy<HashMap<PinPolicy, &'static str>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert(PinPolicy::Default, "Default");
+    m.insert(PinPolicy::Never, "Never");
+    m.insert(PinPolicy::Once, "Once");
+    m.insert(PinPolicy::Always, "Always");
+    m
+});
+
+static STRING_PIN_POLICIES: Lazy<HashMap<String, PinPolicy>> = Lazy::new(|| {
+    PIN_POLICY_STRINGS
+        .iter()
+        .map(|pair| (pair.1.to_uppercase(), *pair.0))
+        .collect()
+});
 
 impl fmt::Display for PinPolicy {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -577,21 +572,20 @@ pub enum Tag {
     TouchPolicy,
 }
 
-lazy_static! {
-    static ref TAG_STRINGS: HashMap<Tag, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert(Tag::Algorithm, "Algorithm");
-        m.insert(Tag::PinPolicy, "PinPolicy");
-        m.insert(Tag::TouchPolicy, "TouchPolicy");
-        m
-    };
-    static ref STRING_TAGS: HashMap<String, Tag> = {
-        TAG_STRINGS
-            .iter()
-            .map(|pair| (pair.1.to_uppercase(), *pair.0))
-            .collect()
-    };
-}
+static TAG_STRINGS: Lazy<HashMap<Tag, &'static str>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert(Tag::Algorithm, "Algorithm");
+    m.insert(Tag::PinPolicy, "PinPolicy");
+    m.insert(Tag::TouchPolicy, "TouchPolicy");
+    m
+});
+
+static STRING_TAGS: Lazy<HashMap<String, Tag>> = Lazy::new(|| {
+    TAG_STRINGS
+        .iter()
+        .map(|pair| (pair.1.to_uppercase(), *pair.0))
+        .collect()
+});
 
 impl fmt::Display for Tag {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -629,22 +623,21 @@ pub enum TouchPolicy {
     Cached,
 }
 
-lazy_static! {
-    static ref TOUCH_POLICY_STRINGS: HashMap<TouchPolicy, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert(TouchPolicy::Default, "Default");
-        m.insert(TouchPolicy::Never, "Never");
-        m.insert(TouchPolicy::Always, "Always");
-        m.insert(TouchPolicy::Cached, "Cached");
-        m
-    };
-    static ref STRING_TOUCH_POLICIES: HashMap<String, TouchPolicy> = {
-        TOUCH_POLICY_STRINGS
-            .iter()
-            .map(|pair| (pair.1.to_uppercase(), *pair.0))
-            .collect()
-    };
-}
+static TOUCH_POLICY_STRINGS: Lazy<HashMap<TouchPolicy, &'static str>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert(TouchPolicy::Default, "Default");
+    m.insert(TouchPolicy::Never, "Never");
+    m.insert(TouchPolicy::Always, "Always");
+    m.insert(TouchPolicy::Cached, "Cached");
+    m
+});
+
+static STRING_TOUCH_POLICIES: Lazy<HashMap<String, TouchPolicy>> = Lazy::new(|| {
+    TOUCH_POLICY_STRINGS
+        .iter()
+        .map(|pair| (pair.1.to_uppercase(), *pair.0))
+        .collect()
+});
 
 impl fmt::Display for TouchPolicy {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

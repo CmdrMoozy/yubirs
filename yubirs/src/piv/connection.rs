@@ -15,15 +15,14 @@
 use crate::error::*;
 use crate::piv::context::PcscHardwareContext;
 use crate::piv::scarderr::{SmartCardError, SmartCardErrorCode};
-use lazy_static::lazy_static;
 use log::warn;
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::sync::{Arc, Mutex, Weak};
 
-lazy_static! {
-    static ref READER_REF_COUNTS: Mutex<HashMap<String, Weak<()>>> = Mutex::new(HashMap::new());
-}
+static READER_REF_COUNTS: Lazy<Mutex<HashMap<String, Weak<()>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub(crate) struct PcscHardwareConnection {
     reader: CString,

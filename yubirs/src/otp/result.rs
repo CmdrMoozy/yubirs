@@ -18,7 +18,7 @@ use crate::otp::Otp;
 use chrono::offset::Utc;
 use chrono::DateTime;
 use data_encoding;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashMap;
 
@@ -47,22 +47,20 @@ pub enum Status {
     ReplayedRequest,
 }
 
-lazy_static! {
-    static ref STRING_TO_STATUS: HashMap<&'static str, Status> = {
-        let mut m = HashMap::new();
-        m.insert("OK", Status::Ok);
-        m.insert("BAD_OTP", Status::BadOtp);
-        m.insert("REPLAYED_OTP", Status::ReplayedOtp);
-        m.insert("BAD_SIGNATURE", Status::BadSignature);
-        m.insert("MISSING_PARAMETER", Status::MissingParameter);
-        m.insert("NO_SUCH_CLIENT", Status::NoSuchClient);
-        m.insert("OPERATION_NOT_ALLOWED", Status::OperationNotAllowed);
-        m.insert("BACKEND_ERROR", Status::BackendError);
-        m.insert("NOT_ENOUGH_ANSWERS", Status::NotEnoughAnswers);
-        m.insert("REPLAYED_REQUEST", Status::ReplayedRequest);
-        m
-    };
-}
+static STRING_TO_STATUS: Lazy<HashMap<&'static str, Status>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert("OK", Status::Ok);
+    m.insert("BAD_OTP", Status::BadOtp);
+    m.insert("REPLAYED_OTP", Status::ReplayedOtp);
+    m.insert("BAD_SIGNATURE", Status::BadSignature);
+    m.insert("MISSING_PARAMETER", Status::MissingParameter);
+    m.insert("NO_SUCH_CLIENT", Status::NoSuchClient);
+    m.insert("OPERATION_NOT_ALLOWED", Status::OperationNotAllowed);
+    m.insert("BACKEND_ERROR", Status::BackendError);
+    m.insert("NOT_ENOUGH_ANSWERS", Status::NotEnoughAnswers);
+    m.insert("REPLAYED_REQUEST", Status::ReplayedRequest);
+    m
+});
 
 fn string_to_status(s: &str) -> Result<Status> {
     if let Some(status) = STRING_TO_STATUS.get(s) {
@@ -94,25 +92,26 @@ enum Field {
     SuccessPercent,
 }
 
-lazy_static! {
-    static ref STRING_TO_FIELD: HashMap<&'static str, Field> = {
-        let mut m = HashMap::new();
-        m.insert("otp", Field::Otp);
-        m.insert("nonce", Field::Nonce);
-        m.insert("h", Field::Signature);
-        m.insert("t", Field::Timestamp);
-        m.insert("status", Field::Status);
-        m.insert("timestamp", Field::DecryptedTimestamp);
-        m.insert("sessioncounter", Field::DecryptedUseCounter);
-        m.insert("sessionuse", Field::DecryptedSessionUseCounter);
-        m.insert("sl", Field::SuccessPercent);
-        m
-    };
-    static ref FIELD_TO_STRING: HashMap<Field, &'static str> = STRING_TO_FIELD
+static STRING_TO_FIELD: Lazy<HashMap<&'static str, Field>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert("otp", Field::Otp);
+    m.insert("nonce", Field::Nonce);
+    m.insert("h", Field::Signature);
+    m.insert("t", Field::Timestamp);
+    m.insert("status", Field::Status);
+    m.insert("timestamp", Field::DecryptedTimestamp);
+    m.insert("sessioncounter", Field::DecryptedUseCounter);
+    m.insert("sessionuse", Field::DecryptedSessionUseCounter);
+    m.insert("sl", Field::SuccessPercent);
+    m
+});
+
+static FIELD_TO_STRING: Lazy<HashMap<Field, &'static str>> = Lazy::new(|| {
+    STRING_TO_FIELD
         .iter()
         .map(|pair| (*pair.1, *pair.0))
-        .collect();
-}
+        .collect()
+});
 
 fn string_to_field(s: &str) -> Result<Field> {
     if let Some(field) = STRING_TO_FIELD.get(s) {
@@ -153,10 +152,9 @@ fn get_signature(fields: &HashMap<Field, &str>) -> Result<Vec<u8>> {
     Ok(data_encoding::BASE64.decode(get_required_field(fields, Field::Signature)?.as_bytes())?)
 }
 
-lazy_static! {
-    static ref DATETIME_REGEX: Regex =
-        Regex::new(r"^(?P<d>\d{4}-\d{2}-\d{2})T(?P<t>\d{2}:\d{2}:\d{2})Z(?P<ms>\d{4})$").unwrap();
-}
+static DATETIME_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(?P<d>\d{4}-\d{2}-\d{2})T(?P<t>\d{2}:\d{2}:\d{2})Z(?P<ms>\d{4})$").unwrap()
+});
 
 fn get_timestamp(fields: &HashMap<Field, &str>) -> Result<DateTime<Utc>> {
     use chrono::TimeZone;

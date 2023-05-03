@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::otp::util::*;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use std::iter::repeat;
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -41,8 +41,8 @@ struct SignatureTest {
     expected_encoded: &'static str,
 }
 
-lazy_static! {
-    static ref SIGNATURE_TEST_CASES: Vec<SignatureTest> = vec![
+static SIGNATURE_TEST_CASES: Lazy<Vec<SignatureTest>> = Lazy::new(|| {
+    vec![
         SignatureTest {
             key: repeat(0x0bu8).take(16).collect(),
             data: "Hello, world!",
@@ -61,8 +61,8 @@ lazy_static! {
             ],
             expected_encoded: "pbJLb2N4M98XZ%2BXKzCDkFnKtJCo%3D",
         },
-    ];
-}
+    ]
+});
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]

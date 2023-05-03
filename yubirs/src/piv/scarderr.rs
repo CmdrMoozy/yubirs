@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use backtrace::Backtrace;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use pcsc_sys;
 use std::collections::HashMap;
 use std::fmt;
@@ -90,8 +90,8 @@ pub enum SmartCardErrorCode {
     WrongChv,
 }
 
-lazy_static! {
-    static ref FROM_SCARDERR_H_MAPPING: HashMap<pcsc_sys::LONG, SmartCardErrorCode> = {
+static FROM_SCARDERR_H_MAPPING: Lazy<HashMap<pcsc_sys::LONG, SmartCardErrorCode>> =
+    Lazy::new(|| {
         let mut m = HashMap::new();
         m.insert(pcsc_sys::SCARD_E_BAD_SEEK, SmartCardErrorCode::BadSeek);
         m.insert(0x00000109, SmartCardErrorCode::BrokenPipe);
@@ -305,13 +305,14 @@ lazy_static! {
         );
         m.insert(pcsc_sys::SCARD_W_WRONG_CHV, SmartCardErrorCode::WrongChv);
         m
-    };
-    static ref TO_SCARDERR_H_MAPPING: HashMap<SmartCardErrorCode, pcsc_sys::LONG> =
-        FROM_SCARDERR_H_MAPPING
-            .iter()
-            .map(|pair| (pair.1.clone(), *pair.0))
-            .collect();
-}
+    });
+
+static TO_SCARDERR_H_MAPPING: Lazy<HashMap<SmartCardErrorCode, pcsc_sys::LONG>> = Lazy::new(|| {
+    FROM_SCARDERR_H_MAPPING
+        .iter()
+        .map(|pair| (pair.1.clone(), *pair.0))
+        .collect()
+});
 
 impl SmartCardErrorCode {
     pub fn new(code: pcsc_sys::LONG) -> ::std::result::Result<(), SmartCardErrorCode> {
