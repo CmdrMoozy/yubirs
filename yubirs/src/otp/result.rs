@@ -157,7 +157,8 @@ static DATETIME_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 
 fn get_timestamp(fields: &HashMap<Field, &str>) -> Result<DateTime<Utc>> {
-    use chrono::TimeZone;
+    use chrono::NaiveDateTime;
+
     if let Some(captures) = DATETIME_REGEX.captures(get_required_field(fields, Field::Timestamp)?) {
         let nanoseconds: u64 = captures.name("ms").unwrap().as_str().parse()?;
         let reformatted = format!(
@@ -166,7 +167,9 @@ fn get_timestamp(fields: &HashMap<Field, &str>) -> Result<DateTime<Utc>> {
             captures.name("t").unwrap().as_str(),
             nanoseconds
         );
-        return Ok(Utc.datetime_from_str(reformatted.as_str(), "%Y-%m-%d %H:%M:%S %f")?);
+        return Ok(
+            NaiveDateTime::parse_from_str(reformatted.as_str(), "%Y-%m-%d %H:%M:%S %f")?.and_utc(),
+        );
     }
     return Err(Error::InvalidArgument(format!(
         "response contained incorrectly formatted 't' field"
